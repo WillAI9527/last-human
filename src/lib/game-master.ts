@@ -1084,6 +1084,7 @@ export async function generateAIVote(
         messages,
         promptScope: "gameplay",
         temperature: GAME_TEMPERATURE.ACTION,
+        reasoningProfile: "decision",
         response_format: seatSelectionResponseFormat(player.agentProfile!.modelRef, "day_vote", validSeats),
       }),
       (cleaned) => {
@@ -1229,13 +1230,15 @@ function seatSelectionResponseFormat(
   return structuredResponseFormat(modelRef, name, {
     type: "object",
     properties: {
+      // 私下分析排在 seat 之前，模型才会先分析再落票；它只进日志，不进入任何公开记录。
+      ...(name === "day_vote" ? { analysis: { type: "string" } } : {}),
       seat: {
         type: "integer",
         enum: validSeats.map((seat) => seat + 1),
       },
       ...(name === "day_vote" ? { reason: { type: "string" } } : {}),
     },
-    required: name === "day_vote" ? ["seat", "reason"] : ["seat"],
+    required: name === "day_vote" ? ["analysis", "seat", "reason"] : ["seat"],
     additionalProperties: false,
   });
 }
@@ -1408,6 +1411,7 @@ export async function generateAIBadgeVote(
         messages,
         promptScope: "gameplay",
         temperature: GAME_TEMPERATURE.ACTION,
+        reasoningProfile: "decision",
         response_format: seatSelectionResponseFormat(player.agentProfile!.modelRef, "badge_vote", validSeats),
       }),
       (cleaned) => {
@@ -1571,6 +1575,7 @@ export async function generateSeerAction(
         messages,
         promptScope: "gameplay",
         temperature: GAME_TEMPERATURE.ACTION,
+        reasoningProfile: "decision",
         response_format: seatSelectionResponseFormat(player.agentProfile!.modelRef, "seer_action", validSeats),
       }),
       (cleaned) => {
@@ -1636,6 +1641,7 @@ export async function generateWolfAction(
         messages,
         promptScope: "gameplay",
         temperature: GAME_TEMPERATURE.ACTION,
+        reasoningProfile: "decision",
         response_format: seatSelectionResponseFormat(player.agentProfile!.modelRef, "wolf_action", validSeats),
       }),
       (cleaned) => {
@@ -1712,6 +1718,7 @@ export async function generateWitchAction(
         messages,
         promptScope: "gameplay",
         temperature: GAME_TEMPERATURE.ACTION,
+        reasoningProfile: "decision",
         response_format: { type: "json_object" },
       }),
       (cleaned) => {
@@ -1806,6 +1813,7 @@ export async function generateGuardAction(
         messages,
         promptScope: "gameplay",
         temperature: GAME_TEMPERATURE.ACTION,
+        reasoningProfile: "decision",
         response_format: seatSelectionResponseFormat(player.agentProfile!.modelRef, "guard_action", validSeats),
       }),
       (cleaned) => {

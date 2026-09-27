@@ -313,5 +313,9 @@ test("最后发言者得到明确收尾约束，投票输入末尾保留本人�
   state.phase = "DAY_VOTE";
   const vote = manager.getPrompt("DAY_VOTE", { state }, actor)!.user;
   assert.match(vote.split("<my_public_position>")[1], /我今天不投6号，我的最终选择是10号/);
-  assert.match(vote, /没有新证据就延续自己的公开结论/);
+  // 已表态的默认按表态投，只有发言之后出现新信息才能改；没表态的不要求“延续”，否则模型会编造立场并跟票。
+  assert.match(vote, /公开发言里说过要投谁，默认就投那个人/);
+  assert.match(vote, /只有在你那次发言之后出现了新的身份声明、新的查验结果、警长归票或主持人公告，才可以改投/);
+  assert.match(vote, /发言里没有说过要投谁，按 analysis 的结论决定/);
+  assert.doesNotMatch(vote, /延续自己的公开结论/);
 });
