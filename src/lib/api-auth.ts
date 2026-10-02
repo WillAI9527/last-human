@@ -1,13 +1,24 @@
+// Modified by LAST HUMAN demo (fork of oil-oil/wolfcha).
 import { NextResponse } from "next/server";
 import { ensureAdminClient, supabaseAdmin } from "@/lib/supabase-admin";
 import { isDemoModeActiveServer } from "@/lib/demo-config-server";
 import { isGuestUser } from "@/lib/demo-mode";
 import { GAME_SESSION_RESUME_WINDOW_MS } from "@/lib/game-session-policy";
 
+function isPublicDemo(): boolean {
+  return !process.env.NEXT_PUBLIC_SUPABASE_URL;
+}
+
 export async function authenticateRequest(request: Request): Promise<
   | { user: { id: string } }
   | { error: NextResponse }
 > {
+  if (isPublicDemo()) {
+    const guestId = request.headers.get("x-guest-id") || request.headers.get("X-Guest-Id");
+    if (guestId && isGuestUser(guestId)) return { user: { id: guestId } };
+    return { user: { id: "guest_public" } };
+  }
+
   try {
     ensureAdminClient();
   } catch (error) {

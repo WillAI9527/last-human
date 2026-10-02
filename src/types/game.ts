@@ -318,19 +318,33 @@ export const MODEL_IDS = {
   },
 } as const;
 
-const BUILTIN_DEEPSEEK_V41_FLASH_MODEL: ModelRef = {
-  provider: "tokendance",
-  model: MODEL_IDS.tokendance.deepseekV41Flash,
+// Modified by LAST HUMAN demo (fork of oil-oil/wolfcha).
+// Player, summary, review, and validation calls stay on ZenMux.
+const ZENMUX_DEEPSEEK_V32: ModelRef = {
+  provider: "zenmux",
+  model: MODEL_IDS.zenmux.deepseek,
   reasoning: { enabled: false },
   decisionReasoning: { enabled: true, effort: "low" },
 };
 
+const ZENMUX_GEMINI_FLASH_LITE: ModelRef = {
+  provider: "zenmux",
+  model: MODEL_IDS.zenmux.geminiFlashLite,
+};
+
+const ZENMUX_MINIMAX_M21: ModelRef = {
+  provider: "zenmux",
+  model: MODEL_IDS.zenmux.minimaxM21,
+  temperature: 1,
+  reasoning: { enabled: false },
+};
+
 export const DEFAULT_MODEL_CONFIG = {
   generator: MODEL_IDS.zenmux.geminiFlashLite,
-  summary: BUILTIN_DEEPSEEK_V41_FLASH_MODEL.model,
-  review: BUILTIN_DEEPSEEK_V41_FLASH_MODEL.model,
+  summary: MODEL_IDS.zenmux.deepseek,
+  review: MODEL_IDS.zenmux.deepseek,
   validation: {
-    zenmux: MODEL_IDS.zenmux.geminiFlashLite,
+    zenmux: MODEL_IDS.zenmux.deepseek,
     dashscope: MODEL_IDS.dashscope.deepseek,
     tokendance: MODEL_IDS.tokendance.minimaxM27,
   },
@@ -345,47 +359,24 @@ export const DASHSCOPE_VALIDATION_MODEL = DEFAULT_MODEL_CONFIG.validation.dashsc
 export const TOKENDANCE_VALIDATION_MODEL = DEFAULT_MODEL_CONFIG.validation.tokendance;
 
 export const BUILTIN_PLAYER_MODELS: ModelRef[] = [
-  BUILTIN_DEEPSEEK_V41_FLASH_MODEL,
+  ZENMUX_DEEPSEEK_V32,
+  ZENMUX_GEMINI_FLASH_LITE,
+  ZENMUX_MINIMAX_M21,
 ];
 
 // Default built-in models exposed to the app when custom key is not enabled.
-// This list includes system defaults plus the small built-in player pool.
 export const AVAILABLE_MODELS: ModelRef[] = [
-  BUILTIN_DEEPSEEK_V41_FLASH_MODEL,
+  ...BUILTIN_PLAYER_MODELS,
 ];
 
 // Built-in project-key models that the server may call internally.
-// These are intentionally not exposed in the custom-key model selector.
 export const PROJECT_MODELS: ModelRef[] = [
   ...AVAILABLE_MODELS,
-  // Provider-specific validation models for user API key checks.
-  { provider: "dashscope", model: MODEL_IDS.dashscope.deepseek },
-  { provider: "zenmux", model: MODEL_IDS.zenmux.geminiFlashLite },
 ];
 
-// User-selectable models when custom key is enabled.
+// The public demo only offers the ZenMux player pool.
 export const ALL_MODELS: ModelRef[] = [
-  { provider: "dashscope", model: MODEL_IDS.dashscope.deepseek },
-  { provider: "zenmux", model: MODEL_IDS.zenmux.geminiFlashLite },
-  { provider: "zenmux", model: MODEL_IDS.zenmux.deepseek },
-  { provider: "zenmux", model: MODEL_IDS.zenmux.deepseekV4Flash },
-  { provider: "zenmux", model: MODEL_IDS.zenmux.geminiFlashPreview },
-  { provider: "zenmux", model: MODEL_IDS.zenmux.gpt52Chat },
-  { provider: "zenmux", model: MODEL_IDS.zenmux.claudeHaiku45 },
-  { provider: "zenmux", model: MODEL_IDS.zenmux.claudeSonnet45 },
-  { provider: "zenmux", model: MODEL_IDS.zenmux.claudeOpus45 },
-  { provider: "zenmux", model: MODEL_IDS.zenmux.grok4 },
-  { provider: "zenmux", model: MODEL_IDS.zenmux.glm47, temperature: 1, reasoning: { enabled: false } },
-  { provider: "zenmux", model: MODEL_IDS.zenmux.minimaxM21, temperature: 1, reasoning: { enabled: false } },
-  { provider: "tokendance", model: MODEL_IDS.tokendance.minimaxM27, temperature: 1, reasoning: { enabled: false } },
-  { provider: "tokendance", model: MODEL_IDS.tokendance.deepseekV4Pro, reasoning: { enabled: false } },
-  { provider: "tokendance", model: MODEL_IDS.tokendance.deepseekV4Flash0731, reasoning: { enabled: false } },
-  BUILTIN_DEEPSEEK_V41_FLASH_MODEL,
-  { provider: "tokendance", model: MODEL_IDS.tokendance.glm53Flash, reasoning: { enabled: false } },
-  { provider: "tokendance", model: MODEL_IDS.tokendance.qwen3Max, reasoning: { enabled: false } },
-  { provider: "tokendance", model: MODEL_IDS.tokendance.glm5, temperature: 1, reasoning: { enabled: false } },
-  { provider: "tokendance", model: MODEL_IDS.tokendance.kimiK25, temperature: 1, reasoning: { enabled: false } },
-  { provider: "tokendance", model: MODEL_IDS.tokendance.deepseekV32, reasoning: { enabled: false } },
+  ...BUILTIN_PLAYER_MODELS,
 ];
 
 // Models not allowed for in-game players (summary & generation only).

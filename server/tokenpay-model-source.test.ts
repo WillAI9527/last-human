@@ -133,21 +133,20 @@ test("legacy key settings migrate to exactly one model source", () => {
   assert.equal(resolveModelSource({}), "project");
 });
 
-test("TokenPay、总结和复盘默认使用 DeepSeek V4.1 Flash", () => {
+test("内置玩家、总结和复盘复用 ZenMux DeepSeek V3.2", () => {
   const builtInModel = AVAILABLE_MODELS[0];
-  const selectableModel = ALL_MODELS.find(
-    (model) => model.model === MODEL_IDS.tokendance.deepseekV41Flash,
-  );
 
-  assert.equal(builtInModel.model, "deepseek-v4.1-flash");
+  assert.equal(builtInModel.provider, "zenmux");
+  assert.equal(builtInModel.model, MODEL_IDS.zenmux.deepseek);
   assert.equal(SUMMARY_MODEL, builtInModel.model);
   assert.equal(REVIEW_MODEL, builtInModel.model);
   assert.deepEqual(builtInModel.reasoning, { enabled: false });
-  assert.deepEqual(selectableModel?.reasoning, { enabled: false });
+  assert.equal(ALL_MODELS.every((model) => model.provider === "zenmux"), true);
 });
 
-test("TokenPay 会同时归一化旧存档的模型与 Provider", async () => {
+test("TokenPay 旧存档归一化到当前内置模型与其 Provider", async () => {
   const { resolveRequestModelForSource } = await import("@/lib/llm");
+  const builtInModel = AVAILABLE_MODELS[0];
   assert.deepEqual(
     resolveRequestModelForSource(
       "tokenpay",
@@ -155,8 +154,8 @@ test("TokenPay 会同时归一化旧存档的模型与 Provider", async () => {
       "zenmux",
     ),
     {
-      model: MODEL_IDS.tokendance.deepseekV41Flash,
-      provider: "tokendance",
+      model: builtInModel.model,
+      provider: builtInModel.provider,
     },
   );
 });

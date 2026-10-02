@@ -47,14 +47,15 @@ export class AudioManager {
     const sessionId = gameSessionTracker.getSessionId();
     if (sessionId) headers["X-Game-Session-Id"] = sessionId;
 
-    if (provider === "tokendance" && getModelSource() === "custom" && hasTokendanceKey()) {
+    const modelSource = getModelSource();
+    if (provider === "tokendance" && modelSource !== "project" && hasTokendanceKey()) {
       headers["X-Tokendance-Api-Key"] = getTokendanceApiKey();
       headers["X-Tokendance-Base-Url"] = getTokendanceBaseUrl();
     }
 
-    // Project and TokenPay credentials stay on the server. User-supplied
-    // credentials are sent only while custom keys are the active source.
-    if (provider === "minimax" && getModelSource() === "custom" && hasMinimaxKey()) {
+    // Project credentials stay on the server. Any other source sends the
+    // user's own MiniMax key and never falls through to project voice.
+    if (provider === "minimax" && modelSource !== "project" && hasMinimaxKey()) {
       headers["X-Minimax-Api-Key"] = getMinimaxApiKey();
       headers["X-Minimax-Group-Id"] = getMinimaxGroupId();
     }
@@ -85,6 +86,11 @@ export class AudioManager {
   }
 
   isEnabled(): boolean {
+    // The public demo has no project MiniMax key. Skip TTS instead of
+    // calling /api/tts on every line.
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL && !hasMinimaxKey() && !hasTokendanceKey()) {
+      return false;
+    }
     return this.enabled && resolveAiVoiceAvailability(
       getModelSource(),
       hasMinimaxKey(),

@@ -23,6 +23,7 @@ import { generateUUID } from "./utils";
 import { withTimeout } from "@/lib/request-timeout";
 import type { PromptScope } from "@/lib/deepseek-prompt-scope";
 import { resolveReasoning, type ReasoningProfile } from "@/lib/reasoning-profile";
+import { getDemoGameToken } from "@/lib/demo-game-client";
 
 export type LLMContentPart =
   | { type: "text"; text: string; cache_control?: { type: "ephemeral"; ttl?: "1h" } }
@@ -76,6 +77,16 @@ export function resolveApiKeySource(model: string): ApiKeySource {
       : "project";
   }
   return getZenmuxApiKey() ? "user" : "project";
+}
+
+function resolveEffectiveModelSource(modelSource: ModelSource): ModelSource {
+  // Public demo has only the server ZenMux key. Ignore leftover TokenPay
+  // or custom-key settings from an older localStorage.
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL) return "project";
+  const customEnabled = modelSource === "custom" && isCustomKeyEnabled();
+  if (customEnabled) return modelSource;
+  if (modelSource === "custom") return "project";
+  return modelSource;
 }
 
 function resolveModelForSource(source: ModelSource, model: string): string {
@@ -691,6 +702,10 @@ function attachGameSessionHeader(headers: Record<string, string>) {
   if (sessionId) {
     headers["X-Game-Session-Id"] = sessionId;
   }
+  const demoGameToken = getDemoGameToken();
+  if (demoGameToken) {
+    headers["X-Demo-Game-Token"] = demoGameToken;
+  }
 }
 
 export async function generateCompletion(
@@ -703,8 +718,7 @@ export async function generateCompletion(
       : undefined;
 
   const modelSource = getModelSource();
-  const customEnabled = modelSource === "custom" && isCustomKeyEnabled();
-  const effectiveSource = customEnabled ? modelSource : modelSource === "custom" ? "project" : modelSource;
+  const effectiveSource = resolveEffectiveModelSource(modelSource);
   const resolvedModel = resolveRequestModelForSource(
     effectiveSource,
     options.model,
@@ -812,8 +826,7 @@ async function generateCompletionBatchInternal(
   if (!Array.isArray(requests) || requests.length === 0) return [];
 
   const modelSource = getModelSource();
-  const customEnabled = modelSource === "custom" && isCustomKeyEnabled();
-  const effectiveSource = customEnabled ? modelSource : modelSource === "custom" ? "project" : modelSource;
+  const effectiveSource = resolveEffectiveModelSource(modelSource);
   const resolvedRequests = requests.map((request) => ({
     ...request,
     prompt_scope: request.promptScope ?? "utility",
@@ -915,8 +928,7 @@ export async function* generateCompletionStream(
       : undefined;
 
   const modelSource = getModelSource();
-  const customEnabled = modelSource === "custom" && isCustomKeyEnabled();
-  const effectiveSource = customEnabled ? modelSource : modelSource === "custom" ? "project" : modelSource;
+  const effectiveSource = resolveEffectiveModelSource(modelSource);
   const resolvedModel = resolveRequestModelForSource(
     effectiveSource,
     options.model,

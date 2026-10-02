@@ -32,7 +32,10 @@ export function resolveAiVoiceAvailability(
   hasCustomTtsKey: boolean,
   hasCustomTokendanceKey = false,
 ): boolean {
-  return source === "project" || source === "tokenpay" || hasCustomTtsKey || hasCustomTokendanceKey;
+  // Project voice uses the server key. TokenPay and custom keys must bring
+  // their own TTS credentials and must not fall through to project MiniMax.
+  if (source === "project") return true;
+  return hasCustomTtsKey || hasCustomTokendanceKey;
 }
 
 function canUseStorage(): boolean {

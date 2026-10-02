@@ -80,6 +80,9 @@ async function authenticateUser(request: Request, bodyToken?: string) {
 }
 
 export async function POST(request: Request) {
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    return NextResponse.json({ disabled: true, sessionId: null });
+  }
   try {
     ensureAdminClient();
   } catch (error) {

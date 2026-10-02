@@ -83,6 +83,18 @@ async function loadDemoConfigRow() {
 export async function getDemoModeConfigServer(): Promise<DemoModePublicConfigSnapshot> {
   const now = new Date();
 
+  // Public demo has no database. Treat the deployment as always open.
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
+    return {
+      source: "database",
+      enabled: true,
+      active: true,
+      startsAt: null,
+      expiresAt: null,
+      serverNow: now.toISOString(),
+    };
+  }
+
   try {
     ensureAdminClient();
   } catch (error) {

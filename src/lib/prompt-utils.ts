@@ -563,6 +563,19 @@ const getTranscriptPhaseLabel = (phase: Phase | undefined): string | null => {
   }
 };
 
+const SPEECH_CHAR_LIMIT = 500;
+const INSTRUCTION_COLON = /(?:系统|主持人|法官|System|GM)[ \t]*[:：]/i;
+
+/** Layer-1 prompt injection guard for non-system speech. UI text is unchanged. */
+export function sanitizePlayerSpeechForPrompt(content: string): string {
+  const flattened = String(content ?? "").replace(/[\r\n]+/g, " ");
+  const chars = Array.from(flattened);
+  const truncated = chars.length > SPEECH_CHAR_LIMIT ? chars.slice(0, SPEECH_CHAR_LIMIT).join("") : flattened;
+  const escaped = truncated.replaceAll("<", "＜").replaceAll(">", "＞");
+  if (INSTRUCTION_COLON.test(escaped)) return `（玩家原话）${escaped}`;
+  return escaped;
+}
+
 const formatTranscriptMessages = (
   state: GameState,
   messages: ChatMessage[]
@@ -597,7 +610,7 @@ const formatTranscriptMessages = (
     const speaker = player ? t("mentions.seatLabel", { seat: player.seat + 1 }) : m.playerName;
     const lastWordsLabel = m.isLastWords ? t("promptUtils.gameContext.lastWordsLabel") : "";
     const statusLabel = m.day === state.day && player && !player.alive ? t("promptUtils.gameContext.transcriptCurrentlyEliminated") : "";
-    lines.push(`${lastWordsLabel}${speaker}${statusLabel}: ${m.content}`);
+    lines.push(`${lastWordsLabel}${speaker}${statusLabel}: ${sanitizePlayerSpeechForPrompt(m.content)}`);
   });
 
   return lines.join("\n");
@@ -622,7 +635,7 @@ export const buildPlayerTodaySpeech = (state: GameState, player: Player): string
   const speech = state.messages
     .filter((m) => m.day === state.day)
     .filter((m) => !m.isSystem && m.playerId === player.playerId)
-    .map((m) => m.content)
+    .map((m) => sanitizePlayerSpeechForPrompt(m.content))
     .join("\n");
 
   if (!speech) return "";

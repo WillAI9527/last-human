@@ -82,4 +82,4 @@ pnpm dev
 
 ## License
 
-[MIT](./LICENSE)
+[Apache-2.0](./LICENSE)。本仓库是 [oil-oil/wolfcha](https://github.com/oil-oil/wolfcha) 的修改分支，主要改动见 [NOTICE](./NOTICE)。
