@@ -13,9 +13,13 @@ type PhaseBarProps = {
 };
 
 export function PhaseBar({ gameState, humanPlayer, isWaitingForAI }: PhaseBarProps) {
-  const humanTurn = Boolean(humanPlayer?.alive && humanMustActOnPhase(gameState, humanPlayer));
-  const eliminated = Boolean(humanPlayer && !humanPlayer.alive);
-  const action = !eliminated && humanTurn ? phaseBarCapsule(gameState.phase) : null;
+  // 真人出局后仍要说遗言：这时提示“轮到你了”，而不是“观战中”。
+  const ownLastWords = Boolean(
+    humanPlayer && gameState.phase === "DAY_LAST_WORDS" && gameState.currentSpeakerSeat === humanPlayer.seat
+  );
+  const humanTurn = ownLastWords || Boolean(humanPlayer?.alive && humanMustActOnPhase(gameState, humanPlayer));
+  const eliminated = Boolean(humanPlayer && !humanPlayer.alive) && !ownLastWords;
+  const action = !eliminated && humanTurn ? (ownLastWords ? "发表遗言" : phaseBarCapsule(gameState.phase)) : null;
   const [pulseKey, setPulseKey] = useState(0);
 
   useEffect(() => {
