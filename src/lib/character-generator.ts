@@ -185,9 +185,11 @@ export interface BaseProfile {
 }
 
 /**
- * Draw a fixed village cast. No model call: name, occupation, age, temperament,
- * avatar and voice come from the table. Role is assigned later and must not
- * change this persona.
+ * Draw this game's villagers from the fixed table.
+ * Name, occupation, age band, and voice are copied from the table and are not invented.
+ * Speaking style for this game is the villager's temperament; there is no model call
+ * that could rename them or change occupation, age, or voice.
+ * Role is assigned later and must not change this persona.
  */
 export async function generateCharacters(
   count: number,

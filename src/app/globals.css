@@ -4696,3 +4696,92 @@ input[type="submit"]:not(:disabled),
 .wc-promo-tag-container {
   display: none !important;
 }
+
+/* Village square paintings. 16:9 on desktop, 9:16 on mobile. WebP first, JPEG fallback. */
+.lh-scene {
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
+}
+
+.lh-scene--day {
+  background-image: url("/backgrounds/bg-day-16x9.jpg");
+  background-image: image-set(
+    url("/backgrounds/bg-day-16x9.webp") type("image/webp"),
+    url("/backgrounds/bg-day-16x9.jpg") type("image/jpeg")
+  );
+}
+
+.lh-scene--night {
+  background-image: url("/backgrounds/bg-night-16x9.jpg");
+  background-image: image-set(
+    url("/backgrounds/bg-night-16x9.webp") type("image/webp"),
+    url("/backgrounds/bg-night-16x9.jpg") type("image/jpeg")
+  );
+}
+
+@media (max-width: 767px) {
+  .lh-scene--day {
+    background-image: url("/backgrounds/bg-day-9x16.jpg");
+    background-image: image-set(
+      url("/backgrounds/bg-day-9x16.webp") type("image/webp"),
+      url("/backgrounds/bg-day-9x16.jpg") type("image/jpeg")
+    );
+  }
+
+  .lh-scene--night {
+    background-image: url("/backgrounds/bg-night-9x16.jpg");
+    background-image: image-set(
+      url("/backgrounds/bg-night-9x16.webp") type("image/webp"),
+      url("/backgrounds/bg-night-9x16.jpg") type("image/jpeg")
+    );
+  }
+}
+
+.lh-scene-scrim {
+  background: rgba(10, 11, 14, 0.55);
+}
+
+.lh-role-card-thumb {
+  width: 54px;
+  height: 81px;
+  object-fit: cover;
+  border-radius: 4px;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.5);
+  flex-shrink: 0;
+}
+
+.lh-role-card-portrait {
+  width: 148px;
+  height: auto;
+  border-radius: 8px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.55);
+}
+
+.lh-action-receipt {
+  margin: 0 0 0.75rem;
+  padding: 0.7rem 0.95rem;
+  border-radius: 8px;
+  border: 1px solid rgba(169, 178, 188, 0.45);
+  background: rgba(15, 13, 12, 0.78);
+  color: #f2ede4;
+  font-size: 0.95rem;
+  font-weight: 650;
+  letter-spacing: 0.01em;
+}
+
+.wc-player-card--mobile.wc-player-card--speaking .wc-player-card__avatar-wrap,
+.wc-player-card--mobile.wc-player-card--speaking .wc-player-card__avatar {
+  width: 52px;
+  height: 52px;
+}
+
+.lh-speaker-ring {
+  position: absolute;
+  inset: -5px;
+  border-radius: 999px;
+  border: 2px solid #c5d0dc;
+  box-shadow: 0 0 0 1px rgba(169, 178, 188, 0.35), 0 0 14px rgba(186, 206, 224, 0.85);
+  pointer-events: none;
+  z-index: 3;
+}

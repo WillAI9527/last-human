@@ -10,11 +10,21 @@ test("固定村民表生成角色时不调用模型，也不会产生 TokenPay �
   };
   try {
     const { generateCharacters } = await import("./character-generator");
-    const characters = await generateCharacters(3);
+    const { VILLAGERS } = await import("./village-cast");
+    const characters = await generateCharacters(8);
     assert.equal(calls, 0);
-    assert.equal(characters.length, 3);
-    assert.equal(new Set(characters.map((character) => character.displayName)).size, 3);
-    assert.ok(characters.every((character) => /^(m|f)-\d{2}$/.test(character.avatarSeed || "")));
+    assert.equal(characters.length, 8);
+    assert.equal(new Set(characters.map((character) => character.displayName)).size, 8);
+    for (const character of characters) {
+      const villager = VILLAGERS.find((entry) => entry.id === character.avatarSeed);
+      assert.ok(villager, character.avatarSeed);
+      assert.equal(character.displayName, villager.name);
+      assert.equal(character.persona.occupation, villager.occupation);
+      assert.equal(character.persona.ageBand, villager.ageBand);
+      assert.equal(character.persona.voiceId, villager.voiceId);
+      assert.equal(character.persona.temperament, villager.temperament);
+      assert.equal(character.persona.basicInfo, `${villager.occupation}。${villager.temperament}`);
+    }
   } finally {
     globalThis.fetch = originalFetch;
   }

@@ -1,14 +1,15 @@
 import type { Role } from "@/types/game";
+import { roleCardUrl } from "@/lib/role-card";
 
 export const ROLE_ICONS: Record<Role, string> = {
-  Werewolf: "/roles/werewolf.png",
-  Seer: "/roles/seer.png",
-  Witch: "/roles/witch.png",
-  Hunter: "/roles/hunter.png",
-  Guard: "/roles/guard.png",
-  Idiot: "/roles/idiot.png",
-  WhiteWolfKing: "/roles/white-wolf-king.png",
-  Villager: "/roles/guard.png",
+  Werewolf: roleCardUrl("Werewolf"),
+  Seer: roleCardUrl("Seer"),
+  Witch: roleCardUrl("Witch"),
+  Hunter: roleCardUrl("Hunter"),
+  Guard: roleCardUrl("Guard"),
+  Idiot: roleCardUrl("Idiot"),
+  WhiteWolfKing: roleCardUrl("WhiteWolfKing"),
+  Villager: roleCardUrl("Villager"),
 };
 
 export const ROLE_NAMES: Record<Role, string> = {

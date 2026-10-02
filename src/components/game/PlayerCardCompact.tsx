@@ -273,6 +273,14 @@ export function PlayerCardCompact({
           <Medal size={variant === "mobile" ? 10 : 12} weight="regular" />
         </div>
       )}
+      {variant === "mobile" && isSpeaking && !isMe && (
+        <motion.span
+          aria-hidden
+          className="lh-speaker-ring"
+          animate={{ opacity: [0.45, 1, 0.45], scale: [0.96, 1.08, 0.96] }}
+          transition={{ duration: 2.4, repeat: Infinity, ease: "easeInOut" }}
+        />
+      )}
       </div>
 
       {/* 狼人队友标记 */}

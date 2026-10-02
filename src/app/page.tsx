@@ -12,7 +12,7 @@ import {
 } from "@phosphor-icons/react";
 import { useTypewriter } from "@/hooks/useTypewriter";
 import { useGameLogic } from "@/hooks/useGameLogic";
-import type { Player, Role } from "@/types/game";
+import type { Phase, Player, Role } from "@/types/game";
 import { isWolfRole } from "@/types/game";
 import { PHASE_CONFIGS, isGameInProgress } from "@/store/game-machine";
 import { getI18n } from "@/i18n/translator";
@@ -20,6 +20,15 @@ import { getSystemMessages, getSystemPatterns } from "@/lib/game-texts";
 import { useTranslations } from "next-intl";
 import { useAtom } from "jotai";
 import { BADGE_TRANSFER_TORN } from "@/lib/game-master";
+import { roleCardUrl } from "@/lib/role-card";
+import {
+  receiptForBadgeSignup,
+  receiptForFinishSpeech,
+  receiptForSeatAction,
+  receiptForSpeech,
+  receiptForWitch,
+  type ActionReceipt,
+} from "@/lib/action-receipt";
 
 // Components
 import { WelcomeScreen } from "@/components/game/WelcomeScreen";
@@ -176,6 +185,21 @@ export default function Home() {
 
   // 游戏结束时自动触发复盘分析生成
   const { isLoading: isAnalysisLoading } = useGameAnalysis();
+
+  const [actionReceipt, setActionReceipt] = useState<{ receipt: ActionReceipt; hideOnPhase: Phase | null } | null>(null);
+  const noteReceipt = useCallback((receipt: ActionReceipt) => {
+    setActionReceipt({ receipt, hideOnPhase: null });
+  }, []);
+  useEffect(() => {
+    setActionReceipt((current) => {
+      if (!current) return current;
+      if (current.hideOnPhase === null) {
+        return { ...current, hideOnPhase: gameState.phase };
+      }
+      if (current.hideOnPhase !== gameState.phase) return null;
+      return current;
+    });
+  }, [gameState.phase]);
 
   const [visualIsNight, setVisualIsNight] = useState(isNight);
   const visualIsNightRef = useRef(isNight);
@@ -1139,12 +1163,16 @@ export default function Home() {
     // 特殊处理：撕毁警徽（当在警徽移交阶段且没有选择目标时）
     if (phase === "BADGE_TRANSFER" && selectedSeat === null && humanPlayer && gameState.badge.holderSeat === humanPlayer.seat) {
       await handleHumanBadgeTransfer(BADGE_TRANSFER_TORN);
+      const receipt = receiptForSeatAction(phase, null);
+      if (receipt) noteReceipt(receipt);
       return;
     }
 
     // 特殊处理：猎人弃枪（当在猎人开枪阶段且没有选择目标时）
     if (phase === "HUNTER_SHOOT" && selectedSeat === null && humanPlayer?.role === "Hunter") {
       await handleNightAction(-1);
+      const receipt = receiptForSeatAction(phase, null);
+      if (receipt) noteReceipt(receipt);
       return;
     }
     
@@ -1166,14 +1194,19 @@ export default function Home() {
       phase === "WHITE_WOLF_KING_BOOM"
     ) {
       await handleNightAction(targetSeat);
+    } else {
+      return;
     }
-  }, [selectedSeat, gameState.phase, handleHumanVote, handleHumanBadgeTransfer, handleNightAction, isRoleRevealOpen, humanPlayer, gameState.badge.holderSeat]);
+    const receipt = receiptForSeatAction(phase, targetSeat);
+    if (receipt) noteReceipt(receipt);
+  }, [selectedSeat, gameState.phase, handleHumanVote, handleHumanBadgeTransfer, handleNightAction, isRoleRevealOpen, humanPlayer, gameState.badge.holderSeat, noteReceipt]);
 
   const handleNightActionConfirm = useCallback(async (targetSeat: number, actionType?: "save" | "poison" | "pass") => {
     if (isRoleRevealOpen) return;
     await handleNightAction(targetSeat, actionType);
     setSelectedSeat(null);
-  }, [handleNightAction, isRoleRevealOpen]);
+    if (actionType) noteReceipt(receiptForWitch(actionType, targetSeat));
+  }, [handleNightAction, isRoleRevealOpen, noteReceipt]);
 
   // 玩家列表（包含人类玩家）
   const allPlayers = useMemo(() => {
@@ -1418,7 +1451,14 @@ export default function Home() {
                   </div>
                 </div>
 
-                <div className="wc-topbar__info">
+                  <div className="wc-topbar__info">
+                  {canShowRole && humanPlayer?.role && (
+                    <img
+                      src={roleCardUrl(humanPlayer.role)}
+                      alt={getRoleLabel(humanPlayer.role)}
+                      className="lh-role-card-thumb md:hidden"
+                    />
+                  )}
                   <div className="wc-topbar__item">
                     <span className="text-xs uppercase tracking-wider opacity-60">Day</span>
                     <span className="font-serif text-lg font-bold">{String(gameState.day).padStart(2, '0')}</span>
@@ -1548,14 +1588,26 @@ export default function Home() {
                       onTutorialOpen={handleTutorialHelpOpen}
                       inputText={inputText}
                       onInputChange={setInputText}
-                      onSendMessage={handleHumanSpeech}
-                      onFinishSpeaking={handleFinishSpeaking}
+                      onSendMessage={async () => {
+                        if (!inputText.trim()) return;
+                        await handleHumanSpeech();
+                        noteReceipt(receiptForSpeech());
+                      }}
+                      onFinishSpeaking={async () => {
+                        await handleFinishSpeaking();
+                        noteReceipt(receiptForFinishSpeech());
+                      }}
                       selectedSeat={selectedSeat}
                       isWaitingForAI={isWaitingForAI}
                       onConfirmAction={confirmSelectedSeat}
                       onCancelSelection={() => setSelectedSeat(null)}
                       onNightAction={handleNightActionConfirm}
-                      onBadgeSignup={handleBadgeSignup}
+                      onBadgeSignup={async (wants) => {
+                        await handleBadgeSignup(wants);
+                        noteReceipt(receiptForBadgeSignup(wants));
+                      }}
+                      actionReceipt={actionReceipt?.receipt ?? null}
+                      showHumanRoleCard={canShowRole}
                       onRestart={restartGame}
                       onWhiteWolfKingBoom={handleWhiteWolfKingBoom}
                       onViewAnalysis={handleViewAnalysis}
