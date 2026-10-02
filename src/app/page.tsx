@@ -188,20 +188,18 @@ export default function Home() {
   // 游戏结束时自动触发复盘分析生成
   const { isLoading: isAnalysisLoading } = useGameAnalysis();
 
-  const [actionReceipt, setActionReceipt] = useState<{ receipt: ActionReceipt; hideOnPhase: Phase | null } | null>(null);
-  const noteReceipt = useCallback((receipt: ActionReceipt) => {
-    setActionReceipt({ receipt, hideOnPhase: null });
+  // A receipt belongs to the phase the human acted in. It must never outlive
+  // that phase: commit receipts hide the action controls, so a receipt that
+  // leaked into the next human turn (e.g. noted after an await that already
+  // advanced to DAY_BADGE_SIGNUP / DAY_VOTE) used to soft-lock the game.
+  const [actionReceipt, setActionReceipt] = useState<{ receipt: ActionReceipt; phase: Phase } | null>(null);
+  const noteReceipt = useCallback((receipt: ActionReceipt, phase: Phase) => {
+    setActionReceipt({ receipt, phase });
   }, []);
   useEffect(() => {
-    setActionReceipt((current) => {
-      if (!current) return current;
-      if (current.hideOnPhase === null) {
-        return { ...current, hideOnPhase: gameState.phase };
-      }
-      if (current.hideOnPhase !== gameState.phase) return null;
-      return current;
-    });
+    setActionReceipt((current) => (current && current.phase !== gameState.phase ? null : current));
   }, [gameState.phase]);
+  const visibleActionReceipt = actionReceipt && actionReceipt.phase === gameState.phase ? actionReceipt.receipt : null;
 
   const [visualIsNight, setVisualIsNight] = useState(isNight);
   const visualIsNightRef = useRef(isNight);
@@ -1170,17 +1168,17 @@ export default function Home() {
     
     // 特殊处理：撕毁警徽（当在警徽移交阶段且没有选择目标时）
     if (phase === "BADGE_TRANSFER" && selectedSeat === null && humanPlayer && gameState.badge.holderSeat === humanPlayer.seat) {
-      await handleHumanBadgeTransfer(BADGE_TRANSFER_TORN);
       const receipt = receiptForSeatAction(phase, null);
-      if (receipt) noteReceipt(receipt);
+      if (receipt) noteReceipt(receipt, phase);
+      await handleHumanBadgeTransfer(BADGE_TRANSFER_TORN);
       return;
     }
 
     // 特殊处理：猎人弃枪（当在猎人开枪阶段且没有选择目标时）
     if (phase === "HUNTER_SHOOT" && selectedSeat === null && humanPlayer?.role === "Hunter") {
-      await handleNightAction(-1);
       const receipt = receiptForSeatAction(phase, null);
-      if (receipt) noteReceipt(receipt);
+      if (receipt) noteReceipt(receipt, phase);
+      await handleNightAction(-1);
       return;
     }
     
@@ -1190,6 +1188,8 @@ export default function Home() {
     const targetSeat = selectedSeat;
     setSelectedSeat(null);
     
+    const seatReceipt = receiptForSeatAction(phase, targetSeat);
+    if (seatReceipt) noteReceipt(seatReceipt, phase);
     if (phase === "DAY_VOTE" || phase === "DAY_BADGE_ELECTION") {
       await handleHumanVote(targetSeat);
     } else if (phase === "BADGE_TRANSFER") {
@@ -1202,19 +1202,15 @@ export default function Home() {
       phase === "WHITE_WOLF_KING_BOOM"
     ) {
       await handleNightAction(targetSeat);
-    } else {
-      return;
     }
-    const receipt = receiptForSeatAction(phase, targetSeat);
-    if (receipt) noteReceipt(receipt);
   }, [selectedSeat, gameState.phase, handleHumanVote, handleHumanBadgeTransfer, handleNightAction, isRoleRevealOpen, humanPlayer, gameState.badge.holderSeat, noteReceipt]);
 
   const handleNightActionConfirm = useCallback(async (targetSeat: number, actionType?: "save" | "poison" | "pass") => {
     if (isRoleRevealOpen) return;
+    if (actionType) noteReceipt(receiptForWitch(actionType, targetSeat), gameState.phase);
     await handleNightAction(targetSeat, actionType);
     setSelectedSeat(null);
-    if (actionType) noteReceipt(receiptForWitch(actionType, targetSeat));
-  }, [handleNightAction, isRoleRevealOpen, noteReceipt]);
+  }, [handleNightAction, isRoleRevealOpen, noteReceipt, gameState.phase]);
 
   // 玩家列表（包含人类玩家）
   const allPlayers = useMemo(() => {
@@ -1599,12 +1595,13 @@ export default function Home() {
                       onInputChange={setInputText}
                       onSendMessage={async () => {
                         if (!inputText.trim()) return;
+                        const speechPhase = gameState.phase;
                         await handleHumanSpeech();
-                        noteReceipt(receiptForSpeech());
+                        noteReceipt(receiptForSpeech(), speechPhase);
                       }}
                       onFinishSpeaking={async () => {
+                        noteReceipt(receiptForFinishSpeech(), gameState.phase);
                         await handleFinishSpeaking();
-                        noteReceipt(receiptForFinishSpeech());
                       }}
                       selectedSeat={selectedSeat}
                       isWaitingForAI={isWaitingForAI}
@@ -1612,10 +1609,10 @@ export default function Home() {
                       onCancelSelection={() => setSelectedSeat(null)}
                       onNightAction={handleNightActionConfirm}
                       onBadgeSignup={async (wants) => {
+                        noteReceipt(receiptForBadgeSignup(wants), gameState.phase);
                         await handleBadgeSignup(wants);
-                        noteReceipt(receiptForBadgeSignup(wants));
                       }}
-                      actionReceipt={actionReceipt?.receipt ?? null}
+                      actionReceipt={visibleActionReceipt}
                       showHumanRoleCard={canShowRole}
                       onRestart={restartGame}
                       onWhiteWolfKingBoom={handleWhiteWolfKingBoom}
