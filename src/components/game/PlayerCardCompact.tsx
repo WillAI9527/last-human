@@ -30,6 +30,36 @@ interface PlayerCardCompactProps {
   isBadgeCandidate?: boolean;
   variant?: "default" | "mobile";
   isInSelectionPhase?: boolean;
+  /** True only for the human's own unrevealed vote target. */
+  showVoteSeal?: boolean;
+}
+
+function SeatCandle({ night }: { night: boolean }) {
+  return (
+    <span className={cn("lh-candle", night && "lh-candle--night")} aria-hidden="true">
+      <motion.span
+        className="lh-candle-glow"
+        animate={{
+          opacity: night ? [0.55, 0.95, 0.62] : [0.28, 0.5, 0.32],
+          scale: night ? [1, 1.12, 1] : [1, 1.06, 1],
+        }}
+        transition={{ duration: 1.7, repeat: Infinity, ease: "easeInOut" }}
+      />
+      <svg className="lh-candle-body" viewBox="0 0 20 28" width="14" height="20">
+        <rect x="7" y="13" width="6" height="12" rx="1.2" fill="#E8BE6A" />
+        <rect x="8.4" y="11" width="3.2" height="2.4" rx="0.4" fill="#6B4A2E" />
+      </svg>
+      <motion.span
+        className="lh-candle-flame"
+        animate={{
+          scaleY: [1, 1.18, 0.9, 1.08, 1],
+          scaleX: [1, 0.88, 1.06, 0.94, 1],
+          opacity: [0.88, 1, 0.78, 0.96, 0.88],
+        }}
+        transition={{ duration: 1.35, repeat: Infinity, ease: "easeInOut" }}
+      />
+    </span>
+  );
 }
 
 export function PlayerCardCompact({
@@ -50,6 +80,7 @@ export function PlayerCardCompact({
   isBadgeCandidate = false,
   variant = "default",
   isInSelectionPhase = false,
+  showVoteSeal = false,
 }: PlayerCardCompactProps) {
   const t = useTranslations();
   const isDead = !player.alive;
@@ -164,7 +195,8 @@ export function PlayerCardCompact({
         variant === "mobile" && "wc-player-card--mobile",
         !isReady && "wc-player-card--loading opacity-80",
         isReady && "bg-[var(--bg-card)]/80 backdrop-blur-sm",
-        isDead && "wc-player-card--dead grayscale-[0.8]",
+        isDead && "wc-player-card--dead",
+        isNight && !isMe && "lh-seat-night",
         isSpeaking && "wc-player-card--speaking",
         isSpeaking && !isMe && "wc-player-card--speaking-ai",
         isMe && "wc-player-card--me",
@@ -214,7 +246,11 @@ export function PlayerCardCompact({
               <img 
                 src={avatarSrc} 
                 alt={player.displayName} 
-                className={cn(avatarClassName, !isMe && "lh-avatar-moon")} 
+                className={cn(
+                  avatarClassName,
+                  !isMe && !isDead && "lh-avatar-moon",
+                  isDead && "lh-avatar-photo-dead",
+                )} 
               />
             </motion.div>
           ) : (
@@ -249,10 +285,7 @@ export function PlayerCardCompact({
         </AnimatePresence>
 
         {isDead && isReady && (
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-[1px] flex items-center justify-center z-10">
-            <span className="lh-death-slash" aria-hidden="true" />
-            <span className="text-[10px] font-bold text-white tracking-widest border border-white/30 px-2 py-0.5 rounded-sm">RIP</span>
-          </div>
+          <span className="lh-death-slash" aria-hidden="true" />
         )}
       </motion.div>
       {isReady && !isMe && (
@@ -260,8 +293,12 @@ export function PlayerCardCompact({
           <img src={getModelLogoUrl(player.agentProfile?.modelRef)} alt="" />
         </span>
       )}
+      {isMe && isReady && !isDead && <SeatCandle night={isNight} />}
       {isMe && isReady && (
         <span className="lh-you-capsule">你 · {seatNumberLabel(player.seat)}</span>
+      )}
+      {showVoteSeal && isReady && (
+        <span className="lh-wax-seal" aria-label="你的票">票</span>
       )}
       {isBadgeHolder && !isDead && isReady && (
         <div className="lh-sheriff-mark" title={t("playerCard.badgeHolder")}>
@@ -315,7 +352,10 @@ export function PlayerCardCompact({
                   key="name-text"
                   initial={{ opacity: 0, y: 5 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="truncate font-medium text-[var(--text-primary)] flex-1 min-w-0"
+                  className={cn(
+                  "truncate font-medium flex-1 min-w-0",
+                  isDead ? "lh-name-dim" : "text-[var(--text-primary)]",
+                )}
                 >
                   {player.displayName}
                 </motion.span>
@@ -341,7 +381,10 @@ export function PlayerCardCompact({
                     key="name-text"
                     initial={{ opacity: 0, y: 5 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="block truncate font-medium text-[var(--text-primary)]"
+                    className={cn(
+                      "block truncate font-medium",
+                      isDead ? "lh-name-dim" : "text-[var(--text-primary)]",
+                    )}
                   >
                     {playerTitle(player.seat, player.displayName)}
                   </motion.span>

@@ -21,6 +21,8 @@ import { useTranslations } from "next-intl";
 import { useAtom } from "jotai";
 import { BADGE_TRANSFER_TORN } from "@/lib/game-master";
 import { roleCardUrl } from "@/lib/role-card";
+import { humanUnrevealedVoteSeat } from "@/lib/human-vote-mark";
+import { cn } from "@/lib/utils";
 import {
   receiptForBadgeSignup,
   receiptForFinishSpeech,
@@ -582,6 +584,12 @@ export default function Home() {
   const ritualCueQueueRef = useRef<Array<{ id: string; title: string; subtitle?: string }>>([]);
   const lastAdvanceTimeRef = useRef(0);
   const canShowRole = hasShownRoleReveal || (gameState.day >= 1 && gameState.phase !== "LOBBY");
+  const humanVoteSeat = humanUnrevealedVoteSeat(
+    gameState.phase,
+    humanPlayer?.playerId,
+    gameState.votes,
+    gameState.badge?.votes,
+  );
   const selectionTone = useMemo(() => {
     if (!humanPlayer) return undefined;
     switch (gameState.phase) {
@@ -1234,7 +1242,7 @@ export default function Home() {
   const isWelcomeStage = !gameStarted;
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden bg-transparent">
+    <div className={cn("h-screen flex flex-col overflow-hidden bg-transparent", visualIsNight && "lh-room--night")}>
       <TokenPayRecoveryHost />
       <GameBackground isNight={visualIsNight} isBlinking={!!dayNightBlinkPhase} />
 
@@ -1563,6 +1571,7 @@ export default function Home() {
                             showModel={gameState.phase === "GAME_END"}
                             selectionTone={selectionTone}
                             isInSelectionPhase={isSelectionPhase}
+                            showVoteSeal={humanVoteSeat === player.seat}
                           />
                         );
                       })}
@@ -1648,6 +1657,7 @@ export default function Home() {
                               showRoleBadge={canShowRole}
                               selectionTone={selectionTone}
                               isInSelectionPhase={isSelectionPhase}
+                              showVoteSeal={humanVoteSeat === player.seat}
                             />
                           );
                         })}
@@ -1687,6 +1697,7 @@ export default function Home() {
                             showModel={gameState.phase === "GAME_END"}
                             selectionTone={selectionTone}
                             isInSelectionPhase={isSelectionPhase}
+                            showVoteSeal={humanVoteSeat === player.seat}
                           />
                         );
                       })}

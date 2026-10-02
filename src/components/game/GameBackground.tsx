@@ -38,6 +38,13 @@ export function GameBackground({ isNight, isBlinking = false }: GameBackgroundPr
         style={{ willChange: "opacity", transform: "translateZ(0)" }}
       />
       <div className="lh-scene-scrim absolute inset-0 pointer-events-none" />
+      <motion.div
+        className="absolute inset-0 pointer-events-none"
+        style={{ background: "rgba(6, 7, 10, 0.34)" }}
+        initial={false}
+        animate={{ opacity: isNight ? 1 : 0 }}
+        transition={{ duration: fadeDuration }}
+      />
 
       <motion.div
         className="pointer-events-none"
