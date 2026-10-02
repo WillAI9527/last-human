@@ -72,3 +72,34 @@ test("单局模型调用达到上限后拒绝继续", async () => {
     assert.equal(blocked.message, MSG_LLM_CAP);
   }
 });
+
+test("签名对局令牌在内存清空后仍然有效", async () => {
+  process.env.ZENMUX_API_KEY = "test-key";
+  resetDemoRateLimitForTests();
+  const started = await startDemoGame(requestFrom("203.0.113.40"));
+  assert.equal(started.ok, true);
+  if (!started.ok) return;
+  const first = new Request("http://localhost/api/chat", {
+    method: "POST",
+    headers: { "x-demo-game-token": started.gameToken, "x-forwarded-for": "203.0.113.40" },
+  });
+  const used = await consumeDemoLlmCall(first, 2);
+  assert.equal(used.ok, true);
+  if (!used.ok) return;
+  resetDemoRateLimitForTests();
+  const cookie = used.cookies.map((item) => item.split(";")[0]).join("; ");
+  const resumed = await consumeDemoLlmCall(new Request("http://localhost/api/chat", {
+    method: "POST",
+    headers: {
+      "x-demo-game-token": started.gameToken,
+      "x-forwarded-for": "203.0.113.40",
+      cookie,
+    },
+  }), 1);
+  assert.equal(resumed.ok, true);
+  const otherIp = await consumeDemoLlmCall(new Request("http://localhost/api/chat", {
+    method: "POST",
+    headers: { "x-demo-game-token": started.gameToken, "x-forwarded-for": "203.0.113.41" },
+  }), 1);
+  assert.equal(otherIp.ok, false);
+});

@@ -1,5 +1,5 @@
 // Modified by LAST HUMAN demo (fork of oil-oil/wolfcha).
-import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { createHmac, timingSafeEqual } from "node:crypto";
 
 export const GAMES_PER_IP_PER_DAY = 3;
 export const LLM_CALLS_PER_GAME = 500;
@@ -172,8 +172,8 @@ export async function startDemoGame(request: Request): Promise<QuotaResult> {
   dailyCounts.set(memoryKey, next);
   await writeSharedCount(sharedKey, next);
 
-  const gameToken = randomBytes(18).toString("base64url");
   const exp = Date.now() + GAME_TTL_SECONDS * 1000;
+  const gameToken = encodeSigned({ ipHash, exp });
   gamesByToken.set(gameToken, { ipHash, calls: 0, exp });
   await upstash(["SET", `lh:game:${gameToken}`, JSON.stringify({ ipHash, calls: 0, exp }), "EX", String(GAME_TTL_SECONDS)]);
 
@@ -189,20 +189,28 @@ export async function startDemoGame(request: Request): Promise<QuotaResult> {
   };
 }
 
-async function loadGame(token: string): Promise<GameRecord | null> {
-  const memory = gamesByToken.get(token);
-  if (memory && memory.exp > Date.now()) return memory;
-  const raw = await upstash(["GET", `lh:game:${token}`]);
-  if (typeof raw !== "string" || !raw) return memory && memory.exp > Date.now() ? memory : null;
-  try {
-    const parsed = JSON.parse(raw) as GameRecord;
-    if (!parsed?.ipHash || !Number.isFinite(parsed.calls) || !Number.isFinite(parsed.exp)) return null;
-    if (parsed.exp <= Date.now()) return null;
-    gamesByToken.set(token, parsed);
-    return parsed;
-  } catch {
+async function loadGame(token: string, ipHash: string): Promise<GameRecord | null> {
+  const signed = decodeSigned<{ ipHash?: string; exp?: number }>(token);
+  if (!signed || signed.ipHash !== ipHash || typeof signed.exp !== "number" || signed.exp <= Date.now()) {
     return null;
   }
+  let calls = 0;
+  const memory = gamesByToken.get(token);
+  if (memory && memory.exp > Date.now()) calls = Math.max(calls, memory.calls);
+  const raw = await upstash(["GET", `lh:game:${token}`]);
+  if (typeof raw === "string" && raw) {
+    try {
+      const parsed = JSON.parse(raw) as GameRecord;
+      if (parsed?.ipHash === ipHash && Number.isFinite(parsed.calls)) {
+        calls = Math.max(calls, parsed.calls);
+      }
+    } catch {
+      // A missing shared counter falls back to the signed cookie.
+    }
+  }
+  const record = { ipHash, calls, exp: signed.exp };
+  gamesByToken.set(token, record);
+  return record;
 }
 
 export function readDemoGameToken(request: Request): string {
@@ -216,7 +224,7 @@ export async function consumeDemoLlmCall(request: Request, count = 1): Promise<L
     return { ok: false, status: 403, code: "missing_game", message: MSG_NEED_GAME };
   }
   const safeCount = Number.isFinite(count) && count > 0 ? Math.floor(count) : 1;
-  const game = await loadGame(token);
+  const game = await loadGame(token, hashValue(getClientIp(request)));
   if (!game) {
     return { ok: false, status: 403, code: "invalid_game", message: MSG_NEED_GAME };
   }
