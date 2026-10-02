@@ -14,6 +14,8 @@ import { applyRateLimitCookies, consumeDemoTtsCall } from "@/lib/demo-rate-limit
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+const TTS_MAX_TEXT_CHARS = 600;
+
 const DEFAULT_TOKENDANCE_TTS_MODEL = "minimax-speech-2.8-turbo";
 const DEFAULT_TOKENDANCE_TTS_ENDPOINT = "https://tokendance.space/gateway/minimax/v1/t2a_v2";
 
@@ -75,6 +77,11 @@ export async function POST(req: NextRequest) {
 
     if (!normText || !normVoiceId) {
       return NextResponse.json({ error: "Missing text or voiceId" }, { status: 400 });
+    }
+    // One in-game line is a few hundred characters at most. Cap it so a game
+    // ticket can't be used to synthesize arbitrary long text on our MiniMax key.
+    if (Array.from(normText).length > TTS_MAX_TEXT_CHARS || normVoiceId.length > 128) {
+      return NextResponse.json({ error: "Text too long" }, { status: 413 });
     }
 
     const apiKey = (hasCustomTtsKey ? headerApiKey : process.env.MINIMAX_API_KEY)?.trim();

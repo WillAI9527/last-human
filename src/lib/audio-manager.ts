@@ -38,6 +38,9 @@ export class AudioManager {
   private cache = new Map<string, { blob: Blob; durationMs?: number }>();
   private inFlight = new Map<string, Promise<void>>();
   private enabled = false;
+  // Set when the server says voice is off (no MiniMax key) or the per-game
+  // voice cap is used up, so we stop calling /api/tts for every line.
+  private serverDisabled = false;
 
   private onPlayStart: ((playerId: string) => void) | null = null;
   private onPlayEnd: ((playerId: string) => void) | null = null;
@@ -88,7 +91,7 @@ export class AudioManager {
   }
 
   isEnabled(): boolean {
-    if (!this.enabled) return false;
+    if (!this.enabled || this.serverDisabled) return false;
     // Public demo reads aloud with the server MiniMax key. A missing key
     // or a failed request falls back to text inside the speech flow.
     if (!process.env.NEXT_PUBLIC_SUPABASE_URL) return true;
@@ -132,6 +135,9 @@ export class AudioManager {
       body: JSON.stringify({ text: task.text, voiceId: task.voiceId, ttsProvider }),
     });
     if (!response.ok) {
+      if (response.status === 503 || response.status === 403 || response.status === 429) {
+        this.serverDisabled = true;
+      }
       const body = await response.text().catch(() => "");
       throw new Error(`TTS request failed: ${response.status} ${body.slice(0, 600)}`);
     }
