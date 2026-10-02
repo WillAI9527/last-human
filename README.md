@@ -6,7 +6,7 @@ This repository is a modified fork of [oil-oil/wolfcha](https://github.com/oil-o
 
 ## Play
 
-The home page is the game setup. Sign your name and start. Each IP can start 3 games per Singapore calendar day.
+The home page is the game setup. Sign your name and start. Each IP can start `DAILY_GAME_LIMIT` games per Singapore calendar day (default 3). A deploy can set `RATE_LIMIT_BYPASS_TOKEN` so QA opening `/?tester=<token>` skips that daily cap. The per-game LLM call cap still applies.
 
 ## Local development
 

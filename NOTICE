@@ -14,7 +14,7 @@ Major modifications in this fork:
 - Public demo that runs with only ZENMUX_API_KEY. Login, credits, payments, sponsor placement, TokenPay, Watcha OAuth/pay, and Stripe are disabled.
 - SEO, landing, guide, and model marketing pages are removed. The home page opens game setup.
 - Built-in player models, summaries, reviews, and character generation use a ZenMux-only pool: deepseek/deepseek-v3.2, google/gemini-3.5-flash-lite, and minimax/minimax-m2.1.
-- Server-side limit of 3 games per IP per Singapore calendar day, plus a per-game cap on LLM calls.
+- Server-side limit of DAILY_GAME_LIMIT games per IP per Singapore calendar day (default 3), plus a per-game cap on LLM calls. RATE_LIMIT_BYPASS_TOKEN can skip only the daily cap.
 - Temporary brand (name, logo, favicon, Open Graph image, CC0 BGM).
 - First-layer prompt-injection guard on player speech serialized into model prompts.
 - Phase bar that does not reveal which night role is acting unless it is the human's own turn.

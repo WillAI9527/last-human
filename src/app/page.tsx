@@ -22,6 +22,7 @@ import { BADGE_TRANSFER_TORN } from "@/lib/game-master";
 // Components
 import { WelcomeScreen } from "@/components/game/WelcomeScreen";
 import { PhaseBar } from "@/components/game/PhaseBar";
+import { captureTesterTokenFromLocation } from "@/lib/demo-game-client";
 import { PlayerCardCompact } from "@/components/game/PlayerCardCompact";
 import { DialogArea } from "@/components/game/DialogArea";
 import { BottomActionPanel } from "@/components/game/BottomActionPanel";
@@ -190,6 +191,7 @@ export default function Home() {
   useEffect(() => {
     persistReferralFromCurrentUrl();
     removeReferralFromCurrentUrl();
+    captureTesterTokenFromLocation();
   }, []);
 
   useEffect(() => {

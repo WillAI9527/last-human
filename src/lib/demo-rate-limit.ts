@@ -1,11 +1,13 @@
 // Modified by LAST HUMAN demo (fork of oil-oil/wolfcha).
 import { createHmac, timingSafeEqual } from "node:crypto";
 
-export const GAMES_PER_IP_PER_DAY = 3;
+export const DEFAULT_DAILY_GAME_LIMIT = 3;
+export const GAMES_PER_IP_PER_DAY = DEFAULT_DAILY_GAME_LIMIT;
 export const LLM_CALLS_PER_GAME = 500;
 export const GAME_COOKIE = "lh_game";
 export const QUOTA_COOKIE = "lh_quota";
 export const LLM_COOKIE = "lh_llm";
+export const TESTER_TOKEN_HEADER = "x-tester-token";
 
 export const MSG_SERVER_NOT_CONFIGURED = "服务器未配置，暂时无法开局。";
 export const MSG_DAILY_LIMIT = "今天的 3 局已经用完了。请明天（新加坡时间）再来。";
@@ -153,6 +155,33 @@ export function isZenmuxConfigured(): boolean {
   return Boolean(process.env.ZENMUX_API_KEY?.trim());
 }
 
+export function getDailyGameLimit(): number {
+  const raw = process.env.DAILY_GAME_LIMIT?.trim();
+  if (!raw) return DEFAULT_DAILY_GAME_LIMIT;
+  const parsed = Number(raw);
+  if (!Number.isInteger(parsed) || parsed < 1) return DEFAULT_DAILY_GAME_LIMIT;
+  return parsed;
+}
+
+export function dailyLimitMessage(limit = getDailyGameLimit()): string {
+  return `今天的 ${limit} 局已经用完了。请明天（新加坡时间）再来。`;
+}
+
+function tokensMatch(expected: string, provided: string): boolean {
+  const left = Buffer.from(expected);
+  const right = Buffer.from(provided);
+  if (left.length === 0 || left.length !== right.length) return false;
+  return timingSafeEqual(left, right);
+}
+
+export function isDailyLimitBypassed(request: Request): boolean {
+  const expected = process.env.RATE_LIMIT_BYPASS_TOKEN?.trim() ?? "";
+  if (!expected) return false;
+  const provided = request.headers.get(TESTER_TOKEN_HEADER)?.trim() ?? "";
+  if (!provided) return false;
+  return tokensMatch(expected, provided);
+}
+
 export async function startDemoGame(request: Request): Promise<QuotaResult> {
   if (!isZenmuxConfigured()) {
     return { ok: false, status: 503, code: "server_not_configured", message: MSG_SERVER_NOT_CONFIGURED };
@@ -165,12 +194,18 @@ export async function startDemoGame(request: Request): Promise<QuotaResult> {
   const sharedKey = `lh:games:${day}:${ipHash}`;
   const shared = await readSharedCount(sharedKey);
   const count = Math.max(dailyCounts.get(memoryKey) ?? 0, readQuotaCookie(request, ipHash, day), shared ?? 0);
-  if (count >= GAMES_PER_IP_PER_DAY) {
-    return { ok: false, status: 429, code: "daily_limit", message: MSG_DAILY_LIMIT };
+  const limit = getDailyGameLimit();
+  const bypass = isDailyLimitBypassed(request);
+  // A tester token skips the shared IP quota and does not consume it.
+  // The per-game LLM cap still applies after the game token is issued.
+  if (!bypass && count >= limit) {
+    return { ok: false, status: 429, code: "daily_limit", message: dailyLimitMessage(limit) };
   }
-  const next = count + 1;
-  dailyCounts.set(memoryKey, next);
-  await writeSharedCount(sharedKey, next);
+  const next = bypass ? count : count + 1;
+  if (!bypass) {
+    dailyCounts.set(memoryKey, next);
+    await writeSharedCount(sharedKey, next);
+  }
 
   const exp = Date.now() + GAME_TTL_SECONDS * 1000;
   const gameToken = encodeSigned({ ipHash, exp });
@@ -180,7 +215,7 @@ export async function startDemoGame(request: Request): Promise<QuotaResult> {
   return {
     ok: true,
     gameToken,
-    remaining: GAMES_PER_IP_PER_DAY - next,
+    remaining: bypass ? limit : limit - next,
     cookies: [
       cookie(GAME_COOKIE, gameToken),
       cookie(QUOTA_COOKIE, encodeSigned({ ipHash, day, count: next })),
