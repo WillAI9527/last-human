@@ -224,11 +224,18 @@ export async function startDemoGame(request: Request): Promise<QuotaResult> {
   };
 }
 
-async function loadGame(token: string, ipHash: string): Promise<GameRecord | null> {
+// The game token is HMAC-signed, so it cannot be forged. It is deliberately
+// NOT re-bound to the caller's current IP: many real networks (CGNAT, mobile
+// handover, VPN/relay egress pools) present a different source IP per
+// connection, which used to break games mid-way with "请先从首页开始一局。".
+// The daily cap is enforced when the token is issued; the per-game LLM cap
+// still bounds what one token can spend.
+async function loadGame(token: string): Promise<GameRecord | null> {
   const signed = decodeSigned<{ ipHash?: string; exp?: number }>(token);
-  if (!signed || signed.ipHash !== ipHash || typeof signed.exp !== "number" || signed.exp <= Date.now()) {
+  if (!signed || typeof signed.ipHash !== "string" || typeof signed.exp !== "number" || signed.exp <= Date.now()) {
     return null;
   }
+  const ipHash = signed.ipHash;
   let calls = 0;
   const memory = gamesByToken.get(token);
   if (memory && memory.exp > Date.now()) calls = Math.max(calls, memory.calls);
@@ -259,7 +266,7 @@ export async function consumeDemoLlmCall(request: Request, count = 1): Promise<L
     return { ok: false, status: 403, code: "missing_game", message: MSG_NEED_GAME };
   }
   const safeCount = Number.isFinite(count) && count > 0 ? Math.floor(count) : 1;
-  const game = await loadGame(token, hashValue(getClientIp(request)));
+  const game = await loadGame(token);
   if (!game) {
     return { ok: false, status: 403, code: "invalid_game", message: MSG_NEED_GAME };
   }

@@ -106,7 +106,9 @@ test("签名对局令牌在内存清空后仍然有效", async () => {
     method: "POST",
     headers: { "x-demo-game-token": started.gameToken, "x-forwarded-for": "203.0.113.41" },
   }), 1);
-  assert.equal(otherIp.ok, false);
+  // Tokens are no longer re-bound to the current IP (see loadGame); the
+  // signed token plus the per-game LLM cap are what protect the budget.
+  assert.equal(otherIp.ok, true);
 });
 
 test("DAILY_GAME_LIMIT 决定每日局数，提示里带上这个数字", async () => {
@@ -232,4 +234,26 @@ test("?tester= 会保存，并在开局请求里带上同一个 header", async (
     if (originalWindow) Object.defineProperty(globalThis, "window", originalWindow);
     else Reflect.deleteProperty(globalThis, "window");
   }
+});
+
+test("游戏令牌在客户端 IP 变化后仍然有效（移动网络 / CGNAT）", async () => {
+  process.env.ZENMUX_API_KEY = "test-key";
+  delete process.env.DAILY_GAME_LIMIT;
+  delete process.env.RATE_LIMIT_BYPASS_TOKEN;
+  resetDemoRateLimitForTests();
+  const started = await startDemoGame(requestFrom("203.0.113.90"));
+  assert.equal(started.ok, true);
+  if (!started.ok) return;
+  const chat = new Request("http://localhost/api/chat", {
+    method: "POST",
+    headers: { "x-forwarded-for": "198.51.100.7", "x-demo-game-token": started.gameToken },
+  });
+  const used = await consumeDemoLlmCall(chat, 1);
+  assert.equal(used.ok, true);
+  const forged = new Request("http://localhost/api/chat", {
+    method: "POST",
+    headers: { "x-forwarded-for": "198.51.100.7", "x-demo-game-token": `${started.gameToken}x` },
+  });
+  const rejected = await consumeDemoLlmCall(forged, 1);
+  assert.equal(rejected.ok, false);
 });
