@@ -155,8 +155,12 @@ export const getScenarios = (): GameScenario[] => {
   return SCENARIOS.map(localizeScenario);
 };
 
-export const getRandomScenario = (): GameScenario => {
-  const scenarios = getScenarios();
-  const index = Math.floor(Math.random() * scenarios.length);
-  return scenarios[index];
+/** Every game is the same late-19th-century mountain village. Modern China setups are retired. */
+export const VILLAGE_SCENARIO: GameScenario = {
+  id: "mountain_village",
+  title: "山村夜话",
+  description: "19世纪末欧洲山村。村民围坐在村中广场，借着月光与一点烛火玩一场狼人杀。职业和脾气只影响说话方式，发言只讨论狼人杀本身，不聊村外的事。",
+  rolesHint: "铁匠、邮差、医生、修女、面包师、神父等山村居民。对话只谈查验、票型和站边。",
 };
+
+export const getRandomScenario = (): GameScenario => VILLAGE_SCENARIO;

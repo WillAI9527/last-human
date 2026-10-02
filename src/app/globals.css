@@ -5,37 +5,44 @@
   --font-body: "Inter", "Noto Serif SC", system-ui, sans-serif;
   --font-chinese: "Noto Serif SC";
   /* ========== 核心色板 (参考 style-unification-preview.html) ========== */
-  --color-blood: #8a1c1c;
-  --color-blood-light: #b93636;
-  --color-gold: #c5a059;
-  --color-gold-dim: #8c7335;
-  --color-gold-dark: #6e5626;
+  --color-blood: #B3262B;
+  --color-blood-light: #B3262B;
+  --color-gold: #E8BE6A;
+  --color-gold-dim: #A98A45;
+  --color-gold-dark: #8C6A32;
+  --night-900: #0F0D0C;
+  --night-800: #1A1715;
+  --night-700: #26211E;
+  --bone-100: #F2EDE4;
+  --ash-400: #A9B2BC;
+  --ash-600: #7F8C99;
+  --human-gold: #E8BE6A;
   --paper: #f0e6d2;
   --paper-dim: #e6dac0;
 
   /* 背景色 - 白天更精致的纸张/羊皮纸质感 */
-  --bg-main: #f5f0e6;
-  --bg-day-main: #f5f0e6;
-  --bg-secondary: #ede6d6;
-  --bg-card: #ffffff;
-  --bg-dark: #1a1614;
-  --bg-dark-secondary: #2c241b;
-  --bg-hover: #e8dfcc;
-  --bg-selected: #fcfbf9;
+  --bg-main: #0F0D0C;
+  --bg-day-main: #1A1715;
+  --bg-secondary: #1A1715;
+  --bg-card: #1A1715;
+  --bg-dark: #0F0D0C;
+  --bg-dark-secondary: #1A1715;
+  --bg-hover: #26211E;
+  --bg-selected: #26211E;
 
-  /* 渐变背景 - 白天 (暖色调) */
-  --bg-day-from: #fdfbf7;
-  --bg-day-via: #f2ebe0;
-  --bg-day-to: #e6ded1;
+  /* 渐变背景 - 山村薄雾，不做大面积暖金 */
+  --bg-day-from: #26211E;
+  --bg-day-via: #1A1715;
+  --bg-day-to: #0F0D0C;
   
-  --bg-night-from: #1a1614;
-  --bg-night-via: #14100e;
-  --bg-night-to: #0d0a08;
+  --bg-night-from: #0F0D0C;
+  --bg-night-via: #14110F;
+  --bg-night-to: #0F0D0C;
   
-  /* 文字颜色 - 白天高对比度，使用深棕色代替纯黑 */
-  --text-primary: #3d2e24;
-  --text-secondary: #6e5948;
-  --text-muted: #9c8570;
+  /* 文字颜色 */
+  --text-primary: #F2EDE4;
+  --text-secondary: #A9B2BC;
+  --text-muted: #7F8C99;
   --text-inverse: #f0e6d2;
   
   /* 角色主题色 */
@@ -113,16 +120,16 @@
 /* ========== 夜晚主题 (参考 style-unification-preview.html) ========== */
 [data-theme="dark"] {
   /* 背景色 */
-  --bg-main: #1a1614;
-  --bg-secondary: #2c241b;
-  --bg-card: #1e1a17;
-  --bg-hover: #3e3428;
-  --bg-selected: #4a3d2e;
+  --bg-main: #0F0D0C;
+  --bg-secondary: #1A1715;
+  --bg-card: #1A1715;
+  --bg-hover: #26211E;
+  --bg-selected: #26211E;
   
-  /* 文字颜色 - 夜晚高对比度 (羊皮纸色) */
-  --text-primary: #f0e6d2;
-  --text-secondary: rgba(240, 230, 210, 0.75);
-  --text-muted: rgba(240, 230, 210, 0.55);
+  /* 文字颜色 */
+  --text-primary: #F2EDE4;
+  --text-secondary: #A9B2BC;
+  --text-muted: #7F8C99;
   --border-color: rgba(197, 160, 89, 0.20);
 
   /* 玻璃面板 - 夜晚 */
@@ -1563,9 +1570,10 @@ input[type="submit"]:not(:disabled),
     padding: 6px;
   }
 
+  .wc-player-card--mobile .wc-player-card__avatar-wrap,
   .wc-player-card--mobile .wc-player-card__avatar {
-    width: 32px;
-    height: 32px;
+    width: 44px;
+    height: 44px;
   }
 
   .wc-player-card--mobile .wc-player-card__name {
@@ -1657,10 +1665,14 @@ input[type="submit"]:not(:disabled),
 }
 
 .wc-player-card--speaking {
-  border-color: var(--color-gold);
-  box-shadow: 0 0 12px rgba(197, 160, 89, 0.15);
-  animation: wc-pulse-border 2.5s infinite;
-  background: linear-gradient(145deg, #fff, #fdfbf5);
+  border-color: var(--ash-400);
+  box-shadow: 0 0 12px rgba(169, 178, 188, 0.22);
+  background: linear-gradient(145deg, #26211E, #1A1715);
+}
+
+.wc-player-card--me.wc-player-card--speaking {
+  border-color: var(--human-gold);
+  box-shadow: 0 0 12px rgba(232, 190, 106, 0.28);
 }
 
 [data-theme="dark"] .wc-player-card--speaking {
@@ -1669,11 +1681,16 @@ input[type="submit"]:not(:disabled),
 }
 
 .wc-player-card--speaking .wc-player-card__avatar {
-  border-color: var(--color-gold);
+  border-color: var(--ash-400);
+}
+
+.wc-player-card--me .wc-player-card__avatar,
+.wc-player-card--me.wc-player-card--speaking .wc-player-card__avatar {
+  border-color: var(--human-gold);
 }
 
 .wc-player-card--speaking .wc-player-card__name {
-  color: var(--color-gold-dark);
+  color: var(--bone-100);
 }
 
 [data-theme="dark"] .wc-player-card--speaking .wc-player-card__name {
@@ -1690,14 +1707,96 @@ input[type="submit"]:not(:disabled),
   opacity: 0.7;
 }
 
+.wc-player-card__avatar-wrap {
+  width: 64px;
+  height: 64px;
+  flex-shrink: 0;
+  position: relative;
+}
+
 .wc-player-card__avatar {
   width: 64px;
   height: 64px;
   border-radius: 50%;
-  border: 2px solid rgba(197, 160, 89, 0.3);
+  border: 2px solid var(--ash-600);
   overflow: hidden;
   position: relative;
   flex-shrink: 0;
+}
+
+.lh-human-frame {
+  border: 2px solid var(--human-gold) !important;
+  box-shadow: 0 0 8px rgba(232, 190, 106, 0.65);
+}
+
+.lh-avatar-moon {
+  filter: saturate(0.82) contrast(1.05);
+}
+
+.lh-model-badge {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  border: 1.5px solid #0F0D0C;
+  background: #1A1715;
+  overflow: hidden;
+  z-index: 12;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.lh-model-badge img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.lh-you-capsule {
+  position: absolute;
+  left: 50%;
+  bottom: -9px;
+  transform: translateX(-50%);
+  height: 16px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--human-gold);
+  color: #0F0D0C;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 16px;
+  white-space: nowrap;
+  z-index: 13;
+}
+
+.lh-sheriff-mark {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: #F2EDE4;
+  color: #1A1715;
+  border: 1.5px solid #7F8C99;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 14;
+}
+
+.lh-sheriff-mark--candidate {
+  background: transparent;
+  color: #F2EDE4;
+}
+
+.lh-death-slash {
+  position: absolute;
+  inset: 8px;
+  background: linear-gradient(135deg, transparent 46%, #B3262B 46%, #B3262B 54%, transparent 54%);
 }
 
 .wc-player-card__info {
@@ -1814,8 +1913,13 @@ input[type="submit"]:not(:disabled),
 }
 
 .wc-player-card--speaking .wc-seat-badge {
-  background: var(--color-gold);
-  color: #fff;
+  background: var(--ash-400);
+  color: #0F0D0C;
+}
+
+.wc-player-card--me.wc-player-card--speaking .wc-seat-badge {
+  background: var(--human-gold);
+  color: #0F0D0C;
 }
 
 [data-theme="dark"] .wc-player-card--speaking .wc-seat-badge {
@@ -2257,10 +2361,28 @@ input[type="submit"]:not(:disabled),
   scroll-snap-align: start;
 }
 
+.wc-player-card--mobile .wc-player-card__avatar-wrap,
 .wc-player-card--mobile .wc-player-card__avatar {
-  width: 40px;
-  height: 40px;
-  margin-bottom: 4px;
+  width: 44px;
+  height: 44px;
+  margin-bottom: 8px;
+}
+
+.wc-player-card--mobile .lh-model-badge {
+  width: 14px;
+  height: 14px;
+}
+
+.wc-player-card--mobile .lh-you-capsule {
+  height: 14px;
+  font-size: 9px;
+  line-height: 14px;
+  bottom: -7px;
+}
+
+.wc-player-card--mobile .lh-sheriff-mark {
+  width: 14px;
+  height: 14px;
 }
 
 .wc-player-card--mobile .wc-player-card__info {

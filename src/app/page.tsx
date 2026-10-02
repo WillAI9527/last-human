@@ -7,6 +7,8 @@ import {
   NotePencil,
   X,
   GearSix,
+  SpeakerHigh,
+  SpeakerSlash,
 } from "@phosphor-icons/react";
 import { useTypewriter } from "@/hooks/useTypewriter";
 import { useGameLogic } from "@/hooks/useGameLogic";
@@ -158,7 +160,7 @@ export default function Home() {
   } = useGameLogic();
   const { settings, setBgmVolume, setSoundEnabled, setAiVoiceEnabled, setGenshinMode, setSpectatorMode, setAutoAdvanceDialogueEnabled } = useSettings();
   const { bgmVolume, isSoundEnabled, isAiVoiceEnabled, isGenshinMode, isSpectatorMode, isAutoAdvanceDialogueEnabled } = settings;
-  const shouldUseAiVoice = isSoundEnabled && isAiVoiceEnabled && bgmVolume > 0;
+  const shouldUseAiVoice = isAiVoiceEnabled;
   
   // Exit game functionality - use restartGame which properly handles all state resets
   const gameInProgress = useMemo(() => isGameInProgress(gameState), [gameState]);
@@ -1393,16 +1395,27 @@ export default function Home() {
                     <span>LAST HUMAN</span>
                   </div>
 
-                  {/* 移动端设置按钮 - 只显示图标 */}
-                  <button
-                    type="button"
-                    onClick={() => setIsSettingsOpen(true)}
-                    title={t("page.audioSettings")}
-                    aria-label={t("page.audioSettings")}
-                    className="md:hidden inline-flex items-center justify-center w-8 h-8 rounded-md border border-[var(--border-color)] bg-[var(--bg-card)] text-[var(--text-primary)] transition-colors hover:border-[var(--color-accent)] hover:bg-[var(--color-accent-bg)]"
-                  >
-                    <GearSix size={16} />
-                  </button>
+                  <div className="md:hidden flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setAiVoiceEnabled(!isAiVoiceEnabled)}
+                      aria-pressed={isAiVoiceEnabled}
+                      aria-label={isAiVoiceEnabled ? "关闭朗读" : "打开朗读"}
+                      title={isAiVoiceEnabled ? "朗读开" : "朗读关"}
+                      className="inline-flex items-center justify-center w-8 h-8 rounded-md border border-[var(--border-color)] bg-[var(--bg-card)] text-[var(--text-primary)]"
+                    >
+                      {isAiVoiceEnabled ? <SpeakerHigh size={16} /> : <SpeakerSlash size={16} />}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsSettingsOpen(true)}
+                      title={t("page.audioSettings")}
+                      aria-label={t("page.audioSettings")}
+                      className="inline-flex items-center justify-center w-8 h-8 rounded-md border border-[var(--border-color)] bg-[var(--bg-card)] text-[var(--text-primary)]"
+                    >
+                      <GearSix size={16} />
+                    </button>
+                  </div>
                 </div>
 
                 <div className="wc-topbar__info">
@@ -1417,7 +1430,7 @@ export default function Home() {
                   {gameState.badge.holderSeat !== null && (
                     <div className="wc-topbar__item">
                       <span className="text-xs uppercase tracking-wider opacity-60">{t("page.badgeLabel")}</span>
-                      <span className="font-serif text-lg font-bold text-[var(--color-gold)]">
+                      <span className="font-serif text-lg font-bold text-[var(--text-primary)]">
                         {t("mentions.seatLabel", { seat: gameState.badge.holderSeat + 1 })}
                       </span>
                     </div>
@@ -1432,6 +1445,17 @@ export default function Home() {
                       {canShowRole ? getRoleLabel(humanPlayer?.role) : t("page.rolePending")}
                     </span>
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => setAiVoiceEnabled(!isAiVoiceEnabled)}
+                    aria-pressed={isAiVoiceEnabled}
+                    aria-label={isAiVoiceEnabled ? "关闭朗读" : "打开朗读"}
+                    title={isAiVoiceEnabled ? "朗读开" : "朗读关"}
+                    className="inline-flex items-center gap-1.5 rounded-md border-2 border-[var(--border-color)] bg-[var(--bg-card)] px-2.5 py-1 text-xs text-[var(--text-primary)]"
+                  >
+                    {isAiVoiceEnabled ? <SpeakerHigh size={16} /> : <SpeakerSlash size={16} />}
+                    {isAiVoiceEnabled ? "朗读" : "静音"}
+                  </button>
                   <button
                     type="button"
                     onClick={() => setIsSettingsOpen(true)}

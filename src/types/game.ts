@@ -84,6 +84,10 @@ export interface Persona {
   gender: "male" | "female" | "nonbinary";
   age: number;
   basicInfo?: string;
+  /** Public, role-independent villager fields. Never include a seat number. */
+  occupation?: string;
+  temperament?: string;
+  ageBand?: string;
   voiceId?: string;
   relationships?: string[];
   logicStyle?: string;

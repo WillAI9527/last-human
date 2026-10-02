@@ -14,6 +14,7 @@ import { TalkingAvatar } from "./TalkingAvatar";
 import { VoiceRecorder, type VoiceRecorderHandle } from "./VoiceRecorder";
 import { EventLog } from "./EventLog";
 import { buildSimpleAvatarUrl, getModelLogoUrl } from "@/lib/avatar-config";
+import { playerTitle } from "@/lib/player-label";
 import { RoleRevealHistoryCard, type RoleRevealEntry } from "@/components/game/RoleRevealHistoryCard";
 import LoadingMiniGame from "./MiniGame/LoadingMiniGame";
 import type { GameState, Player, ChatMessage, Phase } from "@/types/game";
@@ -1647,12 +1648,12 @@ export function DialogArea({
                               className="w-full h-full object-cover"
                             />
                           </div>
-                          <div className="text-sm font-semibold text-[var(--color-gold)]">
-                            {currentSpeaker.player.displayName}
+                          <div className={cn("text-sm font-semibold", currentSpeaker.player.isHuman ? "text-[var(--color-gold)]" : "text-[var(--text-primary)]")}>
+                            {playerTitle(currentSpeaker.player.seat, currentSpeaker.player.displayName)}
                           </div>
                         </div>
-                        <div className="hidden md:block text-base font-bold text-[var(--color-gold)] mb-2 font-serif tracking-wide">
-                          {currentSpeaker.player.displayName}
+                        <div className={cn("hidden md:block text-base font-bold mb-2 font-serif tracking-wide", currentSpeaker.player.isHuman ? "text-[var(--color-gold)]" : "text-[var(--text-primary)]")}>
+                          {playerTitle(currentSpeaker.player.seat, currentSpeaker.player.displayName)}
                         </div>
                       </>
                     )}

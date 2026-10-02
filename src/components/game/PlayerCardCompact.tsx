@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Microphone, Sparkle } from "@phosphor-icons/react";
-import type { Player, Role } from "@/types/game";
+import { Medal, Sparkle } from "@phosphor-icons/react";
+import type { Player } from "@/types/game";
 import { isWolfRole } from "@/types/game";
 import { cn } from "@/lib/utils";
 import { buildSimpleAvatarUrl, getModelLogoUrl } from "@/lib/avatar-config";
+import { playerTitle, seatNumberLabel } from "@/lib/player-label";
 import { useTranslations } from "next-intl";
 
 interface PlayerCardCompactProps {
@@ -41,8 +42,6 @@ export function PlayerCardCompact({
   onClick,
   onDetailClick,
   animationDelay = 0,
-  showWolfBadge = false,
-  showRoleBadge = true,
   showModel = false,
   selectionTone,
   seerCheckResult = null,
@@ -103,28 +102,14 @@ export function PlayerCardCompact({
       case "hunter":
         return "border-[var(--color-warning)] shadow-[0_0_0_2px_var(--color-warning)]";
       case "badge":
-        return "border-[var(--color-gold)] shadow-[0_0_0_2px_rgba(197,160,89,0.25)]";
+        return "border-[#A9B2BC] shadow-[0_0_0_2px_rgba(169,178,188,0.35)]";
       case "vote":
-        return "border-[var(--color-accent)] shadow-[0_0_0_2px_rgba(120,160,255,0.25)]";
+        return "border-[#A9B2BC] shadow-[0_0_0_2px_rgba(169,178,188,0.35)]";
       default:
-        return "border-[var(--color-gold)] shadow-[0_0_0_2px_rgba(197,160,89,0.25)]";
+        return "border-[#A9B2BC] shadow-[0_0_0_2px_rgba(169,178,188,0.35)]";
     }
   })();
 
-  const roleLabels = useMemo<Record<Role, string>>(() => ({
-    Werewolf: t("roles.werewolf"),
-    Seer: t("roles.seer"),
-    Witch: t("roles.witch"),
-    Hunter: t("roles.hunter"),
-    Guard: t("roles.guard"),
-    Idiot: t("roles.idiot"),
-    WhiteWolfKing: t("roles.whiteWolfKing"),
-    Villager: t("roles.villager"),
-  }), [t]);
-  const getRoleLabel = (role: Role) => roleLabels[role] ?? t("roles.villager");
-  const persona = player.agentProfile?.persona;
-  // Show basicInfo instead of styleLabel for richer context
-  const basicInfoLabel = isGenshinMode ? (isMe ? t("common.you") : "") : persona?.basicInfo || (isMe ? t("common.you") : "");
   const modelLabel = player.agentProfile?.modelRef?.model;
 
   const isModelAvatar = isGenshinMode && !player.isHuman;
@@ -180,11 +165,12 @@ export function PlayerCardCompact({
         !isReady && "wc-player-card--loading opacity-80",
         isReady && "bg-[var(--bg-card)]/80 backdrop-blur-sm",
         isDead && "wc-player-card--dead grayscale-[0.8]",
-        isSpeaking && "wc-player-card--speaking ring-1 ring-[var(--color-gold)] shadow-[0_0_15px_rgba(184,134,11,0.15)]",
+        isSpeaking && "wc-player-card--speaking",
+        isSpeaking && !isMe && "wc-player-card--speaking-ai",
         isMe && "wc-player-card--me",
         isWolfTeammate && "border-[var(--color-blood)]/70 bg-[var(--color-wolf-bg)]",
         isDisabledInSelection && "wc-player-card--disabled opacity-50 grayscale-[0.3] pointer-events-none",
-        canClick && isReady && "wc-player-card--selectable border-[var(--color-gold)]/50 hover:border-[var(--color-gold)] cursor-pointer",
+        canClick && isReady && "wc-player-card--selectable cursor-pointer",
         isSelected && "scale-[1.02]",
         isSelected && selectionClass
       )}
@@ -205,7 +191,17 @@ export function PlayerCardCompact({
       )}
 
       {/* 头像区域 */}
-      <div className="wc-player-card__avatar relative overflow-hidden">
+      <div className={cn("wc-player-card__avatar-wrap relative", isMe && "wc-player-card__avatar-wrap--human")}>
+      <motion.div
+        className={cn("wc-player-card__avatar relative overflow-hidden", isMe && "lh-human-frame", !isMe && "lh-avatar-moon")}
+        animate={isSpeaking ? {
+          y: [0, -1.5, 0],
+          boxShadow: isMe
+            ? ["0 0 6px rgba(232,190,106,0.35)", "0 0 16px rgba(232,190,106,0.8)", "0 0 6px rgba(232,190,106,0.35)"]
+            : ["0 0 4px rgba(169,178,188,0.2)", "0 0 14px rgba(169,178,188,0.72)", "0 0 4px rgba(169,178,188,0.2)"],
+        } : { y: 0, boxShadow: isMe ? "0 0 8px rgba(232,190,106,0.55)" : "none" }}
+        transition={{ duration: 2.4, repeat: isSpeaking ? Infinity : 0, ease: "easeInOut" }}
+      >
         <AnimatePresence mode="wait">
           {isReady ? (
             <motion.div
@@ -218,7 +214,7 @@ export function PlayerCardCompact({
               <img 
                 src={avatarSrc} 
                 alt={player.displayName} 
-                className={avatarClassName} 
+                className={cn(avatarClassName, !isMe && "lh-avatar-moon")} 
               />
             </motion.div>
           ) : (
@@ -254,9 +250,29 @@ export function PlayerCardCompact({
 
         {isDead && isReady && (
           <div className="absolute inset-0 bg-black/60 backdrop-blur-[1px] flex items-center justify-center z-10">
+            <span className="lh-death-slash" aria-hidden="true" />
             <span className="text-[10px] font-bold text-white tracking-widest border border-white/30 px-2 py-0.5 rounded-sm">RIP</span>
           </div>
         )}
+      </motion.div>
+      {isReady && !isMe && (
+        <span className="lh-model-badge" title={modelLabel || ""}>
+          <img src={getModelLogoUrl(player.agentProfile?.modelRef)} alt="" />
+        </span>
+      )}
+      {isMe && isReady && (
+        <span className="lh-you-capsule">你 · {seatNumberLabel(player.seat)}</span>
+      )}
+      {isBadgeHolder && !isDead && isReady && (
+        <div className="lh-sheriff-mark" title={t("playerCard.badgeHolder")}>
+          <Medal size={variant === "mobile" ? 10 : 12} weight="fill" />
+        </div>
+      )}
+      {isBadgeCandidate && !isBadgeHolder && !isDead && isReady && (
+        <div className="lh-sheriff-mark lh-sheriff-mark--candidate" title={t("playerCard.badgeCandidate")}>
+          <Medal size={variant === "mobile" ? 10 : 12} weight="regular" />
+        </div>
+      )}
       </div>
 
       {/* 狼人队友标记 */}
@@ -276,36 +292,15 @@ export function PlayerCardCompact({
         </div>
       )}
 
-      {/* 警徽标记 */}
-      {isBadgeHolder && !isDead && isReady && (
-        <div className="absolute top-1.5 right-1.5 px-1.5 py-0.5 rounded-sm flex items-center justify-center z-10 bg-[var(--color-gold)] border border-black/20 shadow-[0_0_8px_rgba(184,134,11,0.35)] text-[10px] font-semibold tracking-wide text-[var(--bg-dark)]">
-          {t("playerCard.badgeHolder")}
-        </div>
-      )}
-      
-      {/* 警长候选人标记 */}
-      {isBadgeCandidate && !isDead && isReady && (
-        <div className="absolute top-1.5 right-1.5 px-1.5 py-0.5 rounded-sm flex items-center justify-center z-10 bg-[var(--color-gold)] border border-black/20 shadow-sm text-[10px] font-semibold tracking-wide text-[var(--bg-dark)]">
-          {t("playerCard.badgeCandidate")}
-        </div>
-      )}
-
-      {/* 自己的身份图标 */}
-      {isMe && !isDead && isReady && showRoleBadge && (
-        <div className="absolute bottom-0 right-0 px-1.5 py-0.5 rounded-sm flex items-center justify-center z-10 bg-[var(--color-gold)] shadow-sm translate-x-1 translate-y-1 text-[10px] font-bold text-[var(--bg-dark)]">
-          {getRoleLabel(player.role)}
-        </div>
-      )}
-      
       {/* 信息区 */}
       <div className="wc-player-card__info relative z-10">
         {variant === "mobile" ? (
-          <div className="wc-player-card__name relative flex items-center gap-1 min-w-0" title={player.displayName}>
+          <div className="wc-player-card__name relative flex items-center gap-1 min-w-0" title={playerTitle(player.seat, player.displayName)}>
             <span className={cn(
               "wc-seat-badge transition-colors duration-300",
-              isSpeaking ? "bg-[var(--color-gold)] text-[#1a1614]" : "bg-black/10 text-[var(--text-secondary)]",
+              isSpeaking && isMe ? "bg-[var(--color-gold)] text-[#0F0D0C]" : "bg-black/20 text-[var(--text-secondary)]",
               !isReady && "opacity-50"
-            )}>{player.seat + 1}</span>
+            )}>{seatNumberLabel(player.seat)}</span>
             <AnimatePresence mode="wait">
               {isReady ? (
                 <motion.span
@@ -328,28 +323,10 @@ export function PlayerCardCompact({
                 </motion.div>
               )}
             </AnimatePresence>
-            {isMe && isReady && (
-              <span className="text-[10px] bg-[var(--color-gold)]/90 text-[#1a1614] px-1.5 rounded-sm font-bold leading-none py-0.5 shadow-sm">
-                {t("common.you")}
-              </span>
-            )}
           </div>
         ) : (
           <>
-            <div className="flex items-center gap-1.5 mb-0.5">
-              <span className={cn(
-                "wc-seat-badge transition-colors duration-300",
-                isSpeaking ? "bg-[var(--color-gold)] text-[#1a1614]" : "bg-black/10 text-[var(--text-secondary)]",
-                !isReady && "opacity-50"
-              )}>{player.seat + 1}</span>
-              {isMe && isReady && (
-                <span className="text-[10px] bg-[var(--color-gold)]/90 text-[#1a1614] px-1.5 rounded-sm font-bold leading-none py-0.5 shadow-sm">
-                  {t("common.you")}
-                </span>
-              )}
-            </div>
-
-            <div className="wc-player-card__name relative h-5" title={player.displayName}>
+            <div className="wc-player-card__name relative h-5" title={playerTitle(player.seat, player.displayName)}>
               <AnimatePresence mode="wait">
                 {isReady ? (
                   <motion.span
@@ -358,7 +335,7 @@ export function PlayerCardCompact({
                     animate={{ opacity: 1, y: 0 }}
                     className="block truncate font-medium text-[var(--text-primary)]"
                   >
-                    {player.displayName}
+                    {playerTitle(player.seat, player.displayName)}
                   </motion.span>
                 ) : (
                   <motion.div
@@ -377,20 +354,6 @@ export function PlayerCardCompact({
         )}
 
         <div className="wc-player-card__meta min-h-[1.25rem] space-y-0.5">
-          {isReady && basicInfoLabel && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.2 }}
-              className="truncate"
-              title={basicInfoLabel}
-            >
-              <span className={cn(
-                "text-xs",
-                isSpeaking ? "text-[var(--color-gold)]" : "text-[var(--text-secondary)]"
-              )}>{basicInfoLabel}</span>
-            </motion.div>
-          )}
           {isReady && showModel && modelLabel && (
             <motion.div
               initial={{ opacity: 0 }}

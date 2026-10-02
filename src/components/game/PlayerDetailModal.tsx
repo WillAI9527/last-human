@@ -16,6 +16,7 @@ import {
   WhiteWolfKingIcon
 } from "@/components/icons/FlatIcons";
 import { buildSimpleAvatarUrl, getModelLogoUrl } from "@/lib/avatar-config";
+import { playerTitle } from "@/lib/player-label";
 import { useTranslations } from "next-intl";
 
 interface PlayerDetailModalProps {
@@ -169,7 +170,12 @@ export function PlayerDetailModal({ player, isOpen, onClose, humanPlayer, isGens
                     </span>
                   )}
                 </div>
-                <h2 className="text-xl font-black text-[var(--text-primary)]">{renderPlayer.displayName}</h2>
+                <h2 className="text-xl font-black text-[var(--text-primary)]">{playerTitle(renderPlayer.seat, renderPlayer.displayName)}</h2>
+                {(persona?.occupation || persona?.temperament) && (
+                  <p className="mt-1 text-sm text-[var(--text-secondary)]">
+                    {[persona?.occupation, persona?.ageBand, persona?.temperament].filter(Boolean).join(" · ")}
+                  </p>
+                )}
                 {showModelTag && (
                   <div className="mt-1 text-xs font-semibold text-[var(--text-muted)]">
                     {t("playerDetail.model", { model: modelLabel })}

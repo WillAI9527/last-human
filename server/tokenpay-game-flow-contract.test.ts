@@ -21,31 +21,29 @@ test("a disconnected TokenPay selection cannot start a game", () => {
   assert.match(welcomeSource, /result\?\.recoveryAction === "reauthorize_api_key"/);
 });
 
-test("character generation is schema-constrained and single-pass", () => {
-  assert.match(characterSource, /response_format: buildBaseProfilesResponseFormat\(count\)/);
-  assert.match(characterSource, /type: "json_schema"/);
-  assert.match(characterSource, /strict: true/);
+test("character generation draws the fixed village cast and does not call a model", () => {
+  assert.match(characterSource, /drawVillagers\(count\)/);
+  assert.match(characterSource, /characterFromVillager\(villager\)/);
+  assert.doesNotMatch(characterSource, /response_format/);
+  assert.doesNotMatch(characterSource, /generateJSON|fetch\(/);
   assert.doesNotMatch(characterSource, /cachedBaseProfiles|cachedPersonaBatches/);
-  assert.doesNotMatch(characterSource, /for \(let attempt|runOnce\(/);
-  assert.doesNotMatch(characterSource, /normalizeBaseProfile\(/);
+  assert.doesNotMatch(characterSource, /CharacterBatchSchemaError/);
 });
 
-test("character personas are generated as bounded JSON batches", () => {
-  assert.match(characterSource, /CHARACTER_PERSONA_BATCH_SIZE = 3/);
-  assert.match(characterSource, /CHARACTER_PERSONA_BATCH_MAX_TOKENS = 4200/);
-  assert.match(characterSource, /Promise\.allSettled\(batchTasks\)/);
-  assert.match(characterSource, /temperature: GAME_TEMPERATURE\.CHARACTER_PERSONA/);
-  assert.match(characterSource, /每批只调用一次/);
-  assert.match(characterSource, /仅作全局去重参考/);
+test("village personas come from the cast table, not JSON batches", () => {
+  const castSource = readFileSync("src/lib/village-cast.ts", "utf8");
+  assert.match(castSource, /export const VILLAGERS/);
+  assert.match(castSource, /voiceId: villager\.voiceId/);
+  assert.doesNotMatch(characterSource, /CHARACTER_PERSONA_BATCH_SIZE/);
+  assert.doesNotMatch(characterSource, /Promise\.allSettled\(batchTasks\)/);
 });
 
-test("TokenPay character generation never replays an ambiguous paid stream", () => {
-  assert.match(characterSource, /response_format: buildPersonaBatchResponseFormat\(batchProfiles\)/);
-  assert.match(llmSource, /export async function generateJSON<[\s\S]*return parseJsonTolerant<T>\(result\.content\);/);
-  assert.doesNotMatch(llmSource, /const retryMessages: LLMMessage\[\]/);
+test("TokenPay character generation never starts a paid stream", () => {
+  assert.doesNotMatch(characterSource, /response_format: buildPersonaBatchResponseFormat/);
   assert.doesNotMatch(characterSource, /lastEmittedCharacters/);
   assert.doesNotMatch(characterSource, /CharacterBatchSchemaError/);
-  assert.doesNotMatch(characterSource, /\(two-stage generation\)/);
+  assert.match(llmSource, /export async function generateJSON</);
+  assert.doesNotMatch(llmSource, /const retryMessages: LLMMessage\[\]/);
 });
 
 test("TokenPay avoids ambiguous automatic request replay", () => {
