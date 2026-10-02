@@ -48,6 +48,8 @@ export function VotingProgress({ gameState, humanPlayer }: VotingProgressProps) 
     const voter = gameState.players.find(p => p.playerId === voterId);
     const target = gameState.players.find(p => p.seat === targetSeat);
     if (!voter || !target) return;
+    // 票在揭晓前保密：只显示真人自己的票，AI 的票只计入“已投 x/y”进度。
+    if (!voter.isHuman) return;
     
     // 警长的票在非警长选举阶段计算为1.5票
     const voteWeight = (!isBadgeElection && sheriffPlayer && voterId === sheriffPlayer.playerId) ? 1.5 : 1;
