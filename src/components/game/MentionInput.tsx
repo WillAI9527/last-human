@@ -311,7 +311,7 @@ export function MentionInput({
       {(!value || value.trim().length === 0) && placeholder ? (
         <div
           className={
-            "pointer-events-none absolute left-0 top-0 text-base " +
+            "wc-input-placeholder pointer-events-none absolute left-0 top-0 text-base " +
             (isNight ? "text-white/35" : "text-[var(--text-secondary)]")
           }
         >

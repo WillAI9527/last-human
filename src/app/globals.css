@@ -5116,3 +5116,19 @@ input[type="submit"]:not(:disabled),
   pointer-events: none;
   z-index: 3;
 }
+
+/* Round-table input sits on the dark dialog panel in both day and night:
+   keep it dark so the light game text stays readable while typing. */
+.lh-dialog-round .wc-input-box,
+.lh-dialog-round .wc-input-box:focus-within {
+  background: rgba(18, 14, 12, 0.82);
+  border-color: rgba(232, 190, 106, 0.4);
+  color: #f2ede4;
+}
+.lh-dialog-round .wc-input-box .wc-input-field {
+  color: #f2ede4;
+  caret-color: #e8be6a;
+}
+.lh-dialog-round .wc-input-box .wc-input-placeholder {
+  color: rgba(242, 237, 228, 0.42);
+}
