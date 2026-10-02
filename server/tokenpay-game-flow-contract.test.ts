@@ -22,7 +22,7 @@ test("a disconnected TokenPay selection cannot start a game", () => {
 });
 
 test("character generation draws the fixed village cast and does not call a model", () => {
-  assert.match(characterSource, /drawVillagers\(count\)/);
+  assert.match(characterSource, /drawVillagers\(count,/);
   assert.match(characterSource, /characterFromVillager\(villager\)/);
   assert.doesNotMatch(characterSource, /response_format/);
   assert.doesNotMatch(characterSource, /generateJSON|fetch\(/);
