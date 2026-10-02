@@ -114,4 +114,4 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ## 📄 License
 
-MIT
+Apache-2.0. This repository is a modified fork of oil-oil/wolfcha. See NOTICE.

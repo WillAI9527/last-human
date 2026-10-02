@@ -4,28 +4,10 @@ import { useEffect, useState, useMemo, useCallback, useRef, type CSSProperties }
 import { AnimatePresence, motion, type TargetAndTransition } from "framer-motion";
 import { toast } from "sonner";
 import {
-  Users,
   NotePencil,
   X,
-  Eye,
-  Skull,
-  Shield,
-  Drop,
-  Crosshair,
   GearSix,
 } from "@phosphor-icons/react";
-import {
-  WerewolfIcon,
-  NightIcon,
-  DayIcon,
-  SpeechIcon,
-  TimerIcon,
-  SeerIcon,
-  WitchIcon,
-  HunterIcon,
-  GuardIcon,
-  VillagerIcon,
-} from "@/components/icons/FlatIcons";
 import { useTypewriter } from "@/hooks/useTypewriter";
 import { useGameLogic } from "@/hooks/useGameLogic";
 import type { Player, Role } from "@/types/game";
@@ -39,6 +21,8 @@ import { BADGE_TRANSFER_TORN } from "@/lib/game-master";
 
 // Components
 import { WelcomeScreen } from "@/components/game/WelcomeScreen";
+import { PhaseBar } from "@/components/game/PhaseBar";
+import { captureTesterTokenFromLocation } from "@/lib/demo-game-client";
 import { PlayerCardCompact } from "@/components/game/PlayerCardCompact";
 import { DialogArea } from "@/components/game/DialogArea";
 import { BottomActionPanel } from "@/components/game/BottomActionPanel";
@@ -207,6 +191,7 @@ export default function Home() {
   useEffect(() => {
     persistReferralFromCurrentUrl();
     removeReferralFromCurrentUrl();
+    captureTesterTokenFromLocation();
   }, []);
 
   useEffect(() => {
@@ -1196,21 +1181,6 @@ export default function Home() {
   const leftPlayers = useMemo(() => allPlayers.slice(0, Math.ceil(allPlayers.length / 2)), [allPlayers]);
   const rightPlayers = useMemo(() => allPlayers.slice(Math.ceil(allPlayers.length / 2)), [allPlayers]);
 
-  // 获取阶段描述
-  const getPhaseDescription = useCallback(() => {
-    const config = PHASE_CONFIGS[gameState.phase];
-    if (config.humanDescription) {
-      return config.humanDescription(humanPlayer, gameState);
-    }
-    return t(config.description as Parameters<typeof t>[0]);
-  }, [gameState, humanPlayer, t]);
-
-  const needsHumanAction = useMemo(() => {
-    return PHASE_CONFIGS[gameState.phase].requiresHumanInput(humanPlayer, gameState);
-  }, [gameState.phase, humanPlayer, gameState]);
-
-  const showWaitingIndicator = isWaitingForAI && !needsHumanAction;
-
   const hasSelectableTargets = useMemo(() => {
     return allPlayers.some((player) => canClickSeat(player));
   }, [allPlayers, canClickSeat]);
@@ -1222,31 +1192,6 @@ export default function Home() {
     if (actionType === "special") return needsHumanActionNow && hasSelectableTargets;
     return false;
   }, [gameState, gameState.phase, hasSelectableTargets, humanPlayer]);
-
-  const renderPhaseIcon = () => {
-    switch (gameState.phase) {
-      case "NIGHT_SEER_ACTION":
-        return <Eye size={14} />;
-      case "NIGHT_WOLF_ACTION":
-        return <Skull size={14} />;
-      case "NIGHT_GUARD_ACTION":
-        return <Shield size={14} />;
-      case "NIGHT_WITCH_ACTION":
-        return <Drop size={14} />;
-      case "HUNTER_SHOOT":
-        return <Crosshair size={14} />;
-      case "DAY_SPEECH":
-        return <SpeechIcon size={14} />;
-      case "DAY_BADGE_SIGNUP":
-        return <Users size={14} />;
-      case "DAY_BADGE_ELECTION":
-        return <Users size={14} />;
-      case "DAY_VOTE":
-        return <Users size={14} />;
-      default:
-        return visualIsNight ? <NightIcon size={14} /> : <DayIcon size={14} />;
-    }
-  };
 
   // ============ 渲染 ==========
 
@@ -1439,12 +1384,13 @@ export default function Home() {
             />
 
             {showTable && (
+              <>
               <div className="wc-topbar wc-topbar--responsive shrink-0 transition-all duration-300">
                 {/* 移动端第一行：Logo + 设置按钮 */}
                 <div className="wc-topbar__row-1 flex items-center justify-between w-full md:w-auto md:contents">
                   <div className="wc-topbar__title">
-                    <WerewolfIcon size={22} className="text-[var(--color-blood)]" />
-                    <span>WOLFCHA</span>
+                    <img src="/brand/mark.svg" alt="" width={22} height={22} />
+                    <span>LAST HUMAN</span>
                   </div>
 
                   {/* 移动端设置按钮 - 只显示图标 */}
@@ -1476,23 +1422,6 @@ export default function Home() {
                       </span>
                     </div>
                   )}
-                  <div className="wc-phase-badge">
-                    <span className="opacity-90">{renderPhaseIcon()}</span>
-                    <span>{getPhaseDescription()}</span>
-                    {showWaitingIndicator && (
-                      <span className="flex items-center gap-1 ml-1">
-                        <motion.span animate={{ scale: [1, 1.25, 1] }} transition={{ repeat: Infinity, duration: 0.7, delay: 0 }} className="w-1.5 h-1.5 rounded-full bg-current" />
-                        <motion.span animate={{ scale: [1, 1.25, 1] }} transition={{ repeat: Infinity, duration: 0.7, delay: 0.15 }} className="w-1.5 h-1.5 rounded-full bg-current" />
-                        <motion.span animate={{ scale: [1, 1.25, 1] }} transition={{ repeat: Infinity, duration: 0.7, delay: 0.3 }} className="w-1.5 h-1.5 rounded-full bg-current" />
-                      </span>
-                    )}
-                    {needsHumanAction && (
-                      <span className="flex items-center gap-1.5 font-semibold text-xs px-2 py-0.5 rounded-full ml-1 bg-[var(--color-gold)]/20 text-[var(--color-gold)]">
-                        <span className="w-1.5 h-1.5 bg-current rounded-full animate-pulse" />
-                        {t("ui.waitingAction")}
-                      </span>
-                    )}
-                  </div>
                 </div>
 
                 {/* 桌面端右侧区域 */}
@@ -1515,6 +1444,13 @@ export default function Home() {
                   </button>
                 </div>
               </div>
+              <PhaseBar
+                gameState={gameState}
+                humanPlayer={humanPlayer}
+                visualIsNight={visualIsNight}
+                isWaitingForAI={isWaitingForAI}
+              />
+              </>
             )}
 
             <div className="flex flex-1 overflow-hidden">

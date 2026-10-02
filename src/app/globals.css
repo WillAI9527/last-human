@@ -1,7 +1,8 @@
 @import "tailwindcss";
 
 :root {
-  --font-title: "Cinzel";
+  --font-title: "Cormorant Garamond", "Noto Serif SC", "Cinzel", ui-serif, Georgia, serif;
+  --font-body: "Inter", "Noto Serif SC", system-ui, sans-serif;
   --font-chinese: "Noto Serif SC";
   /* ========== 核心色板 (参考 style-unification-preview.html) ========== */
   --color-blood: #8a1c1c;
@@ -4496,4 +4497,80 @@ input[type="submit"]:not(:disabled),
   0% { left: -100%; }
   20% { left: 100%; }
   100% { left: 100%; }
+}
+
+.lh-phase-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 44px;
+  min-height: 44px;
+  padding: 0 12px;
+  border-bottom: 1px solid rgba(232, 190, 106, 0.28);
+  background: rgba(15, 13, 12, 0.72);
+  color: #F2EDE4;
+  font-family: var(--font-body), "Inter", "Noto Serif SC", system-ui, sans-serif;
+  backdrop-filter: blur(10px);
+}
+
+.lh-phase-bar__day,
+.lh-phase-bar__status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: 13px;
+}
+
+.lh-phase-bar__day { flex: 0 0 auto; letter-spacing: 0.04em; }
+.lh-phase-bar__status { flex: 1 1 auto; }
+
+.lh-phase-bar__capsule {
+  flex: 0 1 auto;
+  max-width: 46vw;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #E8BE6A;
+  color: #0F0D0C;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  animation: lh-phase-pulse 600ms ease-out 1;
+}
+
+.lh-phase-bar__capsule--out {
+  background: #7F8C99;
+  color: #F2EDE4;
+  animation: none;
+}
+
+.lh-phase-bar__dots { display: inline-flex; gap: 3px; }
+.lh-phase-bar__dots i {
+  width: 4px;
+  height: 4px;
+  border-radius: 999px;
+  background: currentColor;
+  animation: lh-phase-dot 900ms ease-in-out infinite;
+}
+.lh-phase-bar__dots i:nth-child(2) { animation-delay: 150ms; }
+.lh-phase-bar__dots i:nth-child(3) { animation-delay: 300ms; }
+
+@keyframes lh-phase-pulse {
+  0% { transform: scale(0.96); }
+  40% { transform: scale(1.04); }
+  100% { transform: scale(1); }
+}
+
+@keyframes lh-phase-dot {
+  0%, 80%, 100% { opacity: 0.25; }
+  40% { opacity: 1; }
+}
+
+.wc-sponsor-cards,
+.wc-paper-sponsors,
+.wc-promo-tag-container {
+  display: none !important;
 }

@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { cookies, headers } from "next/headers";
-import Script from "next/script";
 import "./globals.css";
 import { Toaster } from "sonner";
 import { Analytics } from "@vercel/analytics/next"
@@ -53,13 +52,13 @@ export const metadata: Metadata = {
     type: "website",
     siteName: defaultMessages.app.title,
     locale: localeToHtmlLang[defaultLocale],
-    url: "https://wolf-cha.com",
+    url: "/",
     images: [
       {
         url: "/og-image.png",
         width: 1200,
         height: 630,
-        alt: "Wolfcha - AI Werewolf Game",
+        alt: "LAST HUMAN · 最后的真人",
       },
     ],
   },
@@ -70,9 +69,13 @@ export const metadata: Metadata = {
     images: ["/og-image.png"],
   },
   icons: {
-    icon: "/brand/wolfcha-favicon.svg",
+    icon: [
+      { url: "/icon-32.png", sizes: "32x32", type: "image/png" },
+      { url: "/brand/mark.svg", type: "image/svg+xml" },
+    ],
+    apple: "/icon-180.png",
   },
-  metadataBase: new URL("https://wolf-cha.com"),
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"),
   alternates: {
     canonical: "/",
     languages: {
@@ -115,18 +118,12 @@ export default async function RootLayout({
     <html lang={localeToHtmlLang[initialLocale]} suppressHydrationWarning>
       <Analytics />
       <head>
-        <Script
-          src="https://www.googletagmanager.com/gtag/js?id=G-3SSRH8KPLY"
-          strategy="afterInteractive"
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Inter:wght@400;600&family=Noto+Serif+SC:wght@600;700&display=swap"
+          rel="stylesheet"
         />
-        <Script id="ga-init" strategy="afterInteractive">
-          {`
-            window.dataLayer = window.dataLayer || [];
-            function gtag(){dataLayer.push(arguments);}
-            gtag('js', new Date());
-            gtag('config', 'G-3SSRH8KPLY');
-          `}
-        </Script>
       </head>
       <body className="antialiased">
         <JsonLd data={getWebsiteJsonLd()} />

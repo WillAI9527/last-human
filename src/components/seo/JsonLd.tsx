@@ -20,12 +20,11 @@ export function getGameJsonLd() {
   return {
     "@context": "https://schema.org",
     "@type": "VideoGame",
-    name: "Wolfcha - AI Werewolf Game",
-    alternateName: ["AI Werewolf", "猹杀", "AI狼人杀"],
+    name: "LAST HUMAN · 最后的真人",
+    alternateName: ["最后的真人", "AI Werewolf", "AI狼人杀"],
     description:
       "Play Werewolf with AI opponents. A single-player social deduction game where AI players reason, bluff, accuse, defend, and vote through the full Werewolf flow.",
-    url: "https://wolf-cha.com",
-    image: "https://wolf-cha.com/og-image.png",
+    image: "/og-image.png",
     genre: ["Social Deduction", "Strategy", "Party Game", "AI Game"],
     gamePlatform: ["Web Browser", "Mobile Browser"],
     applicationCategory: "Game",
@@ -38,8 +37,7 @@ export function getGameJsonLd() {
     },
     author: {
       "@type": "Organization",
-      name: "Wolfcha Team",
-      url: "https://wolf-cha.com",
+      name: "LAST HUMAN",
     },
     keywords:
       "AI werewolf, play werewolf online, werewolf game online, play werewolf alone, single player werewolf, AI mafia game, werewolf with AI opponents, social deduction game",
@@ -57,14 +55,13 @@ export function getWebsiteJsonLd() {
   return {
     "@context": "https://schema.org",
     "@type": "WebSite",
-    name: "Wolfcha",
-    alternateName: "AI Werewolf Game",
-    url: "https://wolf-cha.com",
+    name: "LAST HUMAN · 最后的真人",
+    alternateName: "最后的真人",
     description:
       "Play Werewolf with AI opponents online. A single-player social deduction game with classic roles, AI dialogue, voting, bluffing, and optional voice acting.",
     potentialAction: {
       "@type": "PlayAction",
-      target: "https://wolf-cha.com",
+      target: "/",
       name: "Play AI Werewolf",
     },
   };
@@ -74,15 +71,9 @@ export function getOrganizationJsonLd() {
   return {
     "@context": "https://schema.org",
     "@type": "Organization",
-    name: "Wolfcha",
-    url: "https://wolf-cha.com",
-    logo: "https://wolf-cha.com/logo.png",
+    name: "LAST HUMAN",
+    logo: "/logo.png",
     sameAs: ["https://github.com/oil-oil/wolfcha"],
-    contactPoint: {
-      "@type": "ContactPoint",
-      email: "contact@wolf-cha.com",
-      contactType: "customer support",
-    },
   };
 }
 
@@ -104,7 +95,7 @@ export function getFAQJsonLd() {
         name: "Can I play Werewolf alone?",
         acceptedAnswer: {
           "@type": "Answer",
-          text: "Yes! Wolfcha allows you to play Werewolf completely solo. All other players are AI opponents with distinct personalities, memory, and strategies.",
+          text: "Yes. LAST HUMAN lets you play Werewolf as the only human at the table. Every other seat is an AI.",
         },
       },
       {
@@ -117,10 +108,10 @@ export function getFAQJsonLd() {
       },
       {
         "@type": "Question",
-        name: "Is Wolfcha free to play?",
+        name: "Is LAST HUMAN free to play?",
         acceptedAnswer: {
           "@type": "Answer",
-          text: "Yes, Wolfcha is free to play. You can start playing immediately by visiting wolf-cha.com.",
+          text: "Yes. Open the page, sign your name, and start. Each IP can start 3 games per day.",
         },
       },
       {
@@ -142,13 +133,13 @@ export function getHowToJsonLd() {
     name: "How to Play AI Werewolf",
     description:
       "Learn how to play Werewolf with AI opponents in this single-player social deduction game.",
-    image: "https://wolf-cha.com/og-image.png",
+    image: "/og-image.png",
     totalTime: "PT15M",
     step: [
       {
         "@type": "HowToStep",
         name: "Enter Your Name",
-        text: "Visit wolf-cha.com and enter your player name to begin.",
+        text: "Open the page and enter your name to begin.",
         position: 1,
       },
       {

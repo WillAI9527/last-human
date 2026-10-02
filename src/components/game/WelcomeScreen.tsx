@@ -36,6 +36,9 @@ import {
   type ModelSource,
 } from "@/lib/api-keys";
 import { loadTokenPayConnectionWithRetry } from "@/lib/tokenpay-client";
+import { reservePublicGame } from "@/lib/demo-game-client";
+
+const PUBLIC_DEMO = true;
 import { useAppLocale } from "@/i18n/useAppLocale";
 import {
   SPRING_CAMPAIGN_CODE,
@@ -290,6 +293,23 @@ export function WelcomeScreen({
   const sealButtonRef = useRef<HTMLButtonElement | null>(null);
   const isStartingRef = useRef(false);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
+  const [serverNotice, setServerNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/check-config")
+      .then((response) => response.json())
+      .then((payload: { zenmuxConfigured?: boolean; message?: string | null }) => {
+        if (cancelled) return;
+        setServerNotice(payload.zenmuxConfigured ? null : (payload.message || "服务器未配置，暂时无法开局。"));
+      })
+      .catch(() => {
+        if (!cancelled) setServerNotice("服务器未配置，暂时无法开局。");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   const [isShareOpen, setIsShareOpen] = useState(false);
   const [isAccountOpen, setIsAccountOpen] = useState(false);
   const [isUserProfileOpen, setIsUserProfileOpen] = useState(false);
@@ -596,7 +616,7 @@ export function WelcomeScreen({
   }, [playerCount, t]);
 
   const canConfirm = useMemo(() => {
-    return !!humanName.trim() && !isLoading && !isTransitioning && !creditsLoading;
+    return !!humanName.trim() && !isLoading && !isTransitioning && (PUBLIC_DEMO || !creditsLoading);
   }, [humanName, isLoading, isTransitioning, creditsLoading]);
 
   const isAnyModalOpen =
@@ -831,6 +851,13 @@ export function WelcomeScreen({
         gameSessionId = result.sessionId ?? null;
       }
 
+      const reservation = await reservePublicGame();
+      if (!reservation.ok) {
+        toast.error(reservation.message);
+        setIsTransitioning(false);
+        return;
+      }
+
       await waitForStartAnimation(animationStartedAt);
       await onStart(buildStartOptions(gameSessionId));
       completeGameStartRequest(startRequestId);
@@ -857,14 +884,14 @@ export function WelcomeScreen({
     const latestDemoConfig = await refreshDemoConfig(true);
     const demoModeActive = latestDemoConfig.active;
 
-    // Demo mode: allow guests and skip credit checks
-    if (!user && !demoModeActive) {
+    // Public demo: no account, no credits. Guests start straight from this screen.
+    if (!PUBLIC_DEMO && !user && !demoModeActive) {
       setIsAuthOpen(true);
       toast(t("welcome.toast.signInFirst"));
       return;
     }
 
-    if (getModelSource() === "tokenpay") {
+    if (!PUBLIC_DEMO && getModelSource() === "tokenpay") {
       const connected = tokenPayConnected
         ? true
         : await refreshTokenPayConnection();
@@ -877,6 +904,7 @@ export function WelcomeScreen({
     const hasExternalSource = hasActiveExternalModelSource();
 
     if (
+      !PUBLIC_DEMO &&
       !demoModeActive &&
       !hasExternalSource &&
       !hasPendingGameStartRequest(buildCreditConsumeOptions()) &&
@@ -889,7 +917,7 @@ export function WelcomeScreen({
       return;
     }
 
-    await startGameWithCreditGuard(demoModeActive);
+    await startGameWithCreditGuard(PUBLIC_DEMO || demoModeActive);
   };
 
   const handleOpenPayAsYouGo = () => {
@@ -903,7 +931,7 @@ export function WelcomeScreen({
   };
 
   const handleStartGameFromLowCreditModal = async () => {
-    if (getModelSource() === "tokenpay") {
+    if (!PUBLIC_DEMO && getModelSource() === "tokenpay") {
       const connected = tokenPayConnected
         ? true
         : await refreshTokenPayConnection();
@@ -914,7 +942,7 @@ export function WelcomeScreen({
       }
     }
     const latestDemoConfig = await refreshDemoConfig(true);
-    await startGameWithCreditGuard(latestDemoConfig.active);
+    await startGameWithCreditGuard(PUBLIC_DEMO || latestDemoConfig.active);
   };
 
   const handleOpenGroup = () => {
@@ -1146,6 +1174,7 @@ export function WelcomeScreen({
               <DialogDescription>{t("welcome.mobileMenu.description")}</DialogDescription>
             </DialogHeader>
             <div className="grid gap-2">
+              {!PUBLIC_DEMO && (
               <Button
                 type="button"
                 variant="outline"
@@ -1158,6 +1187,7 @@ export function WelcomeScreen({
                 <Handshake size={16} />
                 {t("welcome.sponsor.action")}
               </Button>
+              )}
               <Button
                 type="button"
                 variant="outline"
@@ -1183,7 +1213,7 @@ export function WelcomeScreen({
                   <UserCircle size={16} />
                   {t("welcome.account.info")}
                 </Button>
-              ) : (
+              ) : !PUBLIC_DEMO ? (
                 <Button
                   type="button"
                   variant="outline"
@@ -1196,7 +1226,7 @@ export function WelcomeScreen({
                   <UserCircle size={16} />
                   {t("welcome.auth.signIn")}
                 </Button>
-              )}
+              ) : null}
               <Button asChild variant="outline" className="justify-start">
                 <a
                   href="https://github.com/oil-oil/wolfcha"
@@ -1274,6 +1304,7 @@ export function WelcomeScreen({
                 </span>
               </span>
             </a>
+            {!PUBLIC_DEMO && (
             <Button
               type="button"
               variant="outline"
@@ -1283,6 +1314,7 @@ export function WelcomeScreen({
               <Handshake size={16} />
               {t("welcome.sponsor.action")}
             </Button>
+            )}
             <Button
               type="button"
               variant="outline"
@@ -1314,7 +1346,7 @@ export function WelcomeScreen({
                   </span>
                 )}
               </button>
-            ) : (
+            ) : !PUBLIC_DEMO ? (
               <Button
                 type="button"
                 variant="outline"
@@ -1324,7 +1356,7 @@ export function WelcomeScreen({
                 <UserCircle size={16} />
                 {t("welcome.auth.signIn")}
               </Button>
-            )}
+            ) : null}
 
             {user && (
               <Button
@@ -1351,6 +1383,7 @@ export function WelcomeScreen({
 
           <div className="flex sm:hidden items-center gap-2">
             <LocaleSwitcher className="shrink-0" />
+            {!PUBLIC_DEMO && (
             <Button
               type="button"
               variant="outline"
@@ -1360,6 +1393,7 @@ export function WelcomeScreen({
               <Handshake size={16} />
               {t("welcome.sponsor.short")}
             </Button>
+            )}
             <Button
               type="button"
               variant="outline"
@@ -1447,8 +1481,11 @@ export function WelcomeScreen({
             </div>
 
             <div className="mt-2 text-center">
-              <div className="wc-contract-title">WOLFCHA</div>
+              <div className="wc-contract-title">LAST HUMAN</div>
               <div className="wc-contract-subtitle">{t("welcome.subtitle")}</div>
+              {serverNotice && (
+                <p className="mt-3 text-sm text-[#B3262B]" role="alert">{serverNotice}</p>
+              )}
             </div>
 
             <div className="mt-5">

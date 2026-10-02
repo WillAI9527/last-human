@@ -1,5 +1,12 @@
+// Modified by LAST HUMAN demo (fork of oil-oil/wolfcha).
 import { NextRequest, NextResponse } from "next/server";
 import { authenticateRequest, hasAuthorizedActiveGameSession } from "@/lib/api-auth";
+import {
+  applyRateLimitCookies,
+  consumeDemoLlmCall,
+  isZenmuxConfigured,
+  MSG_SERVER_NOT_CONFIGURED,
+} from "@/lib/demo-rate-limit";
 import {
   GAME_SESSION_EXPIRED_CODE,
   GAME_SESSION_EXPIRED_MESSAGE,
@@ -680,7 +687,7 @@ async function runBatchItem(
 
   const apiKey = headerApiKey || process.env.ZENMUX_API_KEY;
   if (!apiKey) {
-    return { ok: false, status: 500, error: "ZENMUX_API_KEY not configured on server" };
+    return { ok: false, status: 503, error: MSG_SERVER_NOT_CONFIGURED };
   }
 
   const requestBody: Record<string, unknown> = {
@@ -748,7 +755,13 @@ export async function POST(request: NextRequest) {
   const auth = await authenticateRequest(request as unknown as Request);
   if ("error" in auth) return auth.error;
 
-  const tokenPayRequested = ["true", "1"].includes(
+  const quota = await consumeDemoLlmCall(request, 1);
+  if (!quota.ok) {
+    return NextResponse.json({ error: quota.message, code: quota.code }, { status: quota.status });
+  }
+  const withQuotaCookies = (response: Response) => applyRateLimitCookies(response, quota.cookies);
+
+  const tokenPayRequested = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL) && ["true", "1"].includes(
     request.headers.get(TOKENPAY_MODE_HEADER)?.trim().toLowerCase() ?? "",
   );
   let tokenPayApiKey: string | null = null;
@@ -811,10 +824,20 @@ export async function POST(request: NextRequest) {
         : request.headers.get("x-tokendance-base-url")?.trim() || null;
       const requests = body.requests as ChatRequestPayload[];
       if (requests.length > MAX_BATCH_REQUESTS) {
-        return NextResponse.json(
+        return withQuotaCookies(NextResponse.json(
           { error: `Too many batch requests. Maximum is ${MAX_BATCH_REQUESTS}.` },
           { status: 400 }
-        );
+        ));
+      }
+      if (requests.length > 1) {
+        const extra = await consumeDemoLlmCall(request, requests.length - 1);
+        if (!extra.ok) {
+          return withQuotaCookies(NextResponse.json(
+            { error: extra.message, code: extra.code },
+            { status: extra.status },
+          ));
+        }
+        quota.cookies.push(...extra.cookies);
       }
       const results = await Promise.all(
         requests.map((req) => runBatchItem(
@@ -1182,10 +1205,10 @@ export async function POST(request: NextRequest) {
 
     const apiKey = headerApiKey || process.env.ZENMUX_API_KEY;
     if (!apiKey) {
-      return NextResponse.json(
-        { error: "ZENMUX_API_KEY not configured on server" },
-        { status: 500 }
-      );
+      return withQuotaCookies(NextResponse.json(
+        { error: MSG_SERVER_NOT_CONFIGURED },
+        { status: 503 }
+      ));
     }
 
     const requestBody: Record<string, unknown> = {

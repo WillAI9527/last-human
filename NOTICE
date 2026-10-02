@@ -1,0 +1,23 @@
+LAST HUMAN · 最后的真人
+Copyright 2026 LAST HUMAN demo contributors
+
+This product is a modified fork of Wolfcha (oil-oil/wolfcha).
+Original work Copyright oil-oil and Wolfcha contributors, licensed under the Apache License, Version 2.0.
+You may obtain a copy of the License at
+
+    https://www.apache.org/licenses/LICENSE-2.0
+
+The Apache-2.0 LICENSE file in this repository is unchanged and covers both the original work and these modifications.
+
+Major modifications in this fork:
+
+- Public demo that runs with only ZENMUX_API_KEY. Login, credits, payments, sponsor placement, TokenPay, Watcha OAuth/pay, and Stripe are disabled.
+- SEO, landing, guide, and model marketing pages are removed. The home page opens game setup.
+- Built-in player models, summaries, reviews, and character generation use a ZenMux-only pool: deepseek/deepseek-v3.2, google/gemini-3.5-flash-lite, and minimax/minimax-m2.1.
+- Server-side limit of DAILY_GAME_LIMIT games per IP per Singapore calendar day (default 3), plus a per-game cap on LLM calls. RATE_LIMIT_BYPASS_TOKEN can skip only the daily cap.
+- Temporary brand (name, logo, favicon, Open Graph image, CC0 BGM).
+- First-layer prompt-injection guard on player speech serialized into model prompts.
+- Phase bar that does not reveal which night role is acting unless it is the human's own turn.
+
+Modified source files are noted with "Modified by LAST HUMAN demo (fork of oil-oil/wolfcha)."
+Background music attributions are in public/bgm/LICENSE-BGM.md (CC0).

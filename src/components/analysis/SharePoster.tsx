@@ -15,8 +15,8 @@ interface SharePosterProps {
   overrideTag?: string | null;
 }
 
-const SITE_URL = "wolf-cha.com";
-const SITE_FULL_URL = "https://wolf-cha.com";
+const SITE_URL = "LAST HUMAN";
+const SITE_FULL_URL = "/";
 
 const ROLE_PORTRAITS: Record<string, string> = {
   Werewolf: "/lihui/wolf.png",
@@ -168,7 +168,7 @@ export const SharePoster = forwardRef<HTMLDivElement, SharePosterProps>(
         <div className="px-4 pt-4 pb-2 flex items-center justify-between border-b border-[#c5a059]/20">
           <div className="flex items-center space-x-1.5">
             <Scroll className="w-4 h-4 text-[#c5a059]" />
-            <span className="text-[#c5a059] font-bold text-sm tracking-wider">Wolfcha</span>
+            <span className="text-[#c5a059] font-bold text-sm tracking-wider">LAST HUMAN</span>
           </div>
           <div
             className={`inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold whitespace-nowrap ${
@@ -310,7 +310,7 @@ export const SharePoster = forwardRef<HTMLDivElement, SharePosterProps>(
           <div className="flex items-center justify-between">
             <div>
               <div className="text-[#c5a059] font-bold tracking-wider text-sm">{SITE_URL}</div>
-              <div className="text-[9px] text-white/40 mt-0.5">扫码加入猹杀</div>
+              <div className="text-[9px] text-white/40 mt-0.5">最后的真人</div>
             </div>
             <div className="bg-white p-1.5 rounded">
               <QRCodeSVG value={SITE_FULL_URL} size={52} level="M" bgColor="#ffffff" fgColor="#1a1614" />

@@ -21,6 +21,12 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 export async function POST(req: NextRequest) {
+  const headerApiKeyEarly = req.headers.get("x-minimax-api-key")?.trim();
+  const headerTokendanceKeyEarly = req.headers.get("x-tokendance-api-key")?.trim();
+  if (!process.env.MINIMAX_API_KEY && !headerApiKeyEarly && !headerTokendanceKeyEarly && !process.env.TOKENDANCE_API_KEY) {
+    return NextResponse.json({ error: "语音合成未启用", disabled: true }, { status: 503 });
+  }
+
   const auth = await authenticateRequest(req as unknown as Request);
   if ("error" in auth) return auth.error;
 
