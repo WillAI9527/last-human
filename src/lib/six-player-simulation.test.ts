@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { setLocale } from "@/i18n/locale-store";
 import type { GameState, Role } from "@/types/game";
-import { PhaseManager } from "@/game/core/PhaseManager";
 
 process.env.ZENMUX_API_KEY ||= "test-zenmux-key";
 process.env.NEXT_PUBLIC_SUPABASE_URL ||= "http://127.0.0.1:54321";
@@ -196,6 +195,7 @@ test("第二夜女巫刀口是自己时，提示词不提供解药", async () =>
   state.day = 2;
   state.phase = "NIGHT_WITCH_ACTION";
   const witch = state.players.find((player) => player.role === "Witch")!;
+  const { PhaseManager } = await import("@/game/core/PhaseManager");
   const prompt = new PhaseManager().getPrompt(
     "NIGHT_WITCH_ACTION",
     { state, extras: { wolfTarget: witch.seat } },

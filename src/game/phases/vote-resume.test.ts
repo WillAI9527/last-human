@@ -12,11 +12,11 @@ process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY ||= "vote-resume-test";
 
 test("实际投票恢复只调用未投 AI，保留已投票和弃票，跳过翻牌白痴和 PK 候选", async () => {
   const modules: Record<string, unknown> = {};
-  for (const id of ["@/lib/vote-rounds", "@/lib/prompt-utils", "@/i18n/translator", "@/lib/game-texts", "@/lib/game-constants", "@/lib/concurrency", "@/lib/narrator-voice", "@/lib/game-flow-controller"]) modules[id] = await import(id);
+  for (const id of ["@/lib/vote-rounds", "@/lib/prompt-utils", "@/i18n/translator", "@/lib/game-texts", "@/lib/game-constants", "@/lib/concurrency", "@/lib/narrator-voice", "@/lib/game-flow-controller", "@/lib/suspicion", "@/lib/six-player-rules"]) modules[id] = await import(id);
   modules["../core/GamePhase"] = await import("../core/GamePhase");
   modules["@/lib/narrator-audio-player"] = { playNarrator: async () => {} };
   const calls: string[] = [];
-  modules["@/lib/game-master"] = { ...await import("@/lib/game-master"), generateAIVote: async (_: GameState, p: Player) => { calls.push(p.playerId); return { seat: 2, reason: "补完投票" }; } };
+  modules["@/lib/game-master"] = { ...await import("@/lib/game-master"), generateAIVote: async (_: GameState, p: Player) => { calls.push(p.playerId); return { seat: 2, reason: "补完投票", suspects: [] }; } };
   const m = { exports: {} as { VotePhase: typeof VotePhase } };
   const code = ts.transpileModule(readFileSync("src/game/phases/VotePhase.ts", "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
   runInNewContext(`(function(require,module,exports){${code}\n})`, { console })((id: string) => { assert.ok(id in modules, id); return modules[id]; }, m, m.exports);
@@ -47,7 +47,7 @@ test("实际投票恢复只调用未投 AI，保留已投票和弃票，跳过�
 
 async function loadVotePhase(generateAIVote: (state: GameState, player: Player) => Promise<{ seat: number; reason: string }>) {
   const modules: Record<string, unknown> = {};
-  for (const id of ["@/lib/vote-rounds", "@/lib/prompt-utils", "@/i18n/translator", "@/lib/game-texts", "@/lib/game-constants", "@/lib/concurrency", "@/lib/narrator-voice", "@/lib/game-flow-controller"]) modules[id] = await import(id);
+  for (const id of ["@/lib/vote-rounds", "@/lib/prompt-utils", "@/i18n/translator", "@/lib/game-texts", "@/lib/game-constants", "@/lib/concurrency", "@/lib/narrator-voice", "@/lib/game-flow-controller", "@/lib/suspicion", "@/lib/six-player-rules"]) modules[id] = await import(id);
   modules["../core/GamePhase"] = await import("../core/GamePhase");
   modules["@/lib/narrator-audio-player"] = { playNarrator: async () => {} };
   modules["@/lib/game-master"] = { ...await import("@/lib/game-master"), generateAIVote };
