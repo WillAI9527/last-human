@@ -26,6 +26,8 @@ import { generateUUID } from "@/lib/utils";
 import { withTimeout } from "@/lib/request-timeout";
 import { isGameSessionExpiredMessage } from "@/lib/llm";
 
+const SPEECH_RETRY_BACKOFF_MS = 600;
+
 export interface DayPhaseCallbacks {
   setDialogue: (speaker: string, text: string, isStreaming?: boolean) => void;
   setIsWaitingForAI: (waiting: boolean) => void;
@@ -117,7 +119,7 @@ export function useDayPhase(
   const runAISpeech = useCallback(async (
     state: GameState,
     player: Player,
-    options?: { afterSpeech?: (s: GameState) => Promise<void> }
+    options?: { afterSpeech?: (s: GameState) => Promise<void>; retried?: boolean }
   ) => {
     if (!PHASE_CATEGORIES.SPEECH_PHASES.includes(state.phase as typeof PHASE_CATEGORIES.SPEECH_PHASES[number])) return;
     if (activeRequestRef.current?.isValid()) return;
@@ -231,6 +233,15 @@ export function useDayPhase(
       if (!isValid()) return;
       await displayChain;
       if (!isValid()) return;
+      // One silent retry before the failure banner. A second failure, or a
+      // failure after lines were already shown, still pauses for a manual retry.
+      if (!options?.retried && collected.length === 0 && request.isValid()) {
+        await new Promise((resolve) => setTimeout(resolve, SPEECH_RETRY_BACKOFF_MS));
+        if (!request.isValid()) return;
+        activeRequestRef.current = null;
+        await runAISpeech(store.get(gameStateAtom), player, { ...options, retried: true });
+        return;
+      }
       // 错误属于系统，不能记为角色台词。保留已确认段落，阻止自动推进至下一人。
       failedRequestRef.current = request;
       if (!collected.length) setDialogue(speakerHost, t(isGameSessionExpiredMessage(String(error))

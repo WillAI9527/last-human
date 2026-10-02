@@ -274,12 +274,15 @@ export default function Home() {
 
     const beginBlink = () => {
       if (dayNightBlinkTokenRef.current !== token) return;
+      // The scene follows the phase immediately. The eyelid animation plays
+      // over it and must not leave the day background up after night starts.
+      visualIsNightRef.current = targetIsNight;
+      setVisualIsNight(targetIsNight);
       setDayNightBlinkPhase("closing");
 
       const { closeMs, holdMs, openMs } = DAY_NIGHT_BLINK;
       const t1 = window.setTimeout(() => {
         if (dayNightBlinkTokenRef.current !== token) return;
-        setVisualIsNight(targetIsNight);
         const tHold = window.setTimeout(() => {
           if (dayNightBlinkTokenRef.current !== token) return;
           setDayNightBlinkPhase("opening");
@@ -305,24 +308,12 @@ export default function Home() {
   useEffect(() => {
     if (isNight === visualIsNightRef.current) return;
 
-    if (isNight) {
-      // Mark that we need to blink to night
-      pendingNightBlinkRef.current = true;
-      
-      // In spectator mode (no human player), trigger night blink immediately
-      // because the game progresses quickly without waiting for role reveal
-      if (showTable && !humanPlayer) {
-        scheduleDayNightBlink(true, 0);
-        pendingNightBlinkRef.current = false;
-      }
-      return;
-    }
-
-    // Transition to day immediately
+    // Night used to wait for the nightfall card, so the day scene stayed up
+    // after the night phase (and its controls) had already started.
     pendingNightBlinkRef.current = false;
-    lastNightCueIdRef.current = null;
-    scheduleDayNightBlink(false, 0);
-  }, [isNight, scheduleDayNightBlink, showTable, humanPlayer]);
+    if (!isNight) lastNightCueIdRef.current = null;
+    scheduleDayNightBlink(isNight, 0);
+  }, [isNight, scheduleDayNightBlink]);
 
   useEffect(() => {
     return () => {

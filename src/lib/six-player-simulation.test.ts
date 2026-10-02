@@ -187,6 +187,8 @@ test("AI 狼人解析失败也不会空刀", async () => {
     const seat = await generateWolfAction(state, wolf);
     assert.equal(typeof seat, "number");
     assert.notEqual(seat, wolf.seat);
+    const target = state.players.find((player) => player.seat === seat);
+    assert.notEqual(target?.role, "Werewolf");
   });
 });
 

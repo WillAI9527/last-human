@@ -2633,6 +2633,16 @@ input[type="submit"]:not(:disabled),
   max-width: 92vw;
 }
 
+@media (min-width: 769px) {
+  /* The round-table action row (including the witch pass button) sits in the
+     bottom-right dialog. Keep the notebook off that corner. */
+  .wc-notebook-fab {
+    left: 24px;
+    right: auto;
+    bottom: 24px;
+  }
+}
+
 @media (max-width: 768px) {
   .wc-notebook-fab {
     display: none;

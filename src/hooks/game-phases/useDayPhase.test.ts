@@ -181,20 +181,27 @@ test("首段已收到但 TTS 尚未就绪时超时，仍给出可推进的兜底
 });
 
 
-test("发言恢复耗尽后停住推进，错误不作为角色台词，用户重试仍在同一发言轮次", async () => {
+test("发言失败先静默重试一次，再次失败才暂停，错误不作为角色台词", async () => {
   const h = harness();
   try {
     const running = h.day.runAISpeech(h.state, h.first);
     h.pending[0].reject(new Error("公开发言格式恢复失败"));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    assert.equal(h.failures.length, 0);
+    assert.equal(h.pending.length, 1);
+    await new Promise((resolve) => setTimeout(resolve, 700));
+    assert.equal(h.pending.length, 2);
+    assert.equal(h.failures.length, 0);
+    h.pending[1].reject(new Error("公开发言格式恢复失败"));
     await running;
     assert.equal(h.day.isSpeechBlocked(), true);
     assert.deepEqual([...h.dialogue.getSpeechQueue().segments], []);
     assert.equal(h.failures.length, 1);
     h.failures[0].action.onClick();
-    assert.equal(h.pending.length, 2);
+    assert.equal(h.pending.length, 3);
     assert.equal(h.day.isSpeechBlocked(), false);
-    h.pending[1].options.onSegmentReceived("重试后的公开发言", 0);
-    h.pending[1].resolve(["重试后的公开发言"]);
+    h.pending[2].options.onSegmentReceived("重试后的公开发言", 0);
+    h.pending[2].resolve(["重试后的公开发言"]);
     await tick();
     assert.deepEqual([...h.dialogue.getSpeechQueue().segments], ["重试后的公开发言"]);
   } finally { h.dispose(); }
