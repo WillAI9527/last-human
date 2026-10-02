@@ -3,12 +3,14 @@
 import React, { useEffect, useState, useRef, useMemo } from "react";
 import {
   buildAvatarUrl,
+  buildSimpleAvatarUrl,
   getIdleLipsForSeed,
   getTalkingLips,
   getModelLogoUrl,
 } from "@/lib/avatar-config";
 import type { Gender } from "@/lib/character-generator";
 import type { ModelRef } from "@/types/game";
+import { isVillagerAvatarId } from "@/lib/village-cast";
 
 interface TalkingAvatarProps {
   seed: string;
@@ -35,6 +37,18 @@ export function TalkingAvatar({
 }: TalkingAvatarProps) {
   if (useModelLogo) {
     return <img src={getModelLogoUrl(modelRef)} alt={alt} className={className} />;
+  }
+
+  // Seat cards and history bubbles use the villager painting. Mouth-swap DiceBear
+  // would show a different face for the same person.
+  if (isVillagerAvatarId(seed)) {
+    return (
+      <img
+        src={buildSimpleAvatarUrl(seed, { gender })}
+        alt={alt}
+        className={className}
+      />
+    );
   }
 
   const TALKING_LIPS = useMemo(() => getTalkingLips(), []);
@@ -164,6 +178,16 @@ export function TalkingAvatarSmall({
 }: TalkingAvatarSmallProps) {
   if (useModelLogo) {
     return <img src={getModelLogoUrl(modelRef)} alt={alt} className={className} />;
+  }
+
+  if (isVillagerAvatarId(seed)) {
+    return (
+      <img
+        src={buildSimpleAvatarUrl(seed, { gender })}
+        alt={alt}
+        className={className}
+      />
+    );
   }
 
   const TALKING_LIPS = useMemo(() => getTalkingLips(), []);

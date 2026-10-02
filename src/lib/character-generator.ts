@@ -197,9 +197,10 @@ export async function generateCharacters(
   options?: {
     onBaseProfiles?: (profiles: BaseProfile[]) => void;
     onCharacter?: (index: number, character: GeneratedCharacter) => void;
+    excludeAvatarIds?: readonly string[];
   }
 ): Promise<GeneratedCharacter[]> {
-  const villagers = drawVillagers(count);
+  const villagers = drawVillagers(count, Math.random, options?.excludeAvatarIds ?? []);
   const characters: GeneratedCharacter[] = villagers.map((villager) => characterFromVillager(villager));
   const profiles: BaseProfile[] = characters.map((character) => ({
     displayName: character.displayName,

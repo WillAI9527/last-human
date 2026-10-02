@@ -28,6 +28,7 @@ import { parseLLMJson } from "./llm-json";
 import { getI18n } from "@/i18n/translator";
 import { getRoleConfiguration } from "@/lib/role-configuration";
 import { resolveBadgeElectionWinner } from "@/lib/historical-vote-snapshots";
+import { isVillagerAvatarId } from "@/lib/village-cast";
 
 export { getRoleConfiguration } from "@/lib/role-configuration";
 export { getSpeakingOrder } from "@/lib/speech-order";
@@ -220,7 +221,8 @@ export function setupPlayers(
   seedPlayerIds?: string[],
   modelRefs?: ModelRef[],
   aiSeatOrder?: number[],
-  preferredRole?: Role
+  preferredRole?: Role,
+  humanAvatarSeed?: string
 ): Player[] {
   const { t } = getI18n();
   const totalPlayers = playerCount;
@@ -282,7 +284,7 @@ export function setupPlayers(
         playerId,
         seat,
         displayName: humanName.trim() || fallbackHumanName,
-        avatarSeed: playerId,
+        avatarSeed: isVillagerAvatarId(humanAvatarSeed) ? humanAvatarSeed : playerId,
         alive: true,
         role,
         alignment,

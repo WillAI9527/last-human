@@ -1515,7 +1515,6 @@ export default function Home() {
               <PhaseBar
                 gameState={gameState}
                 humanPlayer={humanPlayer}
-                visualIsNight={visualIsNight}
                 isWaitingForAI={isWaitingForAI}
               />
               </>

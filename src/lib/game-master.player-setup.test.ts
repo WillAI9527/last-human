@@ -102,6 +102,26 @@ test("随机到任意座位时仍会把玩家偏好身份放在真人座位", as
   }
 });
 
+test("真人座位使用预留的村民肖像，名字仍是玩家自己的", async () => {
+  const { setupPlayers } = await import("./game-master");
+  const players = setupPlayers(
+    makeCharacters(7),
+    0,
+    "你",
+    8,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    "Seer",
+    "m-03"
+  );
+  assert.equal(players[0].isHuman, true);
+  assert.equal(players[0].displayName, "你");
+  assert.equal(players[0].avatarSeed, "m-03");
+  assert.equal(players[0].role, "Seer");
+});
+
 test("观战模式仍然是全 AI，随机真人座位逻辑不会占用任何席位", async () => {
   const { setupPlayers } = await import("./game-master");
   const playerCount = 10;

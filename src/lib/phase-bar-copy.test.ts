@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { GameState } from "@/types/game";
-import { phaseBarStatus } from "./phase-bar-copy";
+import { phaseBarDayChip, phaseBarStatus } from "./phase-bar-copy";
 
 function state(partial: Partial<GameState>): GameState {
   return {
@@ -56,6 +56,15 @@ test("警长投票刚结束不会闪出警长移交警徽", () => {
   const copy = phaseBarStatus(state({ phase: "BADGE_TRANSFER", day: 1 }), false);
   assert.equal(copy.includes("移交警徽"), false);
   assert.equal(copy, "天亮了，正在公布昨夜结果");
+});
+
+test("夜晚状态条的日夜标记跟阶段走", () => {
+  const chip = phaseBarDayChip("NIGHT_START", 1);
+  assert.equal(chip.night, true);
+  assert.equal(chip.label, "第 1 天 · 夜晚");
+  assert.equal(phaseBarStatus(state({ phase: "NIGHT_START", day: 1 }), false), "夜晚 · 其他玩家正在行动");
+  assert.equal(phaseBarDayChip("DAY_SPEECH", 1).label, "第 1 天 · 白天");
+  assert.equal(phaseBarDayChip("DAY_SPEECH", 1).night, false);
 });
 
 test("夜晚不是本人行动时不写出具体身份阶段", () => {

@@ -12,6 +12,15 @@ const NIGHT_ACTION_PHASES = new Set<GameState["phase"]>([
 
 const OTHER_PLAYERS_ACTING = "夜晚 · 其他玩家正在行动";
 
+/** Day/night chip follows the phase, not the lagged blink animation. */
+export function phaseBarDayChip(phase: GameState["phase"], day: number): { night: boolean; label: string } {
+  const night = phase.startsWith("NIGHT");
+  return {
+    night,
+    label: `第 ${day} 天 · ${night ? "夜晚" : "白天"}`,
+  };
+}
+
 export function phaseBarStatus(gameState: GameState, humanMustAct: boolean): string {
   const phase = gameState.phase;
   if (NIGHT_ACTION_PHASES.has(phase)) return humanMustAct ? "夜晚" : OTHER_PLAYERS_ACTING;

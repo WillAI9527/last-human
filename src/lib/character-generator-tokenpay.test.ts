@@ -14,6 +14,9 @@ test("固定村民表生成角色时不调用模型，也不会产生 TokenPay �
     const characters = await generateCharacters(8);
     assert.equal(calls, 0);
     assert.equal(characters.length, 8);
+    assert.equal(VILLAGERS.find((entry) => entry.id === "m-08")?.occupation, "护林人");
+    const reserved = await generateCharacters(8, undefined, { excludeAvatarIds: ["m-08"] });
+    assert.equal(reserved.some((character) => character.avatarSeed === "m-08"), false);
     assert.equal(new Set(characters.map((character) => character.displayName)).size, 8);
     for (const character of characters) {
       const villager = VILLAGERS.find((entry) => entry.id === character.avatarSeed);

@@ -3,17 +3,16 @@
 
 import { useEffect, useState } from "react";
 import { DayIcon, NightIcon } from "@/components/icons/FlatIcons";
-import { humanMustActOnPhase, phaseBarCapsule, phaseBarStatus } from "@/lib/phase-bar-copy";
+import { humanMustActOnPhase, phaseBarCapsule, phaseBarDayChip, phaseBarStatus } from "@/lib/phase-bar-copy";
 import type { GameState, Player } from "@/types/game";
 
 type PhaseBarProps = {
   gameState: GameState;
   humanPlayer: Player | null;
-  visualIsNight: boolean;
   isWaitingForAI: boolean;
 };
 
-export function PhaseBar({ gameState, humanPlayer, visualIsNight, isWaitingForAI }: PhaseBarProps) {
+export function PhaseBar({ gameState, humanPlayer, isWaitingForAI }: PhaseBarProps) {
   const humanTurn = Boolean(humanPlayer?.alive && humanMustActOnPhase(gameState, humanPlayer));
   const eliminated = Boolean(humanPlayer && !humanPlayer.alive);
   const action = !eliminated && humanTurn ? phaseBarCapsule(gameState.phase) : null;
@@ -24,14 +23,13 @@ export function PhaseBar({ gameState, humanPlayer, visualIsNight, isWaitingForAI
     setPulseKey((value) => value + 1);
   }, [action, gameState.phase]);
 
-  const dayLabel = visualIsNight ? "夜晚" : "白天";
+  const dayChip = phaseBarDayChip(gameState.phase, gameState.day);
 
   return (
     <div className="lh-phase-bar" role="status" aria-live="polite">
       <div className="lh-phase-bar__day">
-        {visualIsNight ? <NightIcon size={16} /> : <DayIcon size={16} />}
-        <span className="hidden sm:inline">第 {gameState.day} 天 · {dayLabel}</span>
-        <span className="sm:hidden">D{gameState.day}</span>
+        {dayChip.night ? <NightIcon size={16} /> : <DayIcon size={16} />}
+        <span>{dayChip.label}</span>
       </div>
       <div className="lh-phase-bar__status">
         <span className="truncate">{phaseBarStatus(gameState, humanTurn)}</span>

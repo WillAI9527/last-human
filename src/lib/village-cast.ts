@@ -19,7 +19,7 @@ export const VILLAGERS: readonly Villager[] = [
   { id: "m-05", name: "维克多医生", occupation: "医生", gender: "male", ageBand: "35–45", temperament: "讲证据，说话慢条斯理", voiceId: "Chinese (Mandarin)_Gentleman" },
   { id: "m-06", name: "奥托", occupation: "旅店老板", gender: "male", ageBand: "40–50", temperament: "八面玲珑，谁都不得罪", voiceId: "Chinese (Mandarin)_Radio_Host" },
   { id: "m-07", name: "小托比", occupation: "报童", gender: "male", ageBand: "18–20", temperament: "冲动，爱抢话", voiceId: "Chinese (Mandarin)_Straightforward_Boy" },
-  { id: "m-08", name: "卡斯帕", occupation: "猎人", gender: "male", ageBand: "30–40", temperament: "观察细，出手果断", voiceId: "lengdan_xiongzhang" },
+  { id: "m-08", name: "卡斯帕", occupation: "护林人", gender: "male", ageBand: "30–40", temperament: "观察细，出手果断", voiceId: "lengdan_xiongzhang" },
   { id: "m-09", name: "艾米尔", occupation: "钟表匠", gender: "male", ageBand: "35–45", temperament: "抠细节，爱复盘时间线", voiceId: "male-qn-jingying" },
   { id: "m-10", name: "安塞姆神父", occupation: "神父", gender: "male", ageBand: "50+", temperament: "劝和，但关键时刻很硬", voiceId: "Chinese (Mandarin)_Male_Announcer" },
   { id: "m-11", name: "卢西安", occupation: "流浪画家", gender: "male", ageBand: "25–35", temperament: "凭直觉和神态判断人", voiceId: "Chinese (Mandarin)_Lyrical_Voice" },
@@ -66,12 +66,26 @@ function shuffle<T>(items: readonly T[], random: () => number): T[] {
 }
 
 /** Draw N distinct villagers. Role assignment stays independent of this draw. */
-export function drawVillagers(count: number, random: () => number = Math.random): Villager[] {
+export function drawVillagers(
+  count: number,
+  random: () => number = Math.random,
+  excludeIds: readonly string[] = [],
+): Villager[] {
   if (!Number.isFinite(count) || count <= 0) return [];
-  if (count > VILLAGERS.length) {
-    throw new Error(`Village cast only has ${VILLAGERS.length} villagers`);
+  const excluded = new Set(excludeIds);
+  const pool = VILLAGERS.filter((villager) => !excluded.has(villager.id));
+  if (count > pool.length) {
+    throw new Error(`Village cast only has ${pool.length} villagers available`);
   }
-  return shuffle(VILLAGERS, random).slice(0, count);
+  return shuffle(pool, random).slice(0, count);
+}
+
+/** Portrait for the human seat. Not a seated villager, and not a game role. */
+export function pickHumanPortraitId(
+  usedIds: readonly string[] = [],
+  random: () => number = Math.random,
+): string {
+  return drawVillagers(1, random, usedIds)[0].id;
 }
 
 export function personaForVillager(villager: Villager): Persona {

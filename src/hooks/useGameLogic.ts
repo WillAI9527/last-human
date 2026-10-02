@@ -36,6 +36,7 @@ import {
   generateWhiteWolfKingBoomDecision,
 } from "@/lib/game-master";
 import { buildGenshinModelRefs, generateCharacters, generateGenshinModeCharacters, sampleModelRefs, type GeneratedCharacter } from "@/lib/character-generator";
+import { isVillagerAvatarId, pickHumanPortraitId } from "@/lib/village-cast";
 import { getSystemMessages, getUiText } from "@/lib/game-texts";
 import { getRandomScenario } from "@/lib/scenarios";
 import { DELAY_CONFIG, getRoleName } from "@/lib/game-constants";
@@ -1444,6 +1445,13 @@ export function useGameLogic() {
       // 普通模式每局只随机一次人类座位；之后 UI、阶段推进和 Prompt 都读取同一个 seat。
       // 观战模式没有人类玩家。
       const humanSeat = isSpectatorMode ? -1 : getRandomHumanSeat(totalPlayers);
+      const humanPortraitId = isSpectatorMode ? undefined : pickHumanPortraitId();
+      const reservedAvatarIds = [
+        humanPortraitId,
+        ...customCharacters
+          .map((character) => character.avatar_seed)
+          .filter((seed): seed is string => isVillagerAvatarId(seed)),
+      ].filter((seed): seed is string => Boolean(seed));
 
       const aiSeats = Array.from({ length: totalPlayers }, (_, seat) => seat).filter(
         (seat) => seat !== humanSeat
@@ -1465,7 +1473,7 @@ export function useGameLogic() {
           playerId,
           seat,
           displayName: isHuman ? (humanName || "你") : "",
-          avatarSeed: playerId,
+          avatarSeed: isHuman && humanPortraitId ? humanPortraitId : playerId,
           alive: true,
           role: "Villager" as Role,
           alignment: "village",
@@ -1547,7 +1555,9 @@ export function useGameLogic() {
         // Fill remaining slots with generated characters if needed
         const remainingCount = numAiPlayers - customGeneratedCharacters.length;
         if (remainingCount > 0) {
-          const extraCharacters = await generateCharacters(remainingCount, scenario, {});
+          const extraCharacters = await generateCharacters(remainingCount, scenario, {
+            excludeAvatarIds: reservedAvatarIds,
+          });
           characters = [...customGeneratedCharacters, ...extraCharacters];
         } else {
           characters = customGeneratedCharacters;
@@ -1609,6 +1619,7 @@ export function useGameLogic() {
         });
       } else {
         characters = await generateCharacters(numAiPlayers, scenario, {
+          excludeAvatarIds: reservedAvatarIds,
           onBaseProfiles: (profiles) => {
             profiles.forEach((p, i) => {
               const seat = aiSeatOrder[i] ?? aiSeats[i] ?? i;
@@ -1663,7 +1674,8 @@ export function useGameLogic() {
         seedPlayerIds,
         isGenshinMode ? genshinModelRefs : aiModelRefs,
         aiSeatOrder,
-        preferredRole
+        preferredRole,
+        humanPortraitId
       );
 
       let newState: GameState = {
