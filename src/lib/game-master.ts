@@ -1655,7 +1655,10 @@ export async function generateWolfAction(
   const { messages } = buildMessagesForPrompt(prompt);
   const validSeats = alivePlayers.map((p) => p.seat);
   // Six-player AI wolves must knife someone. A parse failure is not an empty knife.
-  const forcedSeat = state.players.length === 6 ? firstSeat(validSeats.filter((seat) => seat !== player.seat)) ?? firstSeat(validSeats) : undefined;
+  const nonWolfSeats = alivePlayers.filter((p) => !isWolfRole(p.role)).map((p) => p.seat);
+  const forcedSeat = state.players.length === 6
+    ? firstSeat(nonWolfSeats) ?? firstSeat(validSeats.filter((seat) => seat !== player.seat)) ?? firstSeat(validSeats)
+    : undefined;
 
   try {
     const completion = await generateCompletionAndParse(
