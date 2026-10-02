@@ -136,6 +136,8 @@ function SponsorCard({
 
 function buildDefaultRoles(playerCount: number): Role[] {
   switch (playerCount) {
+    case 6:
+      return ["Werewolf", "Werewolf", "Seer", "Witch", "Villager", "Villager"];
     case 8:
       return ["Werewolf", "Werewolf", "Werewolf", "Seer", "Witch", "Hunter", "Villager", "Villager"];
     case 9:
@@ -197,6 +199,20 @@ function buildDefaultRoles(playerCount: number): Role[] {
 }
 
 function getRoleCountConfig(playerCount: number) {
+  if (playerCount <= 6) {
+    return {
+      werewolfCount: 2,
+      whiteWolfKingCount: 0,
+      wolfCount: 2,
+      guardCount: 0,
+      seerCount: 1,
+      witchCount: 1,
+      hunterCount: 0,
+      idiotCount: 0,
+      villagerCount: 2,
+      godCount: 2,
+    };
+  }
   const werewolfCount = playerCount >= 11 ? 3 : 2;
   const whiteWolfKingCount = 1;
   const wolfCount = werewolfCount + whiteWolfKingCount;
@@ -792,10 +808,10 @@ export function WelcomeScreen({
       fixedRoles: roles,
       devPreset: preset,
       difficulty,
-      playerCount,
+      playerCount: 6,
       gameSessionId: gameSessionId || undefined,
       customCharacters: selectedCustomChars,
-      preferredRole: preferredRole || undefined,
+      preferredRole: undefined,
     };
   };
 

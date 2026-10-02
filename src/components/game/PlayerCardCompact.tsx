@@ -28,7 +28,7 @@ interface PlayerCardCompactProps {
   humanPlayer?: Player | null;
   isBadgeHolder?: boolean;
   isBadgeCandidate?: boolean;
-  variant?: "default" | "mobile";
+  variant?: "default" | "mobile" | "round";
   isInSelectionPhase?: boolean;
   /** True only for the human's own unrevealed vote target. */
   showVoteSeal?: boolean;
@@ -193,6 +193,7 @@ export function PlayerCardCompact({
       className={cn(
         "wc-player-card relative group transition-all duration-300",
         variant === "mobile" && "wc-player-card--mobile",
+        variant === "round" && "wc-player-card--round",
         !isReady && "wc-player-card--loading opacity-80",
         isReady && "bg-[var(--bg-card)]/80 backdrop-blur-sm",
         isDead && "wc-player-card--dead",
@@ -310,7 +311,7 @@ export function PlayerCardCompact({
           <Medal size={variant === "mobile" ? 10 : 12} weight="regular" />
         </div>
       )}
-      {variant === "mobile" && isSpeaking && !isMe && (
+      {(variant === "mobile" || variant === "round") && isSpeaking && !isMe && (
         <motion.span
           aria-hidden
           className="lh-speaker-ring"
@@ -339,7 +340,11 @@ export function PlayerCardCompact({
 
       {/* 信息区 */}
       <div className="wc-player-card__info relative z-10">
-        {variant === "mobile" ? (
+        {variant === "round" ? (
+          <div className="wc-player-card__name lh-round-name" title={player.displayName}>
+            {isReady ? player.displayName : t("playerCard.joining")}
+          </div>
+        ) : variant === "mobile" ? (
           <div className="wc-player-card__name relative flex items-center gap-1 min-w-0" title={playerTitle(player.seat, player.displayName)}>
             <span className={cn(
               "wc-seat-badge transition-colors duration-300",
@@ -404,6 +409,7 @@ export function PlayerCardCompact({
           </>
         )}
 
+        {variant !== "round" && (
         <div className="wc-player-card__meta min-h-[1.25rem] space-y-0.5">
           {isReady && showModel && modelLabel && (
             <motion.div
@@ -428,6 +434,7 @@ export function PlayerCardCompact({
             </motion.div>
           )}
         </div>
+        )}
       </div>
       
       

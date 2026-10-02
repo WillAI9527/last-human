@@ -26,6 +26,7 @@ import {
 } from "@/lib/game-flow-controller";
 import { playNarrator } from "@/lib/narrator-audio-player";
 import { getI18n } from "@/i18n/translator";
+import { canWitchPoison, canWitchSave, isWolfNightResolved } from "@/lib/six-player-rules";
 
 function randomFakeActionDelay(): number {
   const min = DELAY_CONFIG.NIGHT_ROLE_ANIMATION_MIN;
@@ -380,7 +381,7 @@ export class NightPhase extends GamePhase {
     if (!runtime.isTokenValid(runtime.token)) return;
 
     const humanWolf = currentState.players.find((p) => isWolfRole(p.role) && p.alive && p.isHuman);
-    if (humanWolf && currentState.nightActions.wolfTarget === undefined) {
+    if (humanWolf && !isWolfNightResolved(currentState.nightActions)) {
       return;
     }
 
@@ -424,7 +425,7 @@ export class NightPhase extends GamePhase {
     if (!runtime.isTokenValid(runtime.token)) return;
 
     const humanWolf = currentState.players.find((p) => isWolfRole(p.role) && p.alive && p.isHuman);
-    if (humanWolf && currentState.nightActions.wolfTarget === undefined) {
+    if (humanWolf && !isWolfNightResolved(currentState.nightActions)) {
       return;
     }
 
@@ -522,7 +523,7 @@ export class NightPhase extends GamePhase {
       seat: player.seat + 1,
       name: player.displayName,
       role: getRoleText("Seer"),
-      winCondition: getWinCondition("Seer"),
+      winCondition: getWinCondition("Seer", state.players.length),
     });
 
     const dynamicContent = t("prompts.night.seer.task", {
@@ -579,17 +580,20 @@ export class NightPhase extends GamePhase {
       role: getRoleText(player.role),
     });
     const cacheableRules = t("prompts.night.wolf.rules", {
-      winCondition: getWinCondition(player.role),
+      winCondition: getWinCondition(player.role, state.players.length),
     });
     const teammateVotesSection = teammateVotesStr
       ? t("prompts.night.wolf.teammateVotes", { lines: teammateVotesStr })
       : "";
-    const taskSection = t("prompts.night.wolf.task", {
-      teammateVotesSection,
-      options: alivePlayers
-        .map((p) => t("prompts.night.option", { seat: p.seat + 1, name: p.displayName }))
-        .join(t("promptUtils.gameContext.listSeparator")),
-    });
+    const taskSection = [
+      t("prompts.night.wolf.task", {
+        teammateVotesSection,
+        options: alivePlayers
+          .map((p) => t("prompts.night.option", { seat: p.seat + 1, name: p.displayName }))
+          .join(t("promptUtils.gameContext.listSeparator")),
+      }),
+      state.players.length === 6 ? t("prompts.night.wolf.mustKillSix") : "",
+    ].filter(Boolean).join("\n");
 
     const systemParts: SystemPromptPart[] = [
       { text: identitySection, cacheable: true, ttl: "1h" },
@@ -617,7 +621,7 @@ export class NightPhase extends GamePhase {
       seat: player.seat + 1,
       name: player.displayName,
       role: getRoleText("Guard"),
-      winCondition: getWinCondition("Guard"),
+      winCondition: getWinCondition("Guard", state.players.length),
     });
     const eligiblePlayers = alivePlayers.filter((p) => p.seat !== lastTarget);
     const options = eligiblePlayers
@@ -659,10 +663,9 @@ export class NightPhase extends GamePhase {
       (p) => p.alive && p.playerId !== player.playerId
     );
 
-    const canSave =
-      !state.roleAbilities.witchHealUsed &&
-      wolfTarget !== undefined;
-    const canPoison = !state.roleAbilities.witchPoisonUsed;
+    const canSave = canWitchSave(state, player.seat, wolfTarget);
+    const canPoison = canWitchPoison(state);
+    const selfSaveBlocked = wolfTarget === player.seat && state.day > 1 && !state.roleAbilities.witchHealUsed;
 
     const victimInfo =
       wolfTarget !== undefined && !state.roleAbilities.witchHealUsed
@@ -673,7 +676,7 @@ export class NightPhase extends GamePhase {
       seat: player.seat + 1,
       name: player.displayName,
       role: getRoleText("Witch"),
-      winCondition: getWinCondition("Witch"),
+      winCondition: getWinCondition("Witch", state.players.length),
     });
     const statusHeal = state.roleAbilities.witchHealUsed
       ? t("promptUtils.gameContext.used")
@@ -688,7 +691,9 @@ export class NightPhase extends GamePhase {
         : t("prompts.night.witch.noAttack");
     const saveLine = canSave
       ? t("prompts.night.witch.saveOption", { seat: wolfTarget! + 1 })
-      : t("prompts.night.witch.noSave");
+      : selfSaveBlocked
+        ? t("prompts.night.witch.noSelfSaveBlocked")
+        : t("prompts.night.witch.noSave");
     const poisonLine = canPoison ? t("prompts.night.witch.poisonOption") : t("prompts.night.witch.noPoison");
     const poisonTargets = alivePlayers
       .map((p) => t("promptUtils.gameContext.seatLabel", { seat: p.seat + 1 }))
@@ -700,6 +705,9 @@ export class NightPhase extends GamePhase {
       saveLine,
       poisonLine,
       poisonTargets,
+      selfSaveRule: state.players.length === 6
+        ? t("prompts.night.witch.selfSaveRuleSix")
+        : t("prompts.night.witch.selfSaveRuleDefault"),
       saveJsonFormat: JSON.stringify({ action: "save" }),
       poisonJsonFormat: JSON.stringify({ action: "poison", seat: (alivePlayers[0]?.seat ?? player.seat) + 1 }),
       passJsonFormat: JSON.stringify({ action: "pass" }),

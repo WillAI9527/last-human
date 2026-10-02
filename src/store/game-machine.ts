@@ -11,6 +11,7 @@ import type { GameAnalysisData } from "@/types/analysis";
 import { createInitialGameState } from "@/lib/game-master";
 import { GAME_SESSION_RESUME_WINDOW_MS } from "@/lib/game-session-policy";
 import { getI18n } from "@/i18n/translator";
+import { isWolfNightResolved } from "@/lib/six-player-rules";
 
 // ============ 游戏状态持久化配置 ============
 
@@ -95,7 +96,7 @@ function isCheckpointSafe(state: GameState): boolean {
       const aliveWolves = state.players.filter((p) => isWolfRole(p.role) && p.alive);
       if (aliveWolves.length === 0) return true;
       // 狼人已选择目标
-      return state.nightActions.wolfTarget !== undefined;
+      return isWolfNightResolved(state.nightActions);
     }
 
     case "NIGHT_WITCH_ACTION": {

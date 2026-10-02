@@ -13,6 +13,9 @@ function seatLabel(seat: number): string {
 
 /** One-line receipt after the human confirms a seat action. Stays until the next phase. */
 export function receiptForSeatAction(phase: Phase, targetSeat: number | null): ActionReceipt | null {
+  if (phase === "NIGHT_WOLF_ACTION" && (targetSeat === null || targetSeat < 0)) {
+    return { kind: "commit", text: "✓ 已空刀" };
+  }
   if (targetSeat === null || targetSeat < 0) {
     if (phase === "HUNTER_SHOOT") return { kind: "commit", text: "✓ 已弃枪" };
     if (phase === "BADGE_TRANSFER") return { kind: "commit", text: "✓ 已撕毁警徽" };

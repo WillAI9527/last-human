@@ -1923,6 +1923,213 @@ input[type="submit"]:not(:disabled),
   font-size: 9px;
 }
 
+.wc-player-card--round {
+  width: 96px;
+  min-height: 72px;
+  padding: 0;
+  gap: 4px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  border-radius: 0;
+}
+
+.wc-player-card--round:hover,
+[data-theme="dark"] .wc-player-card--round:hover {
+  transform: none;
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.wc-player-card--round.wc-player-card--me,
+.wc-player-card--round.wc-player-card--speaking,
+.wc-player-card--round.wc-player-card--dead,
+[data-theme="dark"] .wc-player-card--round {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
+
+.wc-player-card--round .wc-player-card__avatar-wrap {
+  width: 72px;
+  height: 72px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.wc-player-card--round .wc-player-card__avatar {
+  width: 64px;
+  height: 64px;
+}
+
+.wc-player-card--round.wc-player-card--speaking .wc-player-card__avatar-wrap,
+.wc-player-card--round.wc-player-card--speaking .wc-player-card__avatar {
+  width: 72px;
+  height: 72px;
+}
+
+.wc-player-card--round .lh-model-badge {
+  width: 14px;
+  height: 14px;
+  right: 2px;
+  bottom: 2px;
+}
+
+.wc-player-card--round .lh-round-name,
+.wc-player-card--round .wc-player-card__name {
+  max-width: 96px;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: unset;
+  text-align: center;
+  font-size: 12px;
+  line-height: 1.25;
+  margin: 0;
+}
+
+.lh-roundtable {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 280px;
+}
+
+.lh-round-seat {
+  position: absolute;
+  transform: translate(-50%, -50%);
+}
+
+.lh-table-wood {
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background:
+    radial-gradient(ellipse at 50% 40%, rgba(122, 86, 52, 0.55), rgba(36, 22, 14, 0.94) 70%);
+  box-shadow:
+    inset 0 0 0 10px rgba(72, 46, 28, 0.9),
+    0 16px 36px rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+}
+
+.lh-roundtable--night .lh-table-wood {
+  background: radial-gradient(ellipse at 50% 78%, rgba(232, 190, 106, 0.22), rgba(8, 6, 5, 0.97) 62%);
+  box-shadow: inset 0 0 0 10px rgba(22, 14, 10, 0.95);
+}
+
+.lh-roundtable--night .lh-round-seat .wc-player-card--round:not(.wc-player-card--me) {
+  filter: brightness(0.72) saturate(0.55);
+}
+
+.lh-roundtable--strip {
+  min-height: 0;
+  height: 100%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 8px;
+  padding: 6px 8px 8px;
+  overflow: hidden;
+}
+
+.lh-roundtable--strip .lh-round-seat {
+  position: static;
+  transform: none;
+}
+
+.lh-roundtable--strip .wc-player-card--round {
+  width: 52px;
+}
+
+.lh-roundtable--strip .wc-player-card--round .wc-player-card__avatar-wrap,
+.lh-roundtable--strip .wc-player-card--round .wc-player-card__avatar,
+.lh-roundtable--strip .wc-player-card--round.wc-player-card--speaking .wc-player-card__avatar {
+  width: 40px;
+  height: 40px;
+}
+
+.lh-roundtable--strip .lh-round-name {
+  display: none;
+}
+
+.lh-transcript-handle {
+  position: relative;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  padding: 8px 0 4px;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+}
+
+.lh-drag-bar {
+  width: 36px;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(242, 237, 228, 0.45);
+}
+
+.lh-unread-count {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #8d1820;
+  color: #f8e7d8;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 18px;
+}
+
+.lh-dialog-round .wc-dialog-history {
+  border: 1px solid rgba(242, 237, 228, 0.12);
+  border-radius: 16px;
+  background: rgba(18, 14, 12, 0.72);
+  overflow: hidden;
+}
+
+.lh-suspicion-bar {
+  flex: 1;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.lh-suspicion-bar > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #8d1820, #e8be6a);
+}
+
+.lh-suspicion-tag {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #0f0d0c;
+  background: var(--human-gold, #e8be6a);
+  border-radius: 999px;
+  padding: 2px 6px;
+}
+
+.lh-suspicion-tag--least {
+  color: #f2ede4;
+  background: #3a4550;
+}
+
 .wc-player-card__info {
   flex: 1;
   min-width: 0;

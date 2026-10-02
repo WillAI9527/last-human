@@ -51,7 +51,7 @@ export class BadgePhase extends GamePhase {
       seat: player.seat + 1,
       name: player.displayName,
       role: getRoleText(player.role),
-      winCondition: getWinCondition(player.role),
+      winCondition: getWinCondition(player.role, state.players.length),
     });
     const dynamicContent = t("prompts.badge.election.task", {
       options: alivePlayers
@@ -92,7 +92,7 @@ export class BadgePhase extends GamePhase {
       seat: player.seat + 1,
       name: player.displayName,
       role: getRoleText(player.role),
-      winCondition: getWinCondition(player.role),
+      winCondition: getWinCondition(player.role, state.players.length),
       persona,
     });
     const dynamicContent = t("prompts.badge.signup.task");
@@ -122,7 +122,7 @@ export class BadgePhase extends GamePhase {
       seat: player.seat + 1,
       name: player.displayName,
       role: getRoleText(player.role),
-      winCondition: getWinCondition(player.role),
+      winCondition: getWinCondition(player.role, state.players.length),
     });
     const dynamicContent = t("prompts.badge.transfer.task", {
       options: alivePlayers

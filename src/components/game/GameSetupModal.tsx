@@ -1,30 +1,11 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { SoundSettingsSection } from "@/components/game/SettingsModal";
 import { useTranslations } from "next-intl";
 import type { Role } from "@/types/game";
-
-/** Return the unique roles present in the default configuration for a given player count. */
-function getAvailableRoles(playerCount: number): Role[] {
-  const configs: Record<number, Role[]> = {
-    8: ["Werewolf", "Seer", "Witch", "Hunter", "Villager"],
-    9: ["Werewolf", "Seer", "Witch", "Hunter", "Villager"],
-    10: ["Werewolf", "WhiteWolfKing", "Seer", "Witch", "Hunter", "Guard", "Villager"],
-    11: ["Werewolf", "WhiteWolfKing", "Seer", "Witch", "Hunter", "Guard", "Idiot", "Villager"],
-    12: ["Werewolf", "WhiteWolfKing", "Seer", "Witch", "Hunter", "Guard", "Idiot", "Villager"],
-  };
-  return configs[playerCount] ?? configs[10];
-}
 
 interface GameSetupModalProps {
   open: boolean;
@@ -70,52 +51,10 @@ export function GameSetupModal({
 }: GameSetupModalProps) {
   const t = useTranslations();
 
-  const PLAYER_COUNT_OPTIONS = [
-    { value: 8, label: t("gameSetup.playerCount.8.title"), description: t("gameSetup.playerCount.8.description"), roles: t("gameSetup.playerCount.8.roles") },
-    { value: 9, label: t("gameSetup.playerCount.9.title"), description: t("gameSetup.playerCount.9.description"), roles: t("gameSetup.playerCount.9.roles") },
-    { value: 10, label: t("gameSetup.playerCount.10.title"), description: t("gameSetup.playerCount.10.description"), roles: t("gameSetup.playerCount.10.roles") },
-    { value: 11, label: t("gameSetup.playerCount.11.title"), description: t("gameSetup.playerCount.11.description"), roles: t("gameSetup.playerCount.11.roles") },
-    { value: 12, label: t("gameSetup.playerCount.12.title"), description: t("gameSetup.playerCount.12.description"), roles: t("gameSetup.playerCount.12.roles") },
-  ];
-
-  const roleLabels = useMemo<Record<Role, string>>(
-    () => ({
-      Villager: t("roles.villager"),
-      Werewolf: t("roles.werewolf"),
-      WhiteWolfKing: t("roles.whiteWolfKing"),
-      Seer: t("roles.seer"),
-      Witch: t("roles.witch"),
-      Hunter: t("roles.hunter"),
-      Guard: t("roles.guard"),
-      Idiot: t("roles.idiot"),
-    }),
-    [t]
-  );
-
-  const roleDescriptions = useMemo<Record<Role, string>>(
-    () => ({
-      Villager: t("gameSetup.rolePreference.desc.villager"),
-      Werewolf: t("gameSetup.rolePreference.desc.werewolf"),
-      WhiteWolfKing: t("gameSetup.rolePreference.desc.whiteWolfKing"),
-      Seer: t("gameSetup.rolePreference.desc.seer"),
-      Witch: t("gameSetup.rolePreference.desc.witch"),
-      Hunter: t("gameSetup.rolePreference.desc.hunter"),
-      Guard: t("gameSetup.rolePreference.desc.guard"),
-      Idiot: t("gameSetup.rolePreference.desc.idiot"),
-    }),
-    [t]
-  );
-
-  const availableRoles = useMemo(() => getAvailableRoles(playerCount), [playerCount]);
-
-  // Reset preferred role if it's no longer available for the current player count
-  const effectivePreferredRole = preferredRole && availableRoles.includes(preferredRole) ? preferredRole : "";
-
   useEffect(() => {
-    if (preferredRole && !availableRoles.includes(preferredRole)) {
-      onPreferredRoleChange("");
-    }
-  }, [preferredRole, availableRoles, onPreferredRoleChange]);
+    if (playerCount !== 6) onPlayerCountChange(6);
+    if (preferredRole) onPreferredRoleChange("");
+  }, [onPlayerCountChange, onPreferredRoleChange, playerCount, preferredRole]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -128,59 +67,12 @@ export function GameSetupModal({
         </DialogHeader>
 
         <div className="space-y-5">
-          <div className="space-y-2">
-            <div className="text-sm font-medium text-[var(--text-primary)]">{t("gameSetup.playerCountLabel")}</div>
-            <Select
-              value={String(playerCount)}
-              onValueChange={(value) => onPlayerCountChange(Number(value))}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder={t("gameSetup.selectPlayerCount")} />
-              </SelectTrigger>
-              <SelectContent>
-                {PLAYER_COUNT_OPTIONS.map((option) => (
-                  <SelectItem
-                    key={option.value}
-                    value={String(option.value)}
-                    label={option.label}
-                    description={`${option.description}｜${option.roles}`}
-                  />
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {!isSpectatorMode && (
-            <div className="space-y-2">
-              <div className="text-sm font-medium text-[var(--text-primary)]">{t("gameSetup.rolePreference.label")}</div>
-              <Select
-                value={effectivePreferredRole || "_random"}
-                onValueChange={(value) => onPreferredRoleChange(value === "_random" ? "" : (value as Role))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder={t("gameSetup.rolePreference.random")} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem
-                    value="_random"
-                    label={t("gameSetup.rolePreference.random")}
-                    description={t("gameSetup.rolePreference.randomDesc")}
-                  />
-                  {availableRoles.map((role) => (
-                    <SelectItem
-                      key={role}
-                      value={role}
-                      label={roleLabels[role]}
-                      description={roleDescriptions[role]}
-                    />
-                  ))}
-                </SelectContent>
-              </Select>
-              <div className="text-xs text-[var(--text-muted)]">
-                {t("gameSetup.rolePreference.hint")}
-              </div>
+          <div className="rounded-md border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-3">
+            <div className="text-sm font-medium text-[var(--text-primary)]">6 人局</div>
+            <div className="mt-1 text-xs leading-relaxed text-[var(--text-muted)]">
+              2 狼人 · 预言家 · 女巫 · 2 平民。你的身份和大家一样随机，可能是狼人。没有警长。
             </div>
-          )}
+          </div>
 
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1 min-w-0">

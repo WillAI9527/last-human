@@ -22,6 +22,7 @@ import LoadingMiniGame from "./MiniGame/LoadingMiniGame";
 import type { GameState, Player, ChatMessage, Phase } from "@/types/game";
 import { isWolfRole } from "@/types/game";
 import { cn } from "@/lib/utils";
+import { canWitchSave } from "@/lib/six-player-rules";
 import { audioManager } from "@/lib/audio-manager";
 import { getLocale } from "@/i18n/locale-store";
 import { useTranslations } from "next-intl";
@@ -286,6 +287,9 @@ interface DialogAreaProps {
   isAnalysisLoading?: boolean;
   isEventLogOpen?: boolean;
   onEventLogOpenChange?: (open: boolean) => void;
+  roomLayout?: "classic" | "round";
+  transcriptExpanded?: boolean;
+  onTranscriptExpandedChange?: (open: boolean) => void;
 }
 
 // 等待状态动画组件已移除，与当前简洁风格不符
@@ -403,6 +407,9 @@ export function DialogArea({
   isAnalysisLoading = false,
   isEventLogOpen = false,
   onEventLogOpenChange,
+  roomLayout = "classic",
+  transcriptExpanded,
+  onTranscriptExpandedChange,
 }: DialogAreaProps) {
   const t = useTranslations();
   const isGenshinMode = !!gameState.isGenshinMode;
@@ -415,6 +422,7 @@ export function DialogArea({
   const voiceRecorderRef = useRef<VoiceRecorderHandle | null>(null);
 
   const [talkingPlayerId, setTalkingPlayerId] = useState<string | null>(null);
+  const [transcriptOpenUncontrolled, setTranscriptOpenUncontrolled] = useState(false);
 
   // 初始化音频管理器
   useEffect(() => {
@@ -476,6 +484,16 @@ export function DialogArea({
       (m) => !(m.isSystem && isTurnPromptSystemMessage(m.content, t))
     );
   }, [gameState.messages, t]);
+  const transcriptOpen = roomLayout !== "round" || (transcriptExpanded ?? transcriptOpenUncontrolled);
+  const toggleTranscript = () => {
+    const next = !transcriptOpen;
+    if (transcriptExpanded === undefined) setTranscriptOpenUncontrolled(next);
+    onTranscriptExpandedChange?.(next);
+  };
+  const shownMessages = roomLayout === "round" && !transcriptOpen ? visibleMessages.slice(-3) : visibleMessages;
+  const hiddenTranscriptCount = roomLayout === "round" && !transcriptOpen
+    ? Math.max(0, visibleMessages.length - shownMessages.length)
+    : 0;
 
   // 获取当前发言者信息
   const currentSpeaker = useMemo(() => {
@@ -1005,6 +1023,15 @@ export function DialogArea({
     );
   })();
   const showWitchPanel = !receiptCommitted && phase === "NIGHT_WITCH_ACTION" && humanPlayer?.role === "Witch" && !isWaitingForAI;
+  const showWolfSkip = !receiptCommitted
+    && phase === "NIGHT_WOLF_ACTION"
+    && !!humanPlayer
+    && isWolfRole(humanPlayer.role)
+    && humanPlayer.alive
+    && selectedSeat === null
+    && !isWaitingForAI
+    && !gameState.nightActions.wolfSkipped
+    && gameState.nightActions.wolfTarget === undefined;
   const showHumanInput = !receiptCommitted && isHumanTurn && phase !== "GAME_END" && phase !== "DAY_BADGE_SIGNUP";
   const showDialogueBlock = !isHumanTurn
     && (currentSpeaker || waitingForNextRound)
@@ -1027,17 +1054,29 @@ export function DialogArea({
     || showHunterPassOption
     || showActionConfirm
     || showWitchPanel
+    || showWolfSkip
     || showHumanInput
     || showDialogueBlock
     || showNightWaiting;
 
   return (
-    <div className="wc-dialog-area h-full w-full flex flex-col min-h-0 justify-start">
+    <div className={cn("wc-dialog-area h-full w-full flex flex-col min-h-0 justify-start", roomLayout === "round" && "lh-dialog-round")}>
       {/* 上方区域：左侧立绘 + 右侧历史记录 */}
-      <div className="flex-1 min-h-0 w-full -mb-1">
-        <div className="wc-dialog-main flex gap-4 lg:gap-6 px-4 lg:px-6 pt-0 pb-0 min-h-0 h-full items-stretch">
+      <div className={cn(
+        "w-full",
+        roomLayout === "round"
+          ? (transcriptOpen ? "flex-1 min-h-0 px-3 pt-2" : "shrink-0 px-3 pt-2")
+          : "flex-1 min-h-0 -mb-1"
+      )}>
+        <div className={cn(
+          "wc-dialog-main flex gap-4 lg:gap-6 pt-0 pb-0 min-h-0 items-stretch",
+          roomLayout === "round" ? "h-full px-0" : "h-full px-4 lg:px-6"
+        )}>
           {/* 左侧立绘区域 */}
-          <div className="wc-dialog-portrait relative hidden md:flex w-[220px] lg:w-[260px] xl:w-[300px] shrink-0 flex-col items-center justify-end">
+          <div className={cn(
+            "wc-dialog-portrait relative w-[220px] lg:w-[260px] xl:w-[300px] shrink-0 flex-col items-center justify-end",
+            roomLayout === "round" ? "hidden" : "hidden md:flex"
+          )}>
             {showHumanRoleCard && humanPlayer?.role && (
               <img
                 src={roleCardUrl(humanPlayer.role)}
@@ -1049,8 +1088,19 @@ export function DialogArea({
           </div>
 
           {/* 右侧：聊天历史记录 */}
-          <div className="wc-dialog-history flex-1 min-w-0 min-h-0 relative">
-            <div className="absolute right-2 top-2 z-20">
+          <div className={cn(
+            "wc-dialog-history flex-1 min-w-0 relative",
+            roomLayout === "round" && !transcriptOpen && "h-[156px]",
+            roomLayout === "round" && transcriptOpen && "h-full min-h-0",
+            roomLayout !== "round" && "min-h-0"
+          )}>
+            {roomLayout === "round" && (
+              <button type="button" className="lh-transcript-handle" onClick={toggleTranscript} aria-expanded={transcriptOpen}>
+                <span className="lh-drag-bar" />
+                {hiddenTranscriptCount > 0 && <span className="lh-unread-count">{hiddenTranscriptCount}</span>}
+              </button>
+            )}
+            <div className={cn("absolute right-2 top-2 z-20", roomLayout === "round" && !transcriptOpen && "hidden", roomLayout === "round" && transcriptOpen && "top-8")}>
               <button
                 type="button"
                 onClick={() => onEventLogOpenChange?.(!isEventLogOpen)}
@@ -1072,7 +1122,8 @@ export function DialogArea({
             <motion.div 
               ref={historyRef}
               className={cn(
-                "absolute inset-0 overflow-y-scroll pb-4 pt-10 scrollbar-hide transition-opacity duration-200",
+                "absolute inset-0 overflow-y-scroll pb-4 scrollbar-hide transition-opacity duration-200",
+                roomLayout === "round" ? "pt-12" : "pt-10",
                 isEventLogOpen && "pointer-events-none opacity-0"
               )}
               style={{
@@ -1084,8 +1135,8 @@ export function DialogArea({
               <div ref={historyContentRef}>
                 <LayoutGroup>
                   <AnimatePresence initial={false}>
-                    {visibleMessages.map((msg, index) => {
-                      const prevMsg = visibleMessages[index - 1];
+                    {shownMessages.map((msg, index) => {
+                      const prevMsg = shownMessages[index - 1];
                       const showDivider = index > 0 && !msg.isSystem && !prevMsg?.isSystem && prevMsg?.playerId !== msg.playerId;
                       const key = msg.id || `${msg.playerId}:${msg.timestamp}:${index}`;
                       return (
@@ -1379,6 +1430,28 @@ export function DialogArea({
                 return null;
               })()}
 
+              {showWolfSkip && (
+                <motion.div
+                  key="wolf-skip"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                >
+                  <div className="text-lg leading-relaxed text-[var(--text-primary)]">
+                    点头像选择刀口，或今晚空刀。
+                  </div>
+                  <div className={`flex items-center justify-end mt-4 pt-3 border-t ${isNight ? "border-white/10" : "border-black/5"}`}>
+                    <button
+                      onClick={() => onNightAction?.(-1)}
+                      className="wc-action-btn text-sm h-9 px-4"
+                      type="button"
+                    >
+                      {t("dialog.action.wolfSkip")}
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+
               {/* 选择确认面板 - 文字形式 */}
               {(() => {
                 if (!showActionConfirm || selectedSeat === null) return null;
@@ -1518,6 +1591,14 @@ export function DialogArea({
                       const targetName = targetPlayer ? t("ui.seatWithName", { seat: wolfTarget! + 1, name: targetPlayer.displayName }) : wolfTarget !== undefined ? t("ui.seatOnly", { seat: wolfTarget + 1 }) : null;
                       const healUsed = gameState.roleAbilities.witchHealUsed;
                       const poisonUsed = gameState.roleAbilities.witchPoisonUsed;
+                      const saveLegal = wolfTarget !== undefined && humanPlayer
+                        ? canWitchSave(
+                            { day: gameState.day, roleAbilities: gameState.roleAbilities, nightActions: gameState.nightActions },
+                            humanPlayer.seat,
+                            wolfTarget,
+                          )
+                        : false;
+                      const selfSaveBlocked = wolfTarget === humanPlayer?.seat && gameState.day > 1 && !healUsed;
 
                       return (
                         <>
@@ -1532,7 +1613,7 @@ export function DialogArea({
                                 })}
                                 {healUsed ? (
                                   <span className="text-[var(--text-muted)]">{t("dialog.witch.healUsedNote")}</span>
-                                ) : (
+                                ) : saveLegal ? (
                                   <>
                                     <span className="mr-2">{t("dialog.witch.youCan")}</span>
                                     <button
@@ -1544,7 +1625,9 @@ export function DialogArea({
                                     </button>
                                     <span className="ml-2">{t("dialog.witch.saveSuffix")}</span>
                                   </>
-                                )}
+                                ) : selfSaveBlocked ? (
+                                  <span className="text-[var(--text-muted)]">{t("dialog.witch.selfSaveBlocked")}</span>
+                                ) : null}
                               </>
                             ) : (
                               <>{t("dialog.witch.noAttackTonight")}</>

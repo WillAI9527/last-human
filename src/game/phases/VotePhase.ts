@@ -12,6 +12,7 @@ import {
   buildDecisionGrounding,
 } from "@/lib/prompt-utils";
 import { getI18n } from "@/i18n/translator";
+import { SUSPICION_PROMPT_LINE_EN, SUSPICION_PROMPT_LINE_ZH, appendSuspicion } from "@/lib/suspicion";
 import {
   addSystemMessage,
   checkWinCondition,
@@ -25,6 +26,7 @@ import { forEachWithConcurrency } from "@/lib/concurrency";
 import { delay, type FlowToken } from "@/lib/game-flow-controller";
 import { playNarrator } from "@/lib/narrator-audio-player";
 import { getPlayerDiedKey } from "@/lib/narrator-voice";
+import { resolveTiedVote } from "@/lib/six-player-rules";
 
 type VotePhaseRuntime = {
   token: FlowToken;
@@ -113,15 +115,27 @@ export class VotePhase extends GamePhase {
           return;
         }
 
+        const suspicionRound = (snapshot.voteRounds ?? []).filter((round) => round.day === snapshot.day).length;
+        const suspicionEntry = {
+          day: snapshot.day,
+          round: suspicionRound,
+          voterId: aiPlayer.playerId,
+          voterSeat: aiPlayer.seat,
+          voteSeat: vote.seat,
+          reason: vote.reason,
+          suspects: vote.suspects,
+        };
         setGameState((prevState) => ({
           ...prevState,
           votes: { ...prevState.votes, [aiPlayer.playerId]: vote.seat },
           voteReasons: { ...(prevState.voteReasons || {}), [aiPlayer.playerId]: vote.reason },
+          suspicionLog: appendSuspicion(prevState.suspicionLog, suspicionEntry),
         }));
         currentState = {
           ...currentState,
           votes: { ...currentState.votes, [aiPlayer.playerId]: vote.seat },
           voteReasons: { ...(currentState.voteReasons || {}), [aiPlayer.playerId]: vote.reason },
+          suspicionLog: appendSuspicion(currentState.suspicionLog, suspicionEntry),
         };
       });
     } finally {
@@ -161,14 +175,20 @@ export class VotePhase extends GamePhase {
       seat: player.seat + 1,
       name: player.displayName,
       role: getRoleText(player.role),
-      winCondition: getWinCondition(player.role),
+      winCondition: getWinCondition(player.role, state.players.length),
     });
     const dynamicContent = t("prompts.vote.task", {
       options: alivePlayers.map((p) => t("prompts.vote.option", { seat: p.seat + 1, name: p.displayName })).join(", "),
     });
     const systemParts: SystemPromptPart[] = [
       { text: cacheableContent, cacheable: true, ttl: "1h" },
-      { text: t("prompts.vote.knowledge"), cacheable: true, ttl: "1h" },
+      {
+        text: state.players.length === 6
+          ? `${t("prompts.vote.knowledge")}\n${t("prompts.vote.knowledgeSix")}`
+          : t("prompts.vote.knowledge"),
+        cacheable: true,
+        ttl: "1h",
+      },
       { text: dynamicContent },
     ];
     const system = buildSystemTextFromParts(systemParts);
@@ -183,8 +203,9 @@ export class VotePhase extends GamePhase {
         analysis: t("prompts.vote.analysisGuide"),
         seat: exampleSeat,
         reason: t("prompts.vote.reasonExample"),
+        suspects: [{ seat: exampleSeat, score: 70 }],
       }),
-    }) + `\n\n${buildDecisionGrounding(state, player)}\n<my_public_position>\n${selfSpeech || "本日没有本人公开发言"}\n</my_public_position>\n${t("prompts.vote.decisionRule")}`;
+    }) + `\n${getI18n().locale === "en" ? SUSPICION_PROMPT_LINE_EN : SUSPICION_PROMPT_LINE_ZH}\n\n${buildDecisionGrounding(state, player)}\n<my_public_position>\n${selfSpeech || "本日没有本人公开发言"}\n</my_public_position>\n${t("prompts.vote.decisionRule")}`;
 
     return { system, user, systemParts };
   }
@@ -404,7 +425,7 @@ export class VotePhase extends GamePhase {
         .filter(([, c]) => c === maxVotes)
         .map(([s]) => Number(s));
 
-      if (topSeats.length > 1 && currentState.pkSource !== "vote") {
+      if (resolveTiedVote(topSeats.length, currentState.pkSource === "vote") === "pk") {
         const pkState = {
           ...currentState,
           pkTargets: topSeats,

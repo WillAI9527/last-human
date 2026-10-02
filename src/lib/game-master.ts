@@ -27,6 +27,8 @@ import { buildCachedSystemMessageFromParts } from "./prompt-utils";
 import { parseLLMJson } from "./llm-json";
 import { getI18n } from "@/i18n/translator";
 import { getRoleConfiguration } from "@/lib/role-configuration";
+import { appendSuspicion, parseSuspects, suspicionSchemaProperty, type SuspicionEntry } from "@/lib/suspicion";
+import { canWitchSave, checkSideKillWin, isSixPlayerGame } from "@/lib/six-player-rules";
 import { resolveBadgeElectionWinner } from "@/lib/historical-vote-snapshots";
 import { isVillagerAvatarId } from "@/lib/village-cast";
 
@@ -195,6 +197,7 @@ export function createInitialGameState(): GameState {
     },
     votes: {},
     voteReasons: {},
+    suspicionLog: [],
     lastVoteReasons: {},
     voteHistory: {},
     dailySummaries: {},
@@ -233,6 +236,7 @@ export function setupPlayers(
   // If the user chose a preferred role (and no dev fixedRoles), swap to ensure the human gets it
   if (
     preferredRole &&
+    totalPlayers !== 6 &&
     !(fixedRoles && fixedRoles.length === totalPlayers) &&
     humanSeat >= 0
   ) {
@@ -399,6 +403,8 @@ export function transitionPhase(state: GameState, newPhase: Phase): GameState {
 }
 
 export function checkWinCondition(state: GameState): Alignment | null {
+  if (isSixPlayerGame(state)) return checkSideKillWin(state);
+
   const alivePlayers = state.players.filter((p) => p.alive);
   const aliveWolves = alivePlayers.filter((p) => p.alignment === "wolf");
   const aliveVillagers = alivePlayers.filter((p) => p.alignment === "village");
@@ -1050,7 +1056,7 @@ export async function generateAISpeechSegmentsStream(
 export async function generateAIVote(
   state: GameState,
   player: Player
-): Promise<{ seat: number; reason: string }> {
+): Promise<{ seat: number; reason: string; suspects: SuspicionEntry["suspects"] }> {
   const { t } = getI18n();
   const prompt = resolvePhasePrompt("DAY_VOTE", state, player);
   const eligibleSeats = state.pkSource === "vote" && state.pkTargets && state.pkTargets.length > 0
@@ -1062,9 +1068,12 @@ export async function generateAIVote(
   const startTime = Date.now();
   const { messages } = buildMessagesForPrompt(prompt);
   const validSeats = alivePlayers.map((p) => p.seat);
+  const suspectSeats = state.players
+    .filter((p) => p.alive && p.playerId !== player.playerId)
+    .map((p) => p.seat);
 
   if (validSeats.length === 0) {
-    return { seat: AI_VOTE_ABSTAIN, reason: t("gameMaster.voteFallback.noTargets") };
+    return { seat: AI_VOTE_ABSTAIN, reason: t("gameMaster.voteFallback.noTargets"), suspects: [] };
   }
 
   try {
@@ -1087,7 +1096,7 @@ export async function generateAIVote(
         promptScope: "gameplay",
         temperature: GAME_TEMPERATURE.ACTION,
         reasoningProfile: "decision",
-        response_format: seatSelectionResponseFormat(player.agentProfile!.modelRef, "day_vote", validSeats),
+        response_format: seatSelectionResponseFormat(player.agentProfile!.modelRef, "day_vote", validSeats, suspectSeats),
       }),
       (cleaned) => {
         const parsed = parseLLMJson<{
@@ -1096,6 +1105,7 @@ export async function generateAIVote(
           target?: unknown;
           vote?: unknown;
           reason?: unknown;
+          suspects?: unknown;
         }>(cleaned);
         if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return parseFail();
 
@@ -1107,7 +1117,11 @@ export async function generateAIVote(
         if (seat === null) return parseFail();
 
         const reason = typeof parsed.reason === "string" ? parsed.reason.trim() : "";
-        return parseOk({ seat, reason: reason || t("gameMaster.voteFallback.missingReason") });
+        return parseOk({
+          seat,
+          reason: reason || t("gameMaster.voteFallback.missingReason"),
+          suspects: parseSuspects(parsed.suspects, suspectSeats, player.seat),
+        });
       }
     );
 
@@ -1116,6 +1130,7 @@ export async function generateAIVote(
       reason: alivePlayers.length === 0
         ? t("gameMaster.voteFallback.noTargets")
         : t("gameMaster.voteFallback.parseFailedAbstain"),
+      suspects: [] as SuspicionEntry["suspects"],
     };
 
     // Log with both raw and parsed data
@@ -1143,6 +1158,7 @@ export async function generateAIVote(
       reason: alivePlayers.length === 0
         ? t("gameMaster.voteFallback.noTargets")
         : t("gameMaster.voteFallback.apiFailedAbstain"),
+      suspects: [] as SuspicionEntry["suspects"],
     };
 
     await aiLogger.log({
@@ -1227,7 +1243,8 @@ function structuredResponseFormat(
 function seatSelectionResponseFormat(
   modelRef: Pick<ModelRef, "provider" | "model">,
   name: string,
-  validSeats: number[]
+  validSeats: number[],
+  suspectSeats: number[] = validSeats
 ): NonNullable<GenerateOptions["response_format"]> {
   return structuredResponseFormat(modelRef, name, {
     type: "object",
@@ -1239,6 +1256,8 @@ function seatSelectionResponseFormat(
         enum: validSeats.map((seat) => seat + 1),
       },
       ...(name === "day_vote" ? { reason: { type: "string" } } : {}),
+      // suspects 不进 required：不支持 strict schema 的模型可以不填。
+      ...(name === "day_vote" ? suspicionSchemaProperty(suspectSeats) : {}),
     },
     required: name === "day_vote" ? ["analysis", "seat", "reason"] : ["seat"],
     additionalProperties: false,
@@ -1635,6 +1654,8 @@ export async function generateWolfAction(
   const startTime = Date.now();
   const { messages } = buildMessagesForPrompt(prompt);
   const validSeats = alivePlayers.map((p) => p.seat);
+  // Six-player AI wolves must knife someone. A parse failure is not an empty knife.
+  const forcedSeat = state.players.length === 6 ? firstSeat(validSeats.filter((seat) => seat !== player.seat)) ?? firstSeat(validSeats) : undefined;
 
   try {
     const completion = await generateCompletionAndParse(
@@ -1651,7 +1672,7 @@ export async function generateWolfAction(
         return parsedSeat === null ? parseFail() : parseOk(parsedSeat);
       }
     );
-    const parsedSeat = completion.parsed ?? undefined;
+    const parsedSeat = completion.parsed ?? forcedSeat;
 
     await aiLogger.log({
       type: "wolf_action",
@@ -1682,12 +1703,12 @@ export async function generateWolfAction(
       },
       response: {
         content: "",
-        parsed: { targetSeat: undefined },
+        parsed: { targetSeat: forcedSeat },
         duration: Date.now() - startTime,
       },
       error: String(error),
     });
-    return undefined;
+    return forcedSeat;
   }
 }
 
@@ -1704,10 +1725,8 @@ export async function generateWitchAction(
   const prompt = resolvePhasePrompt("NIGHT_WITCH_ACTION", state, player, { wolfTarget });
   const startTime = Date.now();
   const { messages } = buildMessagesForPrompt(prompt);
-  const canSave =
-    !state.roleAbilities.witchHealUsed &&
-    wolfTarget !== undefined;
-  const canPoison = !state.roleAbilities.witchPoisonUsed;
+  const canSave = canWitchSave(state, player.seat, wolfTarget);
+  const canPoison = !state.roleAbilities.witchPoisonUsed && state.nightActions.witchSave !== true;
   const validPoisonSeats = state.players
     .filter((p) => p.alive && p.playerId !== player.playerId)
     .map((p) => p.seat);

@@ -97,9 +97,10 @@ test("放逐投票的严格 Schema 把私下分析排在座位之前，且分析
   try {
     const result = await generateAIVote(state, voter);
     const schema = requestBodies[0].response_format?.json_schema?.schema;
-    assert.deepEqual(Object.keys(schema?.properties ?? {}), ["analysis", "seat", "reason"]);
+    assert.deepEqual(Object.keys(schema?.properties ?? {}), ["analysis", "seat", "reason", "suspects"]);
     assert.deepEqual(schema?.required, ["analysis", "seat", "reason"]);
-    assert.deepEqual(result, { seat: 1, reason: "发言前后对不上" });
+    assert.equal(schema?.properties?.suspects !== undefined, true);
+    assert.deepEqual(result, { seat: 1, reason: "发言前后对不上", suspects: [] });
   } finally {
     globalThis.fetch = originalFetch;
   }

@@ -1,4 +1,7 @@
+import type { SuspicionEntry } from "@/lib/suspicion";
+
 export type Role = "Villager" | "Werewolf" | "Seer" | "Witch" | "Hunter" | "Guard" | "Idiot" | "WhiteWolfKing";
+export type { SuspicionEntry };
 
 /** Check if a role belongs to the wolf team (used for seer checks, wolf actions, etc.) */
 export function isWolfRole(role: string | undefined): boolean {
@@ -217,6 +220,8 @@ export interface GameState {
   };
   votes: Record<string, number>;
   voteReasons?: Record<string, string>;
+  /** AI 投票时附带的怀疑度。只在终局复盘读取，任何提示词都不得使用。 */
+  suspicionLog?: SuspicionEntry[];
   lastVoteReasons?: Record<string, string>;
   voteRounds?: VoteRound[];
   voteHistory: Record<number, Record<string, number>>; // day -> { voterId -> targetSeat }
@@ -227,6 +232,7 @@ export interface GameState {
       resultsAnnounced?: boolean;
       guardTarget?: number;
       wolfTarget?: number;
+      wolfSkipped?: boolean;
       witchSave?: boolean;
       witchPoison?: number;
       seerTarget?: number;
@@ -255,6 +261,7 @@ export interface GameState {
     lastGuardTarget?: number;    // 上一晚守卫保护的目标（不能连续保护同一人）
     wolfVotes?: Record<string, number>;
     wolfTarget?: number;         // 狼人出刀目标
+    wolfSkipped?: boolean;       // 真人狼人空刀；AI 不会空刀
     witchSave?: boolean;         // 女巫是否救人
     witchPoison?: number;        // 女巫毒谁
     seerTarget?: number;

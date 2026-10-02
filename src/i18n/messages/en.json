@@ -1069,6 +1069,7 @@
       "option": "Seat {seat} ({name})",
       "reasonExample": "one sentence you could say aloud, without your private role information",
       "knowledge": "【Werewolf basics】\n- When exactly one player has claimed Seer and nobody counter-claims, that player is most likely the real Seer. With a counter-claim, usually one is real and one is fake.\n- Voting out the only Seer claimant when nobody counter-claimed almost always hurts the village. Doubting that claim takes a counter-claim, or a reported check that contradicts public facts.",
+      "knowledgeSix": "- This is a 6-player game: 2 werewolves, Seer, Witch, 2 villagers, no sheriff. One wrong exile can lose the game; vote carefully.\n- Under side-kill rules, once only one power role (or one villager) remains, werewolves will focus on them.\n- 6-player games usually last only 2-3 days; a Seer should reveal and report checks on day 1.",
       "analysisGuide": "private analysis, at most 120 words, answering in order: (1) my role and team (2) who publicly claimed which role today, and whether anyone counter-claimed (3) whether anyone reported a check on me, and what my own private information shows (4) what voting for each main candidate would mean for my team",
       "decisionRule": "Complete analysis first. If your public speech today said whom you would vote for, vote for that player by default. Change only if, after that speech, there was a new role claim, a new check result, a sheriff vote call, or a host announcement, and state which one in reason. If your speech named no vote target, decide from your analysis; do not invent replies that have not happened. analysis stays private; reason is one sentence you could say aloud and must not contain your private role information. Output only the JSON object shown under 【Format】.",
       "userNoTranscript": "(None)",
@@ -1094,6 +1095,7 @@
         "teammateVotes": "【Teammate intent】\n{lines}",
         "voteLine": "- Seat {seat} ({name}) wants to kill: Seat {targetSeat}{targetName}",
         "task": "【Werewolf Skill】\nEach night wolves collectively decide to kill one player. Can kill good players, teammates (self-kill), or skip (no kill).\n\n【Task】\nChoose one player to kill.\n{teammateVotesSection}\n\nOptions: {options}\n",
+        "mustKillSix": "This is a 6-player game. You must choose one available seat. You cannot skip the kill.",
         "user": "{context}\n\nWhich seat do you want to kill?\n\n【Format】\nReturn a strict JSON object only. No code blocks, no explanations, no extra text:\n{jsonFormat}"
       },
       "guard": {
@@ -1110,10 +1112,13 @@
         "noAttack": "No one was attacked tonight",
         "saveOption": "- You may use antidote on Seat {seat}",
         "noSelfSave": "- Witch can self-save",
+        "noSelfSaveBlocked": "- You may save yourself only on night 1, so you cannot save yourself tonight",
         "noSave": "- Antidote unavailable or no victim",
+        "selfSaveRuleSix": "yourself only on night 1",
+        "selfSaveRuleDefault": "including yourself",
         "poisonOption": "- You may use poison on one poison target",
         "noPoison": "- Poison already used",
-        "task": "【Witch Skill】\nYou have one antidote (save) and one poison (kill), each once per game.\n\n【Important Rules】\n- Antidote can save the wolf's victim (including yourself)\n- Poison can kill any player (usually confirmed wolves)\n- One potion max per night\n- If guard and witch both save the same target (milk poison), they still die\n\n【Potion Status】\nAntidote: {healStatus} | Poison: {poisonStatus}\n\n【Tonight】\n{tonightInfo}\n\n【Task】\nDecide whether to use a potion.\n{saveLine}\n{poisonLine}\n- You may use no potion\n\nPoison targets: {poisonTargets}\n\n【Format】\nReturn a strict JSON object only. No code blocks, no explanations, no extra text.\nSave example: {saveJsonFormat}\nPoison example: {poisonJsonFormat}\nPass example: {passJsonFormat}",
+        "task": "【Witch Skill】\nYou have one antidote (save) and one poison (kill), each once per game.\n\n【Important Rules】\n- Antidote can save the wolf's victim ({selfSaveRule})\n- Poison can kill any player (usually confirmed wolves)\n- One potion max per night\n- If guard and witch both save the same target (milk poison), they still die\n\n【Potion Status】\nAntidote: {healStatus} | Poison: {poisonStatus}\n\n【Tonight】\n{tonightInfo}\n\n【Task】\nDecide whether to use a potion.\n{saveLine}\n{poisonLine}\n- You may use no potion\n\nPoison targets: {poisonTargets}\n\n【Format】\nReturn a strict JSON object only. No code blocks, no explanations, no extra text.\nSave example: {saveJsonFormat}\nPoison example: {poisonJsonFormat}\nPass example: {passJsonFormat}",
         "user": "{context}\n\nWhat will you do? Return a strict JSON object."
       }
     }
@@ -1286,13 +1291,15 @@
       "poisonLabel": "poison",
       "poisonHintSuffix": ".",
       "poisonUsedNote": "(Poison already used)",
-      "doNothing": "Do nothing"
+      "doNothing": "Do nothing",
+      "selfSaveBlocked": "You may save yourself only on night 1."
     },
     "action": {
       "vote": "Vote",
       "badgeVote": "Vote sheriff",
       "seerCheck": "Check",
       "wolfKill": "Kill",
+      "wolfSkip": "Skip the kill",
       "guardProtect": "Protect",
       "hunterShoot": "Shoot",
       "whiteWolfKingBoom": "Self-destruct on",
@@ -1644,7 +1651,11 @@
       "guard": "【Win condition】Good wins when all werewolves are eliminated. You can protect one player each night and cannot protect the same player twice in a row.",
       "villager": "【Win condition】Good wins when all werewolves are eliminated.",
       "idiot": "【Win condition】Good wins when all werewolves are eliminated. If voted out, you reveal and survive, then lose voting rights.",
-      "whiteWolfKing": "【Win condition】Werewolves win when their count >= good players. During the day you may self-destruct to take one player; Seer checks you as Werewolf."
+      "whiteWolfKing": "【Win condition】Werewolves win when their count >= good players. During the day you may self-destruct to take one player; Seer checks you as Werewolf.",
+      "sixWerewolf": "[Win condition] Side-kill: werewolves win when both villagers are out, or both the Seer and the Witch are out. Good wins when both werewolves are out.",
+      "sixSeer": "[Win condition] Good wins when both werewolves are out; werewolves win if both villagers or both power roles (Seer, Witch) are out. Only you know your check results.",
+      "sixWitch": "[Win condition] Good wins when both werewolves are out; werewolves win if both villagers or both power roles (Seer, Witch) are out. You have one antidote and one poison, and may use only one per night. You may save yourself only on night 1.",
+      "sixVillager": "[Win condition] Good wins when both werewolves are out; werewolves win if both villagers or both power roles (Seer, Witch) are out."
     },
     "persona": {
       "section": "【Persona】\nSpeaking habits: {voiceRules}\nStyle: {riskLabel}",
@@ -2099,6 +2110,7 @@
     "wolfTieTitle": "Wolf tie",
     "wolfTieDesc": "Tap a player avatar to choose a target",
     "wolfDecided": "Wolf team attacks Seat {seat} {name}",
+    "wolfSkipped": "The wolves skip the kill tonight",
     "usedAntidote": "You used the antidote",
     "usedPoison": "You poisoned Seat {seat} {name}",
     "noPotion": "You chose not to use a potion",
