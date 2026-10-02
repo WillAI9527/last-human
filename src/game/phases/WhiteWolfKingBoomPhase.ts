@@ -27,7 +27,7 @@ export class WhiteWolfKingBoomPhase extends GamePhase {
       seat: player.seat + 1,
       name: player.displayName,
       role: getRoleText(player.role),
-      winCondition: getWinCondition("WhiteWolfKing"),
+      winCondition: getWinCondition("WhiteWolfKing", state.players.length),
     });
     const options = alivePlayers
       .map((p) => t("prompts.night.option", { seat: p.seat + 1, name: p.displayName }))

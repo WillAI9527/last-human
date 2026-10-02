@@ -11,6 +11,7 @@ import { AnalysisFooter } from "./AnalysisFooter";
 import { IdentityDashboard } from "./IdentityDashboard";
 import { PlayerDetailModal } from "./PlayerDetailModal";
 import { ShareModal } from "./ShareModal";
+import { SuspicionReview } from "./SuspicionReview";
 import type { PlayerSnapshot } from "@/types/analysis";
 
 interface PostGameAnalysisPageProps {
@@ -70,6 +71,8 @@ export function PostGameAnalysisPage({
                 onRoundChange={setSelectedRoundIndex}
               />
             </section>
+
+            <SuspicionReview />
 
             <TimelineReview
               timeline={data.timeline}

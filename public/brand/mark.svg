@@ -3,5 +3,5 @@
 </defs>
 <rect width="512" height="512" rx="112" fill="#0F0D0C"/>
 <path d="M250.1,160.2 A96,96 0 1,0 349.2,279.0 A78,78 0 0,1 250.1,160.2 Z" fill="#B3262B"/>
-<circle cx="256.0" cy="424.0" r="34" fill="url(#glow)"/><circle cx="256.0" cy="424.0" r="17" fill="#E8BE6A"/><circle cx="172.0" cy="401.5" r="12" fill="#7F8C99"/><circle cx="110.5" cy="340.0" r="12" fill="#7F8C99"/><circle cx="88.0" cy="256.0" r="12" fill="#7F8C99"/><circle cx="110.5" cy="172.0" r="12" fill="#7F8C99"/><circle cx="172.0" cy="110.5" r="12" fill="#7F8C99"/><circle cx="256.0" cy="88.0" r="12" fill="#7F8C99"/><circle cx="340.0" cy="110.5" r="12" fill="#7F8C99"/><circle cx="401.5" cy="172.0" r="12" fill="#7F8C99"/><circle cx="424.0" cy="256.0" r="12" fill="#7F8C99"/><circle cx="401.5" cy="340.0" r="12" fill="#7F8C99"/><circle cx="340.0" cy="401.5" r="12" fill="#7F8C99"/>
+<circle cx="256.0" cy="424.0" r="46" fill="url(#glow)"/><circle cx="256.0" cy="424.0" r="24" fill="#E8BE6A"/><circle cx="110.5" cy="340.0" r="18" fill="#7F8C99"/><circle cx="110.5" cy="172.0" r="18" fill="#7F8C99"/><circle cx="256.0" cy="88.0" r="18" fill="#7F8C99"/><circle cx="401.5" cy="172.0" r="18" fill="#7F8C99"/><circle cx="401.5" cy="340.0" r="18" fill="#7F8C99"/>
 </svg>

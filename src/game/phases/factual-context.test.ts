@@ -120,7 +120,7 @@ test("放逐投票提供不分角色的常识，并要求先写出私下分析�
   assert.match(wolf.system, /无人对跳时，这名玩家大概率是真预言家/);
   assert.equal(knowledge(wolf.system), knowledge(villager.system));
   // 只在心里核对不会改变结果，analysis 必须是排在 seat 之前的输出字段。
-  assert.match(villager.user, /\{"analysis":"[^"]+","seat":\d+,"reason":"[^"]+"\}/);
+  assert.match(villager.user, /\{"analysis":"[^"]+","seat":\d+,"reason":"[^"]+","suspects":\[\{"seat":\d+,"score":\d+\}\]\}/);
   assert.match(villager.user, /analysis 不会公开/);
   assert.match(villager.user, /reason 写一句可以公开说出口的理由，不要包含你的私有身份信息/);
 });

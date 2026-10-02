@@ -92,13 +92,13 @@ for (const locale of ["zh", "en"] as const) {
 // SHA-256 of the complete PromptResult captured before excerpt mode was implemented.
 const dayOnePromptBaselines: Record<string, string> = {
   "zh/false/DAY_SPEECH": "d30438db2b64df2571f426e57fafc70413daf727aeca08bb1d483add4e80e172",
-  "zh/false/DAY_VOTE": "778be97ecf3be5e93d5a08c98452490eafd8cf802c5c66586695e2527246effe",
+  "zh/false/DAY_VOTE": "1e6d84aa199e49a8fcfa25090d823609241fb21d9581906ca6e20118b7c3d87c",
   "zh/true/DAY_SPEECH": "b27163a430aec1c4aae0e44add98eb0a54672223dcc405ef467ad39e13e9b467",
-  "zh/true/DAY_VOTE": "778be97ecf3be5e93d5a08c98452490eafd8cf802c5c66586695e2527246effe",
+  "zh/true/DAY_VOTE": "1e6d84aa199e49a8fcfa25090d823609241fb21d9581906ca6e20118b7c3d87c",
   "en/false/DAY_SPEECH": "991bfb6084f54710c345b3dd832a85504466f3978c3b4384f9b466a611f6df96",
-  "en/false/DAY_VOTE": "6095b5b04557dcf26e30db4f48c99ce7c524aabf64442a855279927a399665ee",
+  "en/false/DAY_VOTE": "eb14a396676091b7ae6c7263bf1a98985b7fcc679ce54c7a9d6349c116c4c775",
   "en/true/DAY_SPEECH": "eb8b4846d6449f3a1aeb7cee4339ef2c9b49b9b982017b50749b905d231eab64",
-  "en/true/DAY_VOTE": "6095b5b04557dcf26e30db4f48c99ce7c524aabf64442a855279927a399665ee",
+  "en/true/DAY_VOTE": "eb14a396676091b7ae6c7263bf1a98985b7fcc679ce54c7a9d6349c116c4c775",
 };
 
 for (const locale of ["zh", "en"] as const) {

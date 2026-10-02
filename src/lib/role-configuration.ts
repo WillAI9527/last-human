@@ -1,6 +1,7 @@
 import type { Role } from "@/types/game";
 
 const ROLE_CONFIGURATIONS: Record<number, Role[]> = {
+  6: ["Werewolf", "Werewolf", "Seer", "Witch", "Villager", "Villager"],
   8: ["Werewolf", "Werewolf", "Werewolf", "Seer", "Witch", "Hunter", "Villager", "Villager"],
   9: ["Werewolf", "Werewolf", "Werewolf", "Seer", "Witch", "Hunter", "Villager", "Villager", "Villager"],
   10: ["Werewolf", "Werewolf", "WhiteWolfKing", "Seer", "Witch", "Hunter", "Guard", "Villager", "Villager", "Villager"],
@@ -9,5 +10,5 @@ const ROLE_CONFIGURATIONS: Record<number, Role[]> = {
 };
 
 export function getRoleConfiguration(playerCount: number): Role[] {
-  return [...(ROLE_CONFIGURATIONS[playerCount] ?? ROLE_CONFIGURATIONS[10])];
+  return [...(ROLE_CONFIGURATIONS[playerCount] ?? ROLE_CONFIGURATIONS[6])];
 }

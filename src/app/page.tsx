@@ -36,7 +36,7 @@ import {
 import { WelcomeScreen } from "@/components/game/WelcomeScreen";
 import { PhaseBar } from "@/components/game/PhaseBar";
 import { captureTesterTokenFromLocation } from "@/lib/demo-game-client";
-import { PlayerCardCompact } from "@/components/game/PlayerCardCompact";
+import { RoundTable } from "@/components/game/RoundTable";
 import { DialogArea } from "@/components/game/DialogArea";
 import { BottomActionPanel } from "@/components/game/BottomActionPanel";
 import { Notebook } from "@/components/game/Notebook";
@@ -204,6 +204,7 @@ export default function Home() {
   const [visualIsNight, setVisualIsNight] = useState(isNight);
   const visualIsNightRef = useRef(isNight);
   const [isMobile, setIsMobile] = useState(false);
+  const [keyboardOpen, setKeyboardOpen] = useState(false);
   const [dayNightBlinkPhase, setDayNightBlinkPhase] = useState<null | "closing" | "opening">(null);
   const dayNightBlinkTokenRef = useRef(0);
   const dayNightBlinkTimeoutsRef = useRef<number[]>([]);
@@ -230,6 +231,19 @@ export default function Home() {
     }
     media.addListener(update);
     return () => media.removeListener(update);
+  }, []);
+
+  useEffect(() => {
+    const viewport = window.visualViewport;
+    if (!viewport) return;
+    const sync = () => setKeyboardOpen(window.innerHeight - viewport.height > 140);
+    sync();
+    viewport.addEventListener("resize", sync);
+    viewport.addEventListener("scroll", sync);
+    return () => {
+      viewport.removeEventListener("resize", sync);
+      viewport.removeEventListener("scroll", sync);
+    };
   }, []);
 
   useEffect(() => {
@@ -260,12 +274,15 @@ export default function Home() {
 
     const beginBlink = () => {
       if (dayNightBlinkTokenRef.current !== token) return;
+      // The scene follows the phase immediately. The eyelid animation plays
+      // over it and must not leave the day background up after night starts.
+      visualIsNightRef.current = targetIsNight;
+      setVisualIsNight(targetIsNight);
       setDayNightBlinkPhase("closing");
 
       const { closeMs, holdMs, openMs } = DAY_NIGHT_BLINK;
       const t1 = window.setTimeout(() => {
         if (dayNightBlinkTokenRef.current !== token) return;
-        setVisualIsNight(targetIsNight);
         const tHold = window.setTimeout(() => {
           if (dayNightBlinkTokenRef.current !== token) return;
           setDayNightBlinkPhase("opening");
@@ -291,24 +308,12 @@ export default function Home() {
   useEffect(() => {
     if (isNight === visualIsNightRef.current) return;
 
-    if (isNight) {
-      // Mark that we need to blink to night
-      pendingNightBlinkRef.current = true;
-      
-      // In spectator mode (no human player), trigger night blink immediately
-      // because the game progresses quickly without waiting for role reveal
-      if (showTable && !humanPlayer) {
-        scheduleDayNightBlink(true, 0);
-        pendingNightBlinkRef.current = false;
-      }
-      return;
-    }
-
-    // Transition to day immediately
+    // Night used to wait for the nightfall card, so the day scene stayed up
+    // after the night phase (and its controls) had already started.
     pendingNightBlinkRef.current = false;
-    lastNightCueIdRef.current = null;
-    scheduleDayNightBlink(false, 0);
-  }, [isNight, scheduleDayNightBlink, showTable, humanPlayer]);
+    if (!isNight) lastNightCueIdRef.current = null;
+    scheduleDayNightBlink(isNight, 0);
+  }, [isNight, scheduleDayNightBlink]);
 
   useEffect(() => {
     return () => {
@@ -1217,9 +1222,6 @@ export default function Home() {
     return gameState.players;
   }, [gameState.players]);
 
-  const leftPlayers = useMemo(() => allPlayers.slice(0, Math.ceil(allPlayers.length / 2)), [allPlayers]);
-  const rightPlayers = useMemo(() => allPlayers.slice(Math.ceil(allPlayers.length / 2)), [allPlayers]);
-
   const hasSelectableTargets = useMemo(() => {
     return allPlayers.some((player) => canClickSeat(player));
   }, [allPlayers, canClickSeat]);
@@ -1532,50 +1534,32 @@ export default function Home() {
                       transition={{ duration: 0.45, ease: "easeOut" }}
                       className="flex-1 flex flex-col min-h-0 overflow-hidden"
                     >
-                {/* 主布局 - 严格对齐 style-unification-preview.html */}
-                <div className="flex-1 flex gap-4 lg:gap-6 lg:px-6 lg:py-6 overflow-hidden w-full justify-center min-h-0">
-                  {/* 左侧玩家卡片 */}
-                  <div className="hidden md:flex w-[220px] lg:w-[240px] xl:w-[260px] 2xl:w-[300px] flex-col gap-3 shrink-0 overflow-y-auto overflow-x-visible scrollbar-hide pt-2 pb-2 px-1 -mx-1">
-                    <AnimatePresence>
-                      {leftPlayers.map((player, index) => {
-                        const checkResult =
-                          humanPlayer?.role === "Seer"
-                            ? gameState.nightActions.seerHistory?.find((h) => h.targetSeat === player.seat)
-                            : undefined;
-                        const seerResult = checkResult ? (checkResult.isWolf ? "wolf" : "good") : null;
-                        const isBadgeCandidate = (gameState.phase === "DAY_BADGE_ELECTION" || gameState.phase === "DAY_BADGE_SPEECH") && 
-                          (gameState.badge.candidates || []).includes(player.seat);
-
-                        return (
-                          <PlayerCardCompact
-                            key={player.playerId}
-                            player={player}
-                            isSpeaking={gameState.currentSpeakerSeat === player.seat}
-                            canClick={canClickSeat(player)}
-                            isSelected={selectedSeat === player.seat}
-                            onClick={() => handleSeatClick(player)}
-                            onDetailClick={isSelectionPhase ? undefined : () => setDetailPlayer(player)}
-                            animationDelay={index * 0.05}
-                            isNight={visualIsNight}
-                            isGenshinMode={gameState?.isGenshinMode ?? isGenshinMode}
-                            humanPlayer={humanPlayer}
-                            seerCheckResult={seerResult}
-                            isBadgeHolder={gameState.badge.holderSeat === player.seat}
-                            isBadgeCandidate={isBadgeCandidate}
-                            showRoleBadge={canShowRole}
-                            showModel={gameState.phase === "GAME_END"}
-                            selectionTone={selectionTone}
-                            isInSelectionPhase={isSelectionPhase}
-                            showVoteSeal={humanVoteSeat === player.seat}
-                          />
-                        );
-                      })}
-                    </AnimatePresence>
+                <div className="flex-1 flex flex-col md:flex-row overflow-hidden w-full min-h-0">
+                  <div className={cn(
+                    "min-h-0 md:flex-1",
+                    keyboardOpen ? "h-[104px] shrink-0" : "h-[48vh] min-h-[280px] md:h-auto"
+                  )}>
+                    <RoundTable
+                      players={allPlayers}
+                      gameState={gameState}
+                      humanPlayer={humanPlayer}
+                      visualIsNight={visualIsNight}
+                      isGenshinMode={gameState?.isGenshinMode ?? isGenshinMode}
+                      selectedSeat={selectedSeat}
+                      humanVoteSeat={humanVoteSeat}
+                      canClickSeat={canClickSeat}
+                      onSeatClick={handleSeatClick}
+                      onDetailClick={setDetailPlayer}
+                      selectionTone={selectionTone}
+                      isSelectionPhase={isSelectionPhase}
+                      canShowRole={canShowRole}
+                      collapsed={keyboardOpen}
+                    />
                   </div>
 
-                  {/* 中间区域：对话区 */}
-                  <div className="flex-1 flex flex-col min-w-0 min-h-0 h-full max-w-[980px] lg:max-w-[1100px] xl:max-w-[1200px] 2xl:max-w-[1280px] overflow-hidden">
+                  <div className="flex-1 flex flex-col min-w-0 min-h-0 h-full md:w-[min(440px,38vw)] md:flex-none overflow-hidden">
                     <DialogArea
+                      roomLayout="round"
                       gameState={gameState}
                       humanPlayer={humanPlayer}
                       isNight={visualIsNight}
@@ -1620,84 +1604,6 @@ export default function Home() {
                       isEventLogOpen={isEventLogOpen}
                       onEventLogOpenChange={setIsEventLogOpen}
                     />
-
-                    {/* 移动端玩家条 */}
-                    <div className="wc-mobile-player-bar md:hidden">
-                      <div className="wc-mobile-player-bar__track">
-                        {allPlayers.map((player, index) => {
-                          const checkResult =
-                            humanPlayer?.role === "Seer"
-                              ? gameState.nightActions.seerHistory?.find((h) => h.targetSeat === player.seat)
-                              : undefined;
-                          const seerResult = checkResult ? (checkResult.isWolf ? "wolf" : "good") : null;
-                          const isBadgeCandidate = (gameState.phase === "DAY_BADGE_ELECTION" || gameState.phase === "DAY_BADGE_SPEECH") &&
-                            (gameState.badge.candidates || []).includes(player.seat);
-
-                          return (
-                            <PlayerCardCompact
-                              key={player.playerId}
-                              player={player}
-                              isSpeaking={gameState.currentSpeakerSeat === player.seat}
-                              canClick={canClickSeat(player)}
-                              isSelected={selectedSeat === player.seat}
-                              onClick={() => handleSeatClick(player)}
-                              onDetailClick={isSelectionPhase ? undefined : () => setDetailPlayer(player)}
-                              animationDelay={index * 0.02}
-                              isNight={visualIsNight}
-                              isGenshinMode={gameState?.isGenshinMode ?? isGenshinMode}
-                              humanPlayer={humanPlayer}
-                              seerCheckResult={seerResult}
-                              isBadgeHolder={gameState.badge.holderSeat === player.seat}
-                              isBadgeCandidate={isBadgeCandidate}
-                              variant="mobile"
-                              showRoleBadge={canShowRole}
-                              selectionTone={selectionTone}
-                              isInSelectionPhase={isSelectionPhase}
-                              showVoteSeal={humanVoteSeat === player.seat}
-                            />
-                          );
-                        })}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* 右侧玩家卡片 */}
-                  <div className="hidden md:flex w-[220px] lg:w-[240px] xl:w-[260px] 2xl:w-[300px] flex-col gap-3 shrink-0 overflow-y-auto overflow-x-visible scrollbar-hide pt-2 pb-2 px-1 -mx-1">
-                    <AnimatePresence>
-                      {rightPlayers.map((player, index) => {
-                        const checkResult =
-                          humanPlayer?.role === "Seer"
-                            ? gameState.nightActions.seerHistory?.find((h) => h.targetSeat === player.seat)
-                            : undefined;
-                        const seerResult = checkResult ? (checkResult.isWolf ? "wolf" : "good") : null;
-                        const isBadgeCandidate = (gameState.phase === "DAY_BADGE_ELECTION" || gameState.phase === "DAY_BADGE_SPEECH") && 
-                          (gameState.badge.candidates || []).includes(player.seat);
-
-                        return (
-                          <PlayerCardCompact
-                            key={player.playerId}
-                            player={player}
-                            isSpeaking={gameState.currentSpeakerSeat === player.seat}
-                            canClick={canClickSeat(player)}
-                            isSelected={selectedSeat === player.seat}
-                            onClick={() => handleSeatClick(player)}
-                            onDetailClick={isSelectionPhase ? undefined : () => setDetailPlayer(player)}
-                            animationDelay={index * 0.05}
-                            isNight={visualIsNight}
-                            isGenshinMode={gameState?.isGenshinMode ?? isGenshinMode}
-                            humanPlayer={humanPlayer}
-                            seerCheckResult={seerResult}
-                            isBadgeHolder={gameState.badge.holderSeat === player.seat}
-                            isBadgeCandidate={isBadgeCandidate}
-                            showRoleBadge={canShowRole}
-                            showModel={gameState.phase === "GAME_END"}
-                            selectionTone={selectionTone}
-                            isInSelectionPhase={isSelectionPhase}
-                            showVoteSeal={humanVoteSeat === player.seat}
-                          />
-                        );
-                      })}
-                    </AnimatePresence>
                   </div>
                 </div>
               </motion.div>

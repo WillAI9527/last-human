@@ -51,13 +51,11 @@ export const audioSettingsAtom = atom(
   }
 );
 
-const DEFAULT_PLAYER_COUNT = 10;
-const MIN_PLAYER_COUNT = 8;
-const MAX_PLAYER_COUNT = 12;
+const DEFAULT_PLAYER_COUNT = 6;
 
 const normalizePlayerCount = (value: number) => {
   if (!Number.isFinite(value)) return DEFAULT_PLAYER_COUNT;
-  return Math.min(MAX_PLAYER_COUNT, Math.max(MIN_PLAYER_COUNT, Math.round(value)));
+  return 6;
 };
 
 const rawPlayerCountAtom = atomWithStorage<number>("wolfcha.settings.player_count", DEFAULT_PLAYER_COUNT);

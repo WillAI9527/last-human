@@ -27,6 +27,7 @@ import { DELAY_CONFIG } from "@/lib/game-constants";
 import { delay } from "@/lib/game-flow-controller";
 import { playNarrator } from "@/lib/narrator-audio-player";
 import { getPlayerDiedKey } from "@/lib/narrator-voice";
+import { nightDeathHasLastWords, pickPeacefulSpeechStart } from "@/lib/six-player-rules";
 
 type DaySpeechRuntime = {
   token: FlowToken;
@@ -42,6 +43,12 @@ type DaySpeechRuntime = {
   onPkSpeechEnd: (state: GameState) => Promise<void>;
   /** AI白狼王自爆决策：返回 true 表示已自爆（由调用方处理后续），false 表示不自爆 */
   onWhiteWolfKingBoomCheck: (state: GameState, wwk: Player) => Promise<boolean>;
+  /** 6 人局第一夜死者的遗言。说完后继续白天发言。 */
+  onNightOneLastWords?: (
+    state: GameState,
+    seats: number[],
+    then: (state: GameState) => Promise<void>,
+  ) => Promise<void>;
 };
 
 const getRoleGoalKey = (role: Role) => {
@@ -141,7 +148,7 @@ export class DaySpeechPhase extends GamePhase {
       seat: player.seat + 1,
       name: player.displayName,
       role: getRoleText(player.role),
-      winCondition: getWinCondition(player.role),
+      winCondition: getWinCondition(player.role, state.players.length),
       persona,
     });
     const wasVotedOut = isLastWords && state.dayHistory?.[state.day]?.executed?.seat === player.seat;
@@ -179,6 +186,7 @@ export class DaySpeechPhase extends GamePhase {
       ...(publicFactsForPlayer ? [{ text: publicFactsForPlayer }] : []),
       { text: guidelinesSection, cacheable: true, ttl: "1h" },
       { text: t("prompts.daySpeech.roleGoal.section", { goal: roleGoal }) },
+      ...(state.players.length === 6 ? [{ text: t("prompts.vote.knowledgeSix") }] : []),
     ];
     const system = buildSystemTextFromParts(systemParts);
 
@@ -348,6 +356,32 @@ export class DaySpeechPhase extends GamePhase {
     };
     runtime.setGameState(currentState);
 
+    const nightOneDead = nightDeathHasLastWords(currentState.day) && currentState.players.length === 6
+      ? [wolfVictim?.seat, poisonVictim?.seat].filter((seat, index, all): seat is number =>
+          typeof seat === "number" && all.indexOf(seat) === index)
+      : [];
+    if (nightOneDead.length > 0 && runtime.onNightOneLastWords) {
+      await runtime.onNightOneLastWords(currentState, nightOneDead, async (afterWords) => {
+        await this.openDayTable(afterWords, runtime, wolfVictim, poisonVictim);
+      });
+      return;
+    }
+
+    await this.openDayTable(currentState, runtime, wolfVictim, poisonVictim);
+  }
+
+  private async openDayTable(
+    currentState: GameState,
+    runtime: DaySpeechRuntime,
+    wolfVictim: Player | undefined,
+    _poisonVictim: Player | undefined,
+  ): Promise<void> {
+    const { t } = getI18n();
+    const systemMessages = getSystemMessages();
+    const uiText = getUiText();
+    const speakerHost = t("speakers.host");
+    const speakerHint = t("speakers.hint");
+
     const currentSheriffSeat = currentState.badge.holderSeat;
     const sheriffPlayer =
       currentSheriffSeat !== null ? currentState.players.find((p) => p.seat === currentSheriffSeat) : null;
@@ -439,11 +473,18 @@ export class DaySpeechPhase extends GamePhase {
     if (isSheriffAlive) {
       // 有警长存活：从警长下一位开始，警长最后发言
       startSeat = getNextAliveSeat(speechState, sheriffSeat, true, speechDirection);
-    } else if (wolfVictim) {
-      // 无警长但有死者：从死者下一位开始
-      startSeat = getNextAliveSeat(speechState, wolfVictim.seat, false, speechDirection);
+    } else if (wolfVictim || (speechState.players.length === 6 && _poisonVictim)) {
+      const deadSeat = wolfVictim?.seat ?? _poisonVictim?.seat;
+      startSeat = deadSeat === undefined
+        ? null
+        : getNextAliveSeat(speechState, deadSeat, false, speechDirection);
+    } else if (speechState.players.length === 6) {
+      startSeat = pickPeacefulSpeechStart(
+        alivePlayers.map((player) => player.seat),
+        speechState.gameId,
+        speechState.day,
+      );
     } else {
-      // 无警长无死者（和平夜）：从最小座位号开始
       const aliveSeats = alivePlayers.map((p) => p.seat).sort((a, b) => a - b);
       startSeat = aliveSeats[0] ?? null;
     }

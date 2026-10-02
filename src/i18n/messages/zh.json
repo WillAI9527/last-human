@@ -1078,6 +1078,7 @@
       "userNoSelfSpeech": "（你今天没有发言）",
       "user": "{gameContext}\n\n【当前环节】\n白天自由发言已经结束，现在进行放逐投票。本次选择决定你投给谁出局，不是警徽投票。\n\n【本日讨论记录】\n{todayTranscript}\n\n【你本日发言汇总】\n\"{selfSpeech}\"\n\n你投几号？\n\n【格式】\n严格返回 JSON 对象，不要代码块，不要多余文字：\n{voteJsonFormat}",
       "knowledge": "【狼人杀常识】\n- 场上只有一名玩家跳预言家且无人对跳时，这名玩家大概率是真预言家；有人对跳时，通常一真一假。\n- 无人对跳时放逐唯一跳预言家的玩家，好人阵营几乎总是吃亏。要怀疑他，需要有人对跳，或者他报的查验与已公开的事实矛盾。",
+      "knowledgeSix": "- 这是 6 人局：2 狼、预言家、女巫、2 平民，没有警长。一次错误放逐就可能直接输掉，投票要格外谨慎。\n- 屠边规则下，神职（预言家、女巫）只剩一个时，狼人会集中刀他；平民只剩一个时也一样危险。\n- 6 人局通常只有 2–3 个白天，预言家第一天就应该公开身份和查验结果；隐藏太久，信息就带不出来。",
       "analysisGuide": "不超过200字的私下分析，依次回答：①我的身份和阵营 ②今天谁公开跳了什么身份、有没有人对跳 ③有没有人报过关于我的查验，我自己的私有信息说明了什么 ④把票投给每个主要候选人，分别对我的阵营意味着什么",
       "decisionRule": "先完成 analysis。如果你今天的公开发言里说过要投谁，默认就投那个人；只有在你那次发言之后出现了新的身份声明、新的查验结果、警长归票或主持人公告，才可以改投，并在 reason 里写明是哪一条。如果你的发言里没有说过要投谁，按 analysis 的结论决定；不要编造尚未发生的回应。analysis 不会公开；reason 写一句可以公开说出口的理由，不要包含你的私有身份信息。只输出上面【格式】中的 JSON 对象。"
     },
@@ -1100,6 +1101,7 @@
         "teammateVotes": "【队友意向】\n{lines}",
         "voteLine": "- {seat}号({name}) 想杀: {targetSeat}号{targetName}",
         "task": "【狼人技能】\n每晚狼人集体决定击杀一名玩家。可以选择击杀好人、队友（自刀）或不选（空刀）。\n\n【任务】\n选择一名玩家击杀。\n{teammateVotesSection}\n\n可选: {options}\n",
+        "mustKillSix": "这是 6 人局。你必须从可选座位里选一名玩家，不能空刀。",
         "user": "{context}\n\n你们要杀几号？\n\n【格式】\n严格返回 JSON 对象，不要代码块，不要解释，不要多余文字：\n{jsonFormat}"
       },
       "guard": {
@@ -1116,10 +1118,13 @@
         "noAttack": "今晚无人被袭击",
         "saveOption": "- 可以使用解药救 {seat}号",
         "noSelfSave": "- 女巫可自救",
+        "noSelfSaveBlocked": "- 只有第一夜可以自救，今晚不能救自己",
         "noSave": "- 解药已用完或无人被杀",
+        "selfSaveRuleSix": "仅第一夜可以自救",
+        "selfSaveRuleDefault": "包括自救",
         "poisonOption": "- 可以使用毒药毒杀一名可毒目标",
         "noPoison": "- 毒药已用完",
-        "task": "【女巫技能】\n拥有一瓶解药（救人）和一瓶毒药（杀人），全局各一瓶。\n\n【重要规则】\n- 解药可救被狼人杀害的玩家（包括自救）\n- 毒药可毒杀任意玩家（通常用于确认的狼人）\n- 每晚最多用一瓶药\n- 若守卫和女巫同时救同一人（毒奶），该玩家仍会死亡\n\n【药水状态】\n解药: {healStatus} | 毒药: {poisonStatus}\n\n【今晚情况】\n{tonightInfo}\n\n【任务】\n决定是否使用药水。\n{saveLine}\n{poisonLine}\n- 可以不使用药水\n\n可毒目标: {poisonTargets}\n\n【格式】\n严格返回 JSON 对象，不要代码块，不要解释，不要多余文字。\n救人示例：{saveJsonFormat}\n毒人示例：{poisonJsonFormat}\n不用药示例：{passJsonFormat}",
+        "task": "【女巫技能】\n拥有一瓶解药（救人）和一瓶毒药（杀人），全局各一瓶。\n\n【重要规则】\n- 解药可救被狼人杀害的玩家（{selfSaveRule}）\n- 毒药可毒杀任意玩家（通常用于确认的狼人）\n- 每晚最多用一瓶药\n- 若守卫和女巫同时救同一人（毒奶），该玩家仍会死亡\n\n【药水状态】\n解药: {healStatus} | 毒药: {poisonStatus}\n\n【今晚情况】\n{tonightInfo}\n\n【任务】\n决定是否使用药水。\n{saveLine}\n{poisonLine}\n- 可以不使用药水\n\n可毒目标: {poisonTargets}\n\n【格式】\n严格返回 JSON 对象，不要代码块，不要解释，不要多余文字。\n救人示例：{saveJsonFormat}\n毒人示例：{poisonJsonFormat}\n不用药示例：{passJsonFormat}",
         "user": "{context}\n\n你要怎么做？严格返回 JSON 对象。"
       }
     },
@@ -1344,13 +1349,15 @@
       "poisonLabel": "毒药",
       "poisonHintSuffix": "。",
       "poisonUsedNote": "（毒药已用尽）",
-      "doNothing": "什么都不做"
+      "doNothing": "什么都不做",
+      "selfSaveBlocked": "只有第一夜可以自救。"
     },
     "action": {
       "vote": "投票给",
       "badgeVote": "把警徽投给",
       "seerCheck": "查验",
       "wolfKill": "击杀",
+      "wolfSkip": "空刀",
       "guardProtect": "守护",
       "hunterShoot": "射击",
       "whiteWolfKingBoom": "自爆带走",
@@ -1726,7 +1733,11 @@
       "guard": "【获胜条件】放逐所有狼人时好人胜利。你每晚可以守护一名玩家，不能连续两晚守护同一人。",
       "villager": "【获胜条件】放逐所有狼人时好人胜利。",
       "idiot": "【获胜条件】放逐所有狼人时好人胜利。你被投票放逐时会翻牌免疫，之后失去投票权。",
-      "whiteWolfKing": "【获胜条件】狼人数量 >= 好人数量 时狼人胜利。你白天可选择自爆带走一名玩家，预言家查验你为狼人。"
+      "whiteWolfKing": "【获胜条件】狼人数量 >= 好人数量 时狼人胜利。你白天可选择自爆带走一名玩家，预言家查验你为狼人。",
+      "sixWerewolf": "【获胜条件】屠边：两个平民全部出局，或预言家和女巫全部出局，狼人获胜；两只狼都出局则好人获胜。",
+      "sixSeer": "【获胜条件】两只狼全部出局时好人获胜；平民全灭或神职全灭则狼人获胜。你的查验结果只有你知道。",
+      "sixWitch": "【获胜条件】两只狼全部出局时好人获胜；平民全灭或神职全灭则狼人获胜。你有一瓶解药和一瓶毒药，同一晚只能用一瓶；只有第一夜可以救自己。",
+      "sixVillager": "【获胜条件】两只狼全部出局时好人获胜；平民全灭或神职全灭则狼人获胜。"
     },
     "persona": {
       "section": "【角色设定】\n说话习惯: {voiceRules}\n风格: {riskLabel}",
@@ -2181,6 +2192,7 @@
     "wolfTieTitle": "狼队平票",
     "wolfTieDesc": "请重新点击玩家头像选择击杀目标",
     "wolfDecided": "狼队决定袭击 {seat}号 {name}",
+    "wolfSkipped": "狼队今晚空刀",
     "usedAntidote": "你使用了解药",
     "usedPoison": "你对 {seat}号 {name} 使用了毒药",
     "noPotion": "你选择不使用药水",

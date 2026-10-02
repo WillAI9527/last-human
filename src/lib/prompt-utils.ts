@@ -38,8 +38,21 @@ export const getRoleText = (role: string) => {
   }
 };
 
-export const getWinCondition = (role: string) => {
+export const getWinCondition = (role: string, playerCount = 0) => {
   const { t } = getI18n();
+  if (playerCount === 6) {
+    switch (role) {
+      case "Werewolf":
+      case "WhiteWolfKing":
+        return t("promptUtils.winCondition.sixWerewolf");
+      case "Witch":
+        return t("promptUtils.winCondition.sixWitch");
+      case "Seer":
+        return t("promptUtils.winCondition.sixSeer");
+      default:
+        return t("promptUtils.winCondition.sixVillager");
+    }
+  }
   switch (role) {
     case "Werewolf":
       return t("promptUtils.winCondition.werewolf");

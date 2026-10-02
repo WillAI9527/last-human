@@ -40,6 +40,7 @@ import { isVillagerAvatarId, pickHumanPortraitId } from "@/lib/village-cast";
 import { getSystemMessages, getUiText } from "@/lib/game-texts";
 import { getRandomScenario } from "@/lib/scenarios";
 import { DELAY_CONFIG, getRoleName } from "@/lib/game-constants";
+import { canWitchPoison, canWitchSave, isWolfNightResolved, shouldRunSheriffElection } from "@/lib/six-player-rules";
 import { generateUUID } from "@/lib/utils";
 import {
   AsyncFlowController,
@@ -152,6 +153,7 @@ export function useGameLogic() {
   const hunterDeathRef = useRef<((state: GameState, hunter: Player, diedAtNight: boolean) => Promise<void>) | null>(null);
   const proceedToNightRef = useRef<((state: GameState, token: ReturnType<typeof getToken>) => Promise<void>) | null>(null);
   const onStartVoteRef = useRef<((state: GameState, token: ReturnType<typeof getToken>) => Promise<void>) | null>(null);
+  const nightOneLastWordsRef = useRef<((state: GameState, seats: number[], then: (state: GameState) => Promise<void>) => Promise<void>) | null>(null);
   const onBadgeSpeechEndRef = useRef<((state: GameState) => Promise<void>) | null>(null);
   const onPkSpeechEndRef = useRef<((state: GameState) => Promise<void>) | null>(null);
   const wwkBoomCheckRef = useRef<((state: GameState, wwk: Player) => Promise<boolean>) | null>(null);
@@ -367,6 +369,11 @@ export function useGameLogic() {
         if (fn) {
           await fn(state, winner);
         }
+      },
+      onNightOneLastWords: async (state: GameState, seats: number[], then: (next: GameState) => Promise<void>) => {
+        const fn = nightOneLastWordsRef.current;
+        if (fn) await fn(state, seats, then);
+        else await then(state);
       },
     };
   }, [setDialogue, setGameState, waitForUnpause]);
@@ -633,6 +640,20 @@ export function useGameLogic() {
 
   const { startLastWordsPhase, runAISpeech, isSpeechBlocked } = dayPhase;
   runAISpeechRef.current = runAISpeech;
+  nightOneLastWordsRef.current = async (state, seats, then) => {
+    const token = getToken();
+    const step = async (current: GameState, index: number): Promise<void> => {
+      if (!isTokenValid(token)) return;
+      if (index >= seats.length) {
+        await then(current);
+        return;
+      }
+      await startLastWordsPhase(current, seats[index], async (after) => {
+        await step(after, index + 1);
+      }, token);
+    };
+    await step(state, 0);
+  };
 
   // ============================================
   // 警长竞选阶段
@@ -772,7 +793,7 @@ export function useGameLogic() {
     options?: { skipAnnouncements?: boolean }
   ) => {
     // 第一天：先进行警徽评选
-    if (state.day === 1 && state.badge.holderSeat === null) {
+    if (shouldRunSheriffElection(state)) {
       await badgePhase.startBadgeSignupPhase(state);
       return;
     }
@@ -897,7 +918,7 @@ export function useGameLogic() {
         // 狼人阶段：检查是否已完成
         hasContinuedAfterRevealRef.current = true;
         isAwaitingRoleRevealRef.current = false;
-        if (s.nightActions.wolfTarget !== undefined) {
+        if (isWolfNightResolved(s.nightActions)) {
           // 狼人已选择，继续到女巫阶段
           void runNightPhaseAction(s, token, "CONTINUE_NIGHT_AFTER_WOLF");
         } else {
@@ -1389,7 +1410,7 @@ export function useGameLogic() {
       fixedRoles,
       devPreset,
       difficulty = "normal",
-      playerCount = 10,
+      playerCount = 6,
       gameSessionId,
       isGenshinMode = false,
       isSpectatorMode = false,
@@ -2012,6 +2033,14 @@ export function useGameLogic() {
     }
     // 狼人击杀
     else if (gameState.phase === "NIGHT_WOLF_ACTION" && isWolfRole(humanPlayer.role)) {
+      if (targetSeat < 0) {
+        currentState = {
+          ...currentState,
+          nightActions: { ...currentState.nightActions, wolfVotes: {}, wolfTarget: undefined, wolfSkipped: true },
+        };
+        setDialogue(t("speakers.system"), t("gameLogicMessages.wolfSkipped"), false);
+        setGameState(currentState);
+      } else {
       const targetPlayer = currentState.players.find((p) => p.seat === targetSeat);
       const wolves = currentState.players.filter((p) => isWolfRole(p.role) && p.alive);
       
@@ -2023,12 +2052,13 @@ export function useGameLogic() {
 
       currentState = {
         ...currentState,
-        nightActions: { ...currentState.nightActions, wolfVotes, wolfTarget: targetSeat },
+        nightActions: { ...currentState.nightActions, wolfVotes, wolfTarget: targetSeat, wolfSkipped: false },
       };
       
       // 显示狼队达成一致的确认消息
       setDialogue(t("speakers.system"), t("gameLogicMessages.wolfDecided", { seat: targetSeat + 1, name: targetPlayer?.displayName || "" }), false);
       setGameState(currentState);
+      }
 
       await delay(800);
       await waitForUnpause();
@@ -2036,14 +2066,14 @@ export function useGameLogic() {
     }
     // 女巫用药
     else if (gameState.phase === "NIGHT_WITCH_ACTION" && humanPlayer.role === "Witch") {
-      if (witchAction === "save" && !currentState.roleAbilities.witchHealUsed) {
+      if (witchAction === "save" && canWitchSave(currentState, humanPlayer.seat, currentState.nightActions.wolfTarget)) {
         currentState = {
           ...currentState,
           nightActions: { ...currentState.nightActions, witchSave: true },
           roleAbilities: { ...currentState.roleAbilities, witchHealUsed: true },
         };
         setDialogue(t("speakers.system"), t("gameLogicMessages.usedAntidote"), false);
-      } else if (witchAction === "poison" && !currentState.roleAbilities.witchPoisonUsed) {
+      } else if (witchAction === "poison" && canWitchPoison(currentState)) {
         const targetPlayer = currentState.players.find((p) => p.seat === targetSeat);
         currentState = {
           ...currentState,
