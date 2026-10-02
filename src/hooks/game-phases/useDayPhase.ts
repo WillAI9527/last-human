@@ -19,7 +19,6 @@ import { getNextSpeechSeat } from "@/lib/speech-order";
 import { PHASE_CATEGORIES } from "@/lib/game-constants";
 import { type FlowToken } from "@/lib/game-flow-controller";
 import { audioManager, makeAudioTaskId, type TtsProvider } from "@/lib/audio-manager";
-import { getModelSource } from "@/lib/api-keys";
 import { resolveVoiceId, type AppLocale } from "@/lib/voice-constants";
 import { getLocale } from "@/i18n/locale-store";
 import { createSpeechRequest, type SpeechRequest } from "@/lib/speech-request";
@@ -132,7 +131,6 @@ export function useDayPhase(
     if (!request.isValid()) return;
     const isValid = () => request.isValid() && !controller.signal.aborted;
     const afterSpeech = options?.afterSpeech as ((s: unknown) => Promise<void>) | undefined;
-    const modelSource = getModelSource();
     const persona = player.agentProfile?.persona;
     const voiceId = resolveVoiceId(
       persona?.voiceId,
@@ -140,10 +138,7 @@ export function useDayPhase(
       persona?.age,
       getLocale() as AppLocale,
     );
-    const ttsProvider: TtsProvider = modelSource === "tokenpay"
-      || player.agentProfile?.modelRef?.provider === "tokendance"
-      ? "tokendance"
-      : "minimax";
+    const ttsProvider: TtsProvider = "minimax";
     const collected: string[] = [];
     let displayedCount = 0;
     let displayChain = Promise.resolve();

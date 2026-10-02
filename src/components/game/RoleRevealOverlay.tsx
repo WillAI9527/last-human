@@ -14,6 +14,7 @@ import {
   NightIcon,
 } from "@/components/icons/FlatIcons";
 import type { Phase, Player } from "@/types/game";
+import { roleCardUrl } from "@/lib/role-card";
 import { useTranslations } from "next-intl";
 
 interface RoleRevealOverlayProps {
@@ -276,6 +277,12 @@ export function RoleRevealOverlay({ open, player, phase, onContinue }: RoleRevea
                           <div className="text-sm font-semibold text-white/80">{player.displayName}</div>
                         </div>
                       </div>
+
+                      <img
+                        src={roleCardUrl(player.role)}
+                        alt={meta.title}
+                        className="mx-auto mt-5 w-[168px] md:w-[200px] h-auto rounded-md shadow-2xl"
+                      />
 
                       <motion.div
                         className="mt-6 h-px w-full"

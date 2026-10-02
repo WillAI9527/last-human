@@ -7,10 +7,12 @@ import {
   NotePencil,
   X,
   GearSix,
+  SpeakerHigh,
+  SpeakerSlash,
 } from "@phosphor-icons/react";
 import { useTypewriter } from "@/hooks/useTypewriter";
 import { useGameLogic } from "@/hooks/useGameLogic";
-import type { Player, Role } from "@/types/game";
+import type { Phase, Player, Role } from "@/types/game";
 import { isWolfRole } from "@/types/game";
 import { PHASE_CONFIGS, isGameInProgress } from "@/store/game-machine";
 import { getI18n } from "@/i18n/translator";
@@ -18,6 +20,17 @@ import { getSystemMessages, getSystemPatterns } from "@/lib/game-texts";
 import { useTranslations } from "next-intl";
 import { useAtom } from "jotai";
 import { BADGE_TRANSFER_TORN } from "@/lib/game-master";
+import { roleCardUrl } from "@/lib/role-card";
+import { humanUnrevealedVoteSeat } from "@/lib/human-vote-mark";
+import { cn } from "@/lib/utils";
+import {
+  receiptForBadgeSignup,
+  receiptForFinishSpeech,
+  receiptForSeatAction,
+  receiptForSpeech,
+  receiptForWitch,
+  type ActionReceipt,
+} from "@/lib/action-receipt";
 
 // Components
 import { WelcomeScreen } from "@/components/game/WelcomeScreen";
@@ -158,7 +171,7 @@ export default function Home() {
   } = useGameLogic();
   const { settings, setBgmVolume, setSoundEnabled, setAiVoiceEnabled, setGenshinMode, setSpectatorMode, setAutoAdvanceDialogueEnabled } = useSettings();
   const { bgmVolume, isSoundEnabled, isAiVoiceEnabled, isGenshinMode, isSpectatorMode, isAutoAdvanceDialogueEnabled } = settings;
-  const shouldUseAiVoice = isSoundEnabled && isAiVoiceEnabled && bgmVolume > 0;
+  const shouldUseAiVoice = isAiVoiceEnabled;
   
   // Exit game functionality - use restartGame which properly handles all state resets
   const gameInProgress = useMemo(() => isGameInProgress(gameState), [gameState]);
@@ -174,6 +187,19 @@ export default function Home() {
 
   // 游戏结束时自动触发复盘分析生成
   const { isLoading: isAnalysisLoading } = useGameAnalysis();
+
+  // A receipt belongs to the phase the human acted in. It must never outlive
+  // that phase: commit receipts hide the action controls, so a receipt that
+  // leaked into the next human turn (e.g. noted after an await that already
+  // advanced to DAY_BADGE_SIGNUP / DAY_VOTE) used to soft-lock the game.
+  const [actionReceipt, setActionReceipt] = useState<{ receipt: ActionReceipt; phase: Phase } | null>(null);
+  const noteReceipt = useCallback((receipt: ActionReceipt, phase: Phase) => {
+    setActionReceipt({ receipt, phase });
+  }, []);
+  useEffect(() => {
+    setActionReceipt((current) => (current && current.phase !== gameState.phase ? null : current));
+  }, [gameState.phase]);
+  const visibleActionReceipt = actionReceipt && actionReceipt.phase === gameState.phase ? actionReceipt.receipt : null;
 
   const [visualIsNight, setVisualIsNight] = useState(isNight);
   const visualIsNightRef = useRef(isNight);
@@ -556,6 +582,12 @@ export default function Home() {
   const ritualCueQueueRef = useRef<Array<{ id: string; title: string; subtitle?: string }>>([]);
   const lastAdvanceTimeRef = useRef(0);
   const canShowRole = hasShownRoleReveal || (gameState.day >= 1 && gameState.phase !== "LOBBY");
+  const humanVoteSeat = humanUnrevealedVoteSeat(
+    gameState.phase,
+    humanPlayer?.playerId,
+    gameState.votes,
+    gameState.badge?.votes,
+  );
   const selectionTone = useMemo(() => {
     if (!humanPlayer) return undefined;
     switch (gameState.phase) {
@@ -1136,12 +1168,16 @@ export default function Home() {
     
     // 特殊处理：撕毁警徽（当在警徽移交阶段且没有选择目标时）
     if (phase === "BADGE_TRANSFER" && selectedSeat === null && humanPlayer && gameState.badge.holderSeat === humanPlayer.seat) {
+      const receipt = receiptForSeatAction(phase, null);
+      if (receipt) noteReceipt(receipt, phase);
       await handleHumanBadgeTransfer(BADGE_TRANSFER_TORN);
       return;
     }
 
     // 特殊处理：猎人弃枪（当在猎人开枪阶段且没有选择目标时）
     if (phase === "HUNTER_SHOOT" && selectedSeat === null && humanPlayer?.role === "Hunter") {
+      const receipt = receiptForSeatAction(phase, null);
+      if (receipt) noteReceipt(receipt, phase);
       await handleNightAction(-1);
       return;
     }
@@ -1152,6 +1188,8 @@ export default function Home() {
     const targetSeat = selectedSeat;
     setSelectedSeat(null);
     
+    const seatReceipt = receiptForSeatAction(phase, targetSeat);
+    if (seatReceipt) noteReceipt(seatReceipt, phase);
     if (phase === "DAY_VOTE" || phase === "DAY_BADGE_ELECTION") {
       await handleHumanVote(targetSeat);
     } else if (phase === "BADGE_TRANSFER") {
@@ -1165,13 +1203,14 @@ export default function Home() {
     ) {
       await handleNightAction(targetSeat);
     }
-  }, [selectedSeat, gameState.phase, handleHumanVote, handleHumanBadgeTransfer, handleNightAction, isRoleRevealOpen, humanPlayer, gameState.badge.holderSeat]);
+  }, [selectedSeat, gameState.phase, handleHumanVote, handleHumanBadgeTransfer, handleNightAction, isRoleRevealOpen, humanPlayer, gameState.badge.holderSeat, noteReceipt]);
 
   const handleNightActionConfirm = useCallback(async (targetSeat: number, actionType?: "save" | "poison" | "pass") => {
     if (isRoleRevealOpen) return;
+    if (actionType) noteReceipt(receiptForWitch(actionType, targetSeat), gameState.phase);
     await handleNightAction(targetSeat, actionType);
     setSelectedSeat(null);
-  }, [handleNightAction, isRoleRevealOpen]);
+  }, [handleNightAction, isRoleRevealOpen, noteReceipt, gameState.phase]);
 
   // 玩家列表（包含人类玩家）
   const allPlayers = useMemo(() => {
@@ -1199,7 +1238,7 @@ export default function Home() {
   const isWelcomeStage = !gameStarted;
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden bg-transparent">
+    <div className={cn("h-screen flex flex-col overflow-hidden bg-transparent", visualIsNight && "lh-room--night")}>
       <TokenPayRecoveryHost />
       <GameBackground isNight={visualIsNight} isBlinking={!!dayNightBlinkPhase} />
 
@@ -1393,19 +1432,37 @@ export default function Home() {
                     <span>LAST HUMAN</span>
                   </div>
 
-                  {/* 移动端设置按钮 - 只显示图标 */}
-                  <button
-                    type="button"
-                    onClick={() => setIsSettingsOpen(true)}
-                    title={t("page.audioSettings")}
-                    aria-label={t("page.audioSettings")}
-                    className="md:hidden inline-flex items-center justify-center w-8 h-8 rounded-md border border-[var(--border-color)] bg-[var(--bg-card)] text-[var(--text-primary)] transition-colors hover:border-[var(--color-accent)] hover:bg-[var(--color-accent-bg)]"
-                  >
-                    <GearSix size={16} />
-                  </button>
+                  <div className="md:hidden flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setAiVoiceEnabled(!isAiVoiceEnabled)}
+                      aria-pressed={isAiVoiceEnabled}
+                      aria-label={isAiVoiceEnabled ? "关闭朗读" : "打开朗读"}
+                      title={isAiVoiceEnabled ? "朗读开" : "朗读关"}
+                      className="inline-flex items-center justify-center w-8 h-8 rounded-md border border-[var(--border-color)] bg-[var(--bg-card)] text-[var(--text-primary)]"
+                    >
+                      {isAiVoiceEnabled ? <SpeakerHigh size={16} /> : <SpeakerSlash size={16} />}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsSettingsOpen(true)}
+                      title={t("page.audioSettings")}
+                      aria-label={t("page.audioSettings")}
+                      className="inline-flex items-center justify-center w-8 h-8 rounded-md border border-[var(--border-color)] bg-[var(--bg-card)] text-[var(--text-primary)]"
+                    >
+                      <GearSix size={16} />
+                    </button>
+                  </div>
                 </div>
 
-                <div className="wc-topbar__info">
+                  <div className="wc-topbar__info">
+                  {canShowRole && humanPlayer?.role && (
+                    <img
+                      src={roleCardUrl(humanPlayer.role)}
+                      alt={getRoleLabel(humanPlayer.role)}
+                      className="lh-role-card-thumb md:hidden"
+                    />
+                  )}
                   <div className="wc-topbar__item">
                     <span className="text-xs uppercase tracking-wider opacity-60">Day</span>
                     <span className="font-serif text-lg font-bold">{String(gameState.day).padStart(2, '0')}</span>
@@ -1417,7 +1474,7 @@ export default function Home() {
                   {gameState.badge.holderSeat !== null && (
                     <div className="wc-topbar__item">
                       <span className="text-xs uppercase tracking-wider opacity-60">{t("page.badgeLabel")}</span>
-                      <span className="font-serif text-lg font-bold text-[var(--color-gold)]">
+                      <span className="font-serif text-lg font-bold text-[var(--text-primary)]">
                         {t("mentions.seatLabel", { seat: gameState.badge.holderSeat + 1 })}
                       </span>
                     </div>
@@ -1434,6 +1491,17 @@ export default function Home() {
                   </div>
                   <button
                     type="button"
+                    onClick={() => setAiVoiceEnabled(!isAiVoiceEnabled)}
+                    aria-pressed={isAiVoiceEnabled}
+                    aria-label={isAiVoiceEnabled ? "关闭朗读" : "打开朗读"}
+                    title={isAiVoiceEnabled ? "朗读开" : "朗读关"}
+                    className="inline-flex items-center gap-1.5 rounded-md border-2 border-[var(--border-color)] bg-[var(--bg-card)] px-2.5 py-1 text-xs text-[var(--text-primary)]"
+                  >
+                    {isAiVoiceEnabled ? <SpeakerHigh size={16} /> : <SpeakerSlash size={16} />}
+                    {isAiVoiceEnabled ? "朗读" : "静音"}
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => setIsSettingsOpen(true)}
                     title={t("page.audioSettings")}
                     aria-label={t("page.audioSettings")}
@@ -1447,7 +1515,6 @@ export default function Home() {
               <PhaseBar
                 gameState={gameState}
                 humanPlayer={humanPlayer}
-                visualIsNight={visualIsNight}
                 isWaitingForAI={isWaitingForAI}
               />
               </>
@@ -1499,6 +1566,7 @@ export default function Home() {
                             showModel={gameState.phase === "GAME_END"}
                             selectionTone={selectionTone}
                             isInSelectionPhase={isSelectionPhase}
+                            showVoteSeal={humanVoteSeat === player.seat}
                           />
                         );
                       })}
@@ -1524,14 +1592,27 @@ export default function Home() {
                       onTutorialOpen={handleTutorialHelpOpen}
                       inputText={inputText}
                       onInputChange={setInputText}
-                      onSendMessage={handleHumanSpeech}
-                      onFinishSpeaking={handleFinishSpeaking}
+                      onSendMessage={async () => {
+                        if (!inputText.trim()) return;
+                        const speechPhase = gameState.phase;
+                        await handleHumanSpeech();
+                        noteReceipt(receiptForSpeech(), speechPhase);
+                      }}
+                      onFinishSpeaking={async () => {
+                        noteReceipt(receiptForFinishSpeech(), gameState.phase);
+                        await handleFinishSpeaking();
+                      }}
                       selectedSeat={selectedSeat}
                       isWaitingForAI={isWaitingForAI}
                       onConfirmAction={confirmSelectedSeat}
                       onCancelSelection={() => setSelectedSeat(null)}
                       onNightAction={handleNightActionConfirm}
-                      onBadgeSignup={handleBadgeSignup}
+                      onBadgeSignup={async (wants) => {
+                        noteReceipt(receiptForBadgeSignup(wants), gameState.phase);
+                        await handleBadgeSignup(wants);
+                      }}
+                      actionReceipt={visibleActionReceipt}
+                      showHumanRoleCard={canShowRole}
                       onRestart={restartGame}
                       onWhiteWolfKingBoom={handleWhiteWolfKingBoom}
                       onViewAnalysis={handleViewAnalysis}
@@ -1572,6 +1653,7 @@ export default function Home() {
                               showRoleBadge={canShowRole}
                               selectionTone={selectionTone}
                               isInSelectionPhase={isSelectionPhase}
+                              showVoteSeal={humanVoteSeat === player.seat}
                             />
                           );
                         })}
@@ -1611,6 +1693,7 @@ export default function Home() {
                             showModel={gameState.phase === "GAME_END"}
                             selectionTone={selectionTone}
                             isInSelectionPhase={isSelectionPhase}
+                            showVoteSeal={humanVoteSeat === player.seat}
                           />
                         );
                       })}

@@ -9,6 +9,7 @@ import {
   resolveAiVoiceAvailability,
 } from "@/lib/api-keys";
 import { getAuthHeaders } from "@/lib/auth-headers";
+import { getDemoGameToken } from "@/lib/demo-game-client";
 import { gameSessionTracker } from "@/lib/game-session-tracker";
 
 export type TtsProvider = "minimax" | "tokendance";
@@ -37,6 +38,9 @@ export class AudioManager {
   private cache = new Map<string, { blob: Blob; durationMs?: number }>();
   private inFlight = new Map<string, Promise<void>>();
   private enabled = false;
+  // Set when the server says voice is off (no MiniMax key) or the per-game
+  // voice cap is used up, so we stop calling /api/tts for every line.
+  private serverDisabled = false;
 
   private onPlayStart: ((playerId: string) => void) | null = null;
   private onPlayEnd: ((playerId: string) => void) | null = null;
@@ -47,18 +51,19 @@ export class AudioManager {
     const sessionId = gameSessionTracker.getSessionId();
     if (sessionId) headers["X-Game-Session-Id"] = sessionId;
 
+    const publicDemo = !process.env.NEXT_PUBLIC_SUPABASE_URL;
     const modelSource = getModelSource();
-    if (provider === "tokendance" && modelSource !== "project" && hasTokendanceKey()) {
+    // The public demo and production use the server MiniMax key only.
+    if (!publicDemo && provider === "tokendance" && modelSource !== "project" && hasTokendanceKey()) {
       headers["X-Tokendance-Api-Key"] = getTokendanceApiKey();
       headers["X-Tokendance-Base-Url"] = getTokendanceBaseUrl();
     }
-
-    // Project credentials stay on the server. Any other source sends the
-    // user's own MiniMax key and never falls through to project voice.
-    if (provider === "minimax" && modelSource !== "project" && hasMinimaxKey()) {
+    if (!publicDemo && provider === "minimax" && modelSource !== "project" && hasMinimaxKey()) {
       headers["X-Minimax-Api-Key"] = getMinimaxApiKey();
       headers["X-Minimax-Group-Id"] = getMinimaxGroupId();
     }
+    const demoGameToken = getDemoGameToken();
+    if (demoGameToken) headers["X-Demo-Game-Token"] = demoGameToken;
     return headers;
   }
 
@@ -86,12 +91,11 @@ export class AudioManager {
   }
 
   isEnabled(): boolean {
-    // The public demo has no project MiniMax key. Skip TTS instead of
-    // calling /api/tts on every line.
-    if (!process.env.NEXT_PUBLIC_SUPABASE_URL && !hasMinimaxKey() && !hasTokendanceKey()) {
-      return false;
-    }
-    return this.enabled && resolveAiVoiceAvailability(
+    if (!this.enabled || this.serverDisabled) return false;
+    // Public demo reads aloud with the server MiniMax key. A missing key
+    // or a failed request falls back to text inside the speech flow.
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL) return true;
+    return resolveAiVoiceAvailability(
       getModelSource(),
       hasMinimaxKey(),
       hasTokendanceKey(),
@@ -131,6 +135,9 @@ export class AudioManager {
       body: JSON.stringify({ text: task.text, voiceId: task.voiceId, ttsProvider }),
     });
     if (!response.ok) {
+      if (response.status === 503 || response.status === 403 || response.status === 429) {
+        this.serverDisabled = true;
+      }
       const body = await response.text().catch(() => "");
       throw new Error(`TTS request failed: ${response.status} ${body.slice(0, 600)}`);
     }

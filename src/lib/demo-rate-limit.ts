@@ -4,14 +4,17 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 export const DEFAULT_DAILY_GAME_LIMIT = 3;
 export const GAMES_PER_IP_PER_DAY = DEFAULT_DAILY_GAME_LIMIT;
 export const LLM_CALLS_PER_GAME = 500;
+export const TTS_CALLS_PER_GAME = 300;
 export const GAME_COOKIE = "lh_game";
 export const QUOTA_COOKIE = "lh_quota";
 export const LLM_COOKIE = "lh_llm";
+export const TTS_COOKIE = "lh_tts";
 export const TESTER_TOKEN_HEADER = "x-tester-token";
 
 export const MSG_SERVER_NOT_CONFIGURED = "服务器未配置，暂时无法开局。";
 export const MSG_DAILY_LIMIT = "今天的 3 局已经用完了。请明天（新加坡时间）再来。";
 export const MSG_LLM_CAP = "这一局的对话次数已经到上限，不能再继续了。请回到首页，明天再开新局。";
+export const MSG_TTS_CAP = "这一局的语音次数已经到上限，后面的发言只显示文字。";
 export const MSG_NEED_GAME = "请先从首页开始一局。";
 
 const GAME_TTL_SECONDS = 60 * 60 * 24;
@@ -27,6 +30,7 @@ type LlmResult =
   | { ok: false; status: number; code: string; message: string };
 
 const gamesByToken = new Map<string, GameRecord>();
+const ttsCounts = new Map<string, number>();
 const dailyCounts = new Map<string, number>();
 let lastSweep = Date.now();
 
@@ -220,15 +224,23 @@ export async function startDemoGame(request: Request): Promise<QuotaResult> {
       cookie(GAME_COOKIE, gameToken),
       cookie(QUOTA_COOKIE, encodeSigned({ ipHash, day, count: next })),
       cookie(LLM_COOKIE, encodeSigned({ gameId: gameToken, count: 0, exp })),
+      cookie(TTS_COOKIE, encodeSigned({ gameId: gameToken, count: 0, exp })),
     ],
   };
 }
 
-async function loadGame(token: string, ipHash: string): Promise<GameRecord | null> {
+// The game token is HMAC-signed, so it cannot be forged. It is deliberately
+// NOT re-bound to the caller's current IP: many real networks (CGNAT, mobile
+// handover, VPN/relay egress pools) present a different source IP per
+// connection, which used to break games mid-way with "请先从首页开始一局。".
+// The daily cap is enforced when the token is issued; the per-game LLM cap
+// still bounds what one token can spend.
+async function loadGame(token: string): Promise<GameRecord | null> {
   const signed = decodeSigned<{ ipHash?: string; exp?: number }>(token);
-  if (!signed || signed.ipHash !== ipHash || typeof signed.exp !== "number" || signed.exp <= Date.now()) {
+  if (!signed || typeof signed.ipHash !== "string" || typeof signed.exp !== "number" || signed.exp <= Date.now()) {
     return null;
   }
+  const ipHash = signed.ipHash;
   let calls = 0;
   const memory = gamesByToken.get(token);
   if (memory && memory.exp > Date.now()) calls = Math.max(calls, memory.calls);
@@ -259,7 +271,7 @@ export async function consumeDemoLlmCall(request: Request, count = 1): Promise<L
     return { ok: false, status: 403, code: "missing_game", message: MSG_NEED_GAME };
   }
   const safeCount = Number.isFinite(count) && count > 0 ? Math.floor(count) : 1;
-  const game = await loadGame(token, hashValue(getClientIp(request)));
+  const game = await loadGame(token);
   if (!game) {
     return { ok: false, status: 403, code: "invalid_game", message: MSG_NEED_GAME };
   }
@@ -279,6 +291,38 @@ export async function consumeDemoLlmCall(request: Request, count = 1): Promise<L
   };
 }
 
+function readTtsCookie(request: Request, gameId: string): number {
+  const parsed = decodeSigned<{ gameId?: string; count?: number; exp?: number }>(readCookie(request, TTS_COOKIE));
+  if (!parsed || parsed.gameId !== gameId) return 0;
+  if (typeof parsed.exp === "number" && parsed.exp <= Date.now()) return 0;
+  return Number.isFinite(parsed.count) ? Math.max(0, Number(parsed.count)) : 0;
+}
+
+/** Same signed game ticket as chat, with its own 300-call cap. */
+export async function consumeDemoTtsCall(request: Request, count = 1): Promise<LlmResult> {
+  const token = readDemoGameToken(request);
+  if (!token) {
+    return { ok: false, status: 403, code: "missing_game", message: MSG_NEED_GAME };
+  }
+  const safeCount = Number.isFinite(count) && count > 0 ? Math.floor(count) : 1;
+  const game = await loadGame(token);
+  if (!game) {
+    return { ok: false, status: 403, code: "invalid_game", message: MSG_NEED_GAME };
+  }
+  const shared = await readSharedCount(`lh:tts:${token}`);
+  const used = Math.max(ttsCounts.get(token) ?? 0, readTtsCookie(request, token), shared ?? 0);
+  if (used + safeCount > TTS_CALLS_PER_GAME) {
+    return { ok: false, status: 429, code: "tts_cap", message: MSG_TTS_CAP };
+  }
+  const next = used + safeCount;
+  ttsCounts.set(token, next);
+  await writeSharedCount(`lh:tts:${token}`, next);
+  return {
+    ok: true,
+    cookies: [cookie(TTS_COOKIE, encodeSigned({ gameId: token, count: next, exp: game.exp }))],
+  };
+}
+
 export function applyRateLimitCookies(response: Response, cookies: string[]): Response {
   if (cookies.length === 0) return response;
   const headers = new Headers(response.headers);
@@ -288,5 +332,6 @@ export function applyRateLimitCookies(response: Response, cookies: string[]): Re
 
 export function resetDemoRateLimitForTests() {
   gamesByToken.clear();
+  ttsCounts.clear();
   dailyCounts.clear();
 }

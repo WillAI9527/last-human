@@ -14,6 +14,9 @@ import { TalkingAvatar } from "./TalkingAvatar";
 import { VoiceRecorder, type VoiceRecorderHandle } from "./VoiceRecorder";
 import { EventLog } from "./EventLog";
 import { buildSimpleAvatarUrl, getModelLogoUrl } from "@/lib/avatar-config";
+import { playerTitle } from "@/lib/player-label";
+import { roleCardUrl } from "@/lib/role-card";
+import type { ActionReceipt } from "@/lib/action-receipt";
 import { RoleRevealHistoryCard, type RoleRevealEntry } from "@/components/game/RoleRevealHistoryCard";
 import LoadingMiniGame from "./MiniGame/LoadingMiniGame";
 import type { GameState, Player, ChatMessage, Phase } from "@/types/game";
@@ -30,14 +33,14 @@ const HISTORY_BOTTOM_THRESHOLD = 24;
 
 // 职业立绘映射
 const ROLE_PORTRAIT_MAP: Record<string, string> = {
-  Werewolf: '/roles/werewolf.png',
-  WhiteWolfKing: '/roles/white-wolf-king.png',
-  Seer: '/roles/seer.png',
-  Witch: '/roles/witch.png',
-  Hunter: '/roles/hunter.png',
-  Guard: '/roles/guard.png',
-  Idiot: '/roles/idiot.png',
-  Villager: '/roles/villager.png',
+  Werewolf: roleCardUrl("Werewolf"),
+  WhiteWolfKing: roleCardUrl("WhiteWolfKing"),
+  Seer: roleCardUrl("Seer"),
+  Witch: roleCardUrl("Witch"),
+  Hunter: roleCardUrl("Hunter"),
+  Guard: roleCardUrl("Guard"),
+  Idiot: roleCardUrl("Idiot"),
+  Villager: roleCardUrl("Villager"),
 };
 
 // 预加载所有职业立绘
@@ -275,6 +278,8 @@ interface DialogAreaProps {
   onCancelSelection?: () => void;
   onNightAction?: (seat: number, actionType?: WitchActionType) => void;
   onBadgeSignup?: (wants: boolean) => void;
+  actionReceipt?: ActionReceipt | null;
+  showHumanRoleCard?: boolean;
   onRestart?: () => void;
   onWhiteWolfKingBoom?: () => void;
   onViewAnalysis?: () => void;
@@ -390,6 +395,8 @@ export function DialogArea({
   onCancelSelection,
   onNightAction,
   onBadgeSignup,
+  actionReceipt = null,
+  showHumanRoleCard = false,
   onRestart,
   onWhiteWolfKingBoom,
   onViewAnalysis,
@@ -961,18 +968,19 @@ export function DialogArea({
   ].includes(phase);
 
   const showGameEnd = phase === "GAME_END";
-  const showBadgeSignup = phase === "DAY_BADGE_SIGNUP"
+  const receiptCommitted = actionReceipt?.kind === "commit";
+  const showBadgeSignup = !receiptCommitted && phase === "DAY_BADGE_SIGNUP"
     && humanPlayer?.alive
     && typeof gameState.badge.signup?.[humanPlayer.playerId] !== "boolean";
   const showBadgeSignupWaiting = phase === "DAY_BADGE_SIGNUP"
     && isWaitingForAI
     && humanPlayer?.alive
     && typeof gameState.badge.signup?.[humanPlayer.playerId] === "boolean";
-  const showBadgeTransferOption = phase === "BADGE_TRANSFER"
+  const showBadgeTransferOption = !receiptCommitted && phase === "BADGE_TRANSFER"
     && humanPlayer
     && gameState.badge.holderSeat === humanPlayer.seat
     && selectedSeat === null;
-  const showHunterPassOption = phase === "HUNTER_SHOOT"
+  const showHunterPassOption = !receiptCommitted && phase === "HUNTER_SHOOT"
     && humanPlayer?.role === "Hunter"
     && selectedSeat === null;
   const showActionConfirm = (() => {
@@ -990,13 +998,14 @@ export function DialogArea({
       (phase === "WHITE_WOLF_KING_BOOM" && humanPlayer?.role === "WhiteWolfKing" && humanPlayer?.alive && !gameState.roleAbilities.whiteWolfKingBoomUsed);
 
     return Boolean(
-      isCorrectRoleForPhase
+      !receiptCommitted
+        && isCorrectRoleForPhase
         && selectedSeat !== null
         && (phase === "DAY_VOTE" || phase === "DAY_BADGE_ELECTION" || phase === "BADGE_TRANSFER" || !isWaitingForAI)
     );
   })();
-  const showWitchPanel = phase === "NIGHT_WITCH_ACTION" && humanPlayer?.role === "Witch" && !isWaitingForAI;
-  const showHumanInput = isHumanTurn && phase !== "GAME_END" && phase !== "DAY_BADGE_SIGNUP";
+  const showWitchPanel = !receiptCommitted && phase === "NIGHT_WITCH_ACTION" && humanPlayer?.role === "Witch" && !isWaitingForAI;
+  const showHumanInput = !receiptCommitted && isHumanTurn && phase !== "GAME_END" && phase !== "DAY_BADGE_SIGNUP";
   const showDialogueBlock = !isHumanTurn
     && (currentSpeaker || waitingForNextRound)
     && shouldShowDialogue
@@ -1028,7 +1037,14 @@ export function DialogArea({
       <div className="flex-1 min-h-0 w-full -mb-1">
         <div className="wc-dialog-main flex gap-4 lg:gap-6 px-4 lg:px-6 pt-0 pb-0 min-h-0 h-full items-stretch">
           {/* 左侧立绘区域 */}
-          <div className="wc-dialog-portrait hidden md:flex w-[220px] lg:w-[260px] xl:w-[300px] shrink-0 flex-col items-center justify-end">
+          <div className="wc-dialog-portrait relative hidden md:flex w-[220px] lg:w-[260px] xl:w-[300px] shrink-0 flex-col items-center justify-end">
+            {showHumanRoleCard && humanPlayer?.role && (
+              <img
+                src={roleCardUrl(humanPlayer.role)}
+                alt={humanPlayer.role}
+                className="lh-role-card-portrait absolute top-3 left-1/2 -translate-x-1/2 z-20"
+              />
+            )}
             {portraitNode}
           </div>
 
@@ -1170,6 +1186,12 @@ export function DialogArea({
         {gameState.phase === "NIGHT_WOLF_ACTION" && humanPlayer && isWolfRole(humanPlayer.role) && (
           <div className="mb-3">
             <WolfPlanningPanel gameState={gameState} humanPlayer={humanPlayer} />
+          </div>
+        )}
+
+        {actionReceipt && (
+          <div className="lh-action-receipt" role="status">
+            {actionReceipt.text}
           </div>
         )}
 
@@ -1647,12 +1669,12 @@ export function DialogArea({
                               className="w-full h-full object-cover"
                             />
                           </div>
-                          <div className="text-sm font-semibold text-[var(--color-gold)]">
-                            {currentSpeaker.player.displayName}
+                          <div className={cn("text-sm font-semibold", currentSpeaker.player.isHuman ? "text-[var(--color-gold)]" : "text-[var(--text-primary)]")}>
+                            {playerTitle(currentSpeaker.player.seat, currentSpeaker.player.displayName)}
                           </div>
                         </div>
-                        <div className="hidden md:block text-base font-bold text-[var(--color-gold)] mb-2 font-serif tracking-wide">
-                          {currentSpeaker.player.displayName}
+                        <div className={cn("hidden md:block text-base font-bold mb-2 font-serif tracking-wide", currentSpeaker.player.isHuman ? "text-[var(--color-gold)]" : "text-[var(--text-primary)]")}>
+                          {playerTitle(currentSpeaker.player.seat, currentSpeaker.player.displayName)}
                         </div>
                       </>
                     )}
@@ -1888,13 +1910,11 @@ function ChatMessageItem({
           "min-w-0 max-w-[80%] w-fit text-left",
           isHuman ? "mr-0" : "ml-0"
         )}>
-          <div className={cn("flex items-center gap-2 mb-1 text-xs opacity-70")}>
-            {player && (
-              <span className="wc-seat-badge">
-                {t("ui.seatOnly", { seat: player.seat + 1 })}
-              </span>
-            )}
-            <span className="font-serif font-bold text-[var(--text-primary)]">{msg.playerName}</span>
+          <div className={cn(
+            "mb-1 text-xs font-serif font-bold",
+            isHuman ? "text-[var(--color-gold)]" : "text-[var(--text-primary)]"
+          )}>
+            {player ? playerTitle(player.seat, player.displayName) : msg.playerName}
           </div>
           
           <div className="text-base leading-relaxed text-[var(--text-primary)] text-left">

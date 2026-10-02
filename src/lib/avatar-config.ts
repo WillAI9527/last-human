@@ -9,6 +9,7 @@
 import type { ModelRef } from "@/types/game";
 import type { Gender } from "./character-generator";
 import { getModelLogoPath } from "./model-logo";
+import { isVillagerAvatarId, villagerAvatarPath } from "./village-cast";
 
 // ============================================
 // 发型配置 (Hair)
@@ -250,6 +251,8 @@ export function buildSimpleAvatarUrl(
 
   const eyes =
     typeof backgroundColorOrOptions === "string" ? undefined : backgroundColorOrOptions?.eyes;
+
+  if (isVillagerAvatarId(seed)) return villagerAvatarPath(seed);
 
   return buildAvatarUrl({
     seed,

@@ -1242,7 +1242,8 @@ export function WelcomeScreen({
           </DialogContent>
         </Dialog>
 
-        {/* Scattered sponsor cards */}
+        {/* Scattered sponsor cards (upstream sponsors; hidden in LAST HUMAN demo) */}
+        {!PUBLIC_DEMO && (
         <div className="wc-sponsor-cards" aria-label={t("welcome.sponsor.showcaseLabel")}>
           {/* Sponsor card - Bailian (左上) */}
           <SponsorCard
@@ -1284,6 +1285,7 @@ export function WelcomeScreen({
           />
           */}
         </div>
+        )}
 
         <div className="wc-welcome-actions absolute top-5 right-5 z-20 flex items-center gap-2">
           <div className="hidden sm:flex items-center gap-2">
@@ -1315,6 +1317,7 @@ export function WelcomeScreen({
               {t("welcome.sponsor.action")}
             </Button>
             )}
+            {!PUBLIC_DEMO && (
             <Button
               type="button"
               variant="outline"
@@ -1324,6 +1327,7 @@ export function WelcomeScreen({
               {groupIcon}
               {t("welcome.group.title")}
             </Button>
+            )}
 
             {user ? (
               <button
@@ -1394,6 +1398,7 @@ export function WelcomeScreen({
               {t("welcome.sponsor.short")}
             </Button>
             )}
+            {!PUBLIC_DEMO && (
             <Button
               type="button"
               variant="outline"
@@ -1403,6 +1408,7 @@ export function WelcomeScreen({
               {groupIcon}
               {t("welcome.group.short")}
             </Button>
+            )}
             <Button
               type="button"
               variant="outline"
@@ -1442,6 +1448,7 @@ export function WelcomeScreen({
             )}
 
             {/* Mobile: inline sponsor stamps at top of paper */}
+            {!PUBLIC_DEMO && (
             <div className="wc-paper-sponsors sm:hidden">
               <a
                 href="https://bailian.console.aliyun.com/?ref=wolfcha"
@@ -1479,6 +1486,7 @@ export function WelcomeScreen({
               </a>
               */}
             </div>
+            )}
 
             <div className="mt-2 text-center">
               <div className="wc-contract-title">LAST HUMAN</div>

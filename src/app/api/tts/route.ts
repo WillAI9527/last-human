@@ -9,9 +9,12 @@ import * as https from "node:https";
 import { URL } from "node:url";
 import * as zlib from "node:zlib";
 import { DEFAULT_VOICE_ID } from "@/lib/voice-constants";
+import { applyRateLimitCookies, consumeDemoTtsCall } from "@/lib/demo-rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+const TTS_MAX_TEXT_CHARS = 600;
 
 const DEFAULT_TOKENDANCE_TTS_MODEL = "minimax-speech-2.8-turbo";
 const DEFAULT_TOKENDANCE_TTS_ENDPOINT = "https://tokendance.space/gateway/minimax/v1/t2a_v2";
@@ -22,27 +25,35 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 export async function POST(req: NextRequest) {
   const headerApiKeyEarly = req.headers.get("x-minimax-api-key")?.trim();
+  const headerGroupEarly = req.headers.get("x-minimax-group-id")?.trim();
   const headerTokendanceKeyEarly = req.headers.get("x-tokendance-api-key")?.trim();
-  if (!process.env.MINIMAX_API_KEY && !headerApiKeyEarly && !headerTokendanceKeyEarly && !process.env.TOKENDANCE_API_KEY) {
+  const publicDemo = !process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const rejectUserKeys = publicDemo || process.env.NODE_ENV === "production";
+  if (rejectUserKeys && (headerApiKeyEarly || headerGroupEarly || headerTokendanceKeyEarly)) {
+    return NextResponse.json({ error: "语音合成未启用", disabled: true }, { status: 403 });
+  }
+  if (!process.env.MINIMAX_API_KEY && !headerApiKeyEarly) {
     return NextResponse.json({ error: "语音合成未启用", disabled: true }, { status: 503 });
   }
 
   const auth = await authenticateRequest(req as unknown as Request);
   if ("error" in auth) return auth.error;
 
+  const quota = await consumeDemoTtsCall(req as unknown as Request, 1);
+  if (!quota.ok) {
+    return NextResponse.json({ error: quota.message, code: quota.code, disabled: true }, { status: quota.status });
+  }
+  const withQuotaCookies = (response: NextResponse) => applyRateLimitCookies(response, quota.cookies) as NextResponse;
+
   const parsed: unknown = await req.json().catch(() => ({}));
   const parsedRecord = isRecord(parsed) ? parsed : {};
   const text = typeof parsedRecord.text === "string" ? parsedRecord.text : String(parsedRecord.text ?? "");
   const voiceId = typeof parsedRecord.voiceId === "string" ? parsedRecord.voiceId : String(parsedRecord.voiceId ?? "");
-  const ttsProvider = parsedRecord.ttsProvider === "tokendance" ? "tokendance" : "minimax";
-  const headerApiKey = req.headers.get("x-minimax-api-key")?.trim();
-  const headerGroupId = req.headers.get("x-minimax-group-id")?.trim();
-  const headerTokendanceKey = req.headers.get("x-tokendance-api-key")?.trim();
-  const hasCustomTtsKey = ttsProvider === "tokendance"
-    ? Boolean(headerTokendanceKey)
-    : Boolean(headerApiKey || headerGroupId);
+  const headerApiKey = rejectUserKeys ? "" : req.headers.get("x-minimax-api-key")?.trim();
+  const headerGroupId = rejectUserKeys ? "" : req.headers.get("x-minimax-group-id")?.trim();
+  const hasCustomTtsKey = Boolean(headerApiKey || headerGroupId);
 
-  if (ttsProvider === "minimax" && hasCustomTtsKey && (!headerApiKey || !headerGroupId)) {
+  if (hasCustomTtsKey && (!headerApiKey || !headerGroupId)) {
     return NextResponse.json({ error: "MiniMax API key and group ID are both required" }, { status: 400 });
   }
 
@@ -67,21 +78,24 @@ export async function POST(req: NextRequest) {
     if (!normText || !normVoiceId) {
       return NextResponse.json({ error: "Missing text or voiceId" }, { status: 400 });
     }
+    // One in-game line is a few hundred characters at most. Cap it so a game
+    // ticket can't be used to synthesize arbitrary long text on our MiniMax key.
+    if (Array.from(normText).length > TTS_MAX_TEXT_CHARS || normVoiceId.length > 128) {
+      return NextResponse.json({ error: "Text too long" }, { status: 413 });
+    }
 
-    const apiKey = ttsProvider === "tokendance"
-      ? (hasCustomTtsKey ? headerTokendanceKey : process.env.TOKENDANCE_API_KEY)?.trim()
-      : (hasCustomTtsKey ? headerApiKey : process.env.MINIMAX_API_KEY)?.trim();
+    const apiKey = (hasCustomTtsKey ? headerApiKey : process.env.MINIMAX_API_KEY)?.trim();
     const groupId = hasCustomTtsKey ? headerGroupId : process.env.MINIMAX_GROUP_ID;
 
-    if (!apiKey || (ttsProvider === "minimax" && !groupId)) {
-      console.error(`Missing ${ttsProvider === "tokendance" ? "TokenDance" : "MiniMax"} TTS credentials`);
+    if (!apiKey || !groupId) {
+      console.error("Missing MiniMax TTS credentials");
       return NextResponse.json({ error: "TTS server configuration error" }, { status: 500 });
     }
 
     // MiniMax T2A V2 API Endpoint
     // 参考文档：https://platform.minimaxi.com/document/T2A%20V2
     const baseUrlFromEnv = process.env.MINIMAX_API_BASE_URL;
-    const primaryBaseUrl = baseUrlFromEnv || "https://api.minimax.chat";
+    const primaryBaseUrl = baseUrlFromEnv || "https://api.minimaxi.com";
 
     const candidateBaseUrls = [primaryBaseUrl];
     if (!baseUrlFromEnv) {
@@ -226,16 +240,18 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      return new NextResponse(bufferToArrayBuffer(b), {
+      return withQuotaCookies(new NextResponse(bufferToArrayBuffer(b), {
         headers: {
           "Content-Type": sniff.mime,
           "Content-Length": b.length.toString(),
           ...(extraHeaders ?? {}),
         },
-      });
+      }));
     };
 
-    if (ttsProvider === "tokendance") {
+    // TokenDance TTS is unused. Village voices go through MiniMax official T2A.
+    if (false as boolean) {
+      const headerTokendanceKey = "";
       const endpoint = process.env.TOKENDANCE_TTS_ENDPOINT?.trim()
         || DEFAULT_TOKENDANCE_TTS_ENDPOINT;
       const model = process.env.TOKENDANCE_TTS_MODEL?.trim() || DEFAULT_TOKENDANCE_TTS_MODEL;
