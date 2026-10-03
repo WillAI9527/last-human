@@ -43,6 +43,11 @@ test("普通与批量 TokenDance 请求共用同一套思考配置和超时入�
   const source = readFileSync("src/app/api/chat/route.ts", "utf8");
   assert.equal(source.match(/resolveReasoning\(modelRefOverride, reasoning, reasoningProfile\)/g)?.length, 2);
   assert.equal(source.match(/buildTokendanceThinking\(effectiveReasoning\)/g)?.length, 2);
-  assert.equal(source.match(/controller\.abort\(\), providerTimeoutMs\)/g)?.length, 2);
+  assert.equal(
+    source.match(/reasoningProfile === "decision" && effectiveReasoning\?\.enabled === true\s*\?\s*DECISION_TIMEOUT_MS\s*:\s*NORMAL_ATTEMPT_TIMEOUT_MS/g)?.length,
+    2,
+  );
+  assert.equal(source.match(/await fetchUpstream\(/g)?.length, 6);
+  assert.doesNotMatch(source, /API_TIMEOUT_MS/);
   assert.doesNotMatch(source, /effortBudget/);
 });

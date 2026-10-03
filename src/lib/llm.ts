@@ -232,6 +232,8 @@ export interface GenerateOptions {
   model: string;
   provider?: Provider;
   promptScope?: PromptScope;
+  /** /api/chat 完成日志用。未知调用在服务端记为 other。 */
+  callType?: "speech" | "vote" | "summary" | "night";
   messages: LLMMessage[];
   temperature?: number;
   max_tokens?: number;
@@ -805,6 +807,7 @@ export async function generateCompletion(
         model: resolvedModel.model,
         provider: resolvedModel.provider,
         prompt_scope: options.promptScope ?? "utility",
+        ...(options.callType ? { call_type: options.callType } : {}),
         request_id: logicalRequestId,
         messages: options.messages,
         temperature: options.temperature ?? 0.7,
@@ -901,8 +904,8 @@ async function generateCompletionBatchInternal(
   const logicalRequestId = generateUUID();
 
   const requestsWithIds = resolvedRequests.map((request) => {
-    const { signal: _signal, deadlineMs: _deadlineMs, maxAttempts: _maxAttempts, ...rest } = request;
-    return { ...rest, request_id: generateUUID() };
+    const { signal: _signal, deadlineMs: _deadlineMs, maxAttempts: _maxAttempts, callType, ...rest } = request;
+    return { ...rest, request_id: generateUUID(), ...(callType ? { call_type: callType } : {}) };
   });
   const budget = openAttemptBudget({
     model: requests[0]?.model ?? "",
@@ -1029,6 +1032,7 @@ export async function* generateCompletionStream(
         model: resolvedModel.model,
         provider: resolvedModel.provider,
         prompt_scope: options.promptScope ?? "utility",
+        ...(options.callType ? { call_type: options.callType } : {}),
         request_id: logicalRequestId,
         messages: options.messages,
         temperature: options.temperature ?? 0.7,

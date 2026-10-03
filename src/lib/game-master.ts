@@ -716,6 +716,7 @@ export async function generateDailySummary(
         model: summaryModel,
         messages,
         temperature: GAME_TEMPERATURE.SUMMARY,
+        callType: "summary",
         signal: controller.signal,
         deadlineMs: DAILY_SUMMARY_DEADLINE_MS,
         maxAttempts: 2,
@@ -801,6 +802,7 @@ export async function* generateAISpeechStream(
       model: player.agentProfile!.modelRef.model,
       messages,
       promptScope: "gameplay",
+      callType: "speech",
       temperature: GAME_TEMPERATURE.SPEECH,
     }))) {
       fullResponse += chunk;
@@ -876,6 +878,7 @@ export async function generateAISpeechSegments(
       model: player.agentProfile!.modelRef.model,
       messages,
       promptScope: "gameplay",
+      callType: "speech",
       temperature: GAME_TEMPERATURE.SPEECH,
     }));
 
@@ -958,7 +961,7 @@ async function recoverPublicSpeech(
       : "刚才没有任何内容公开，请重新生成完整发言。"}` }];
   const result = await generateCompletion(mergeOptionsFromModelRef(modelRef, {
     model: modelRef.model, messages: recoveryMessages,
-    promptScope: "gameplay", temperature: GAME_TEMPERATURE.ACTION, signal,
+    promptScope: "gameplay", callType: "speech", temperature: GAME_TEMPERATURE.ACTION, signal,
     response_format: structuredResponseFormat(modelRef, "public_speech", {
       type: "object", properties: { segments: { type: "array", items: { type: "string" }, minItems: 1 } },
       required: ["segments"], additionalProperties: false,
@@ -1022,6 +1025,7 @@ async function generateSpeechAttempt(
       model: modelRef.model,
       messages,
       promptScope: "gameplay",
+      callType: "speech",
       temperature: GAME_TEMPERATURE.SPEECH,
       signal: options.signal,
     }));
@@ -1221,6 +1225,7 @@ export async function generateAIVote(
         model: player.agentProfile!.modelRef.model,
         messages,
         promptScope: "gameplay",
+        callType: "vote",
         temperature: GAME_TEMPERATURE.ACTION,
         reasoningProfile: "decision",
         response_format: seatSelectionResponseFormat(player.agentProfile!.modelRef, "day_vote", validSeats, suspectSeats),
@@ -1558,6 +1563,7 @@ export async function generateAIBadgeVote(
         model: player.agentProfile!.modelRef.model,
         messages,
         promptScope: "gameplay",
+        callType: "vote",
         temperature: GAME_TEMPERATURE.ACTION,
         reasoningProfile: "decision",
         response_format: seatSelectionResponseFormat(player.agentProfile!.modelRef, "badge_vote", validSeats),
@@ -1722,6 +1728,7 @@ export async function generateSeerAction(
         model: player.agentProfile!.modelRef.model,
         messages,
         promptScope: "gameplay",
+        callType: "night",
         temperature: GAME_TEMPERATURE.ACTION,
         reasoningProfile: "decision",
         response_format: seatSelectionResponseFormat(player.agentProfile!.modelRef, "seer_action", validSeats),
@@ -1793,6 +1800,7 @@ export async function generateWolfAction(
         model: player.agentProfile!.modelRef.model,
         messages,
         promptScope: "gameplay",
+        callType: "night",
         temperature: GAME_TEMPERATURE.ACTION,
         reasoningProfile: "decision",
         response_format: seatSelectionResponseFormat(player.agentProfile!.modelRef, "wolf_action", validSeats),
@@ -1868,6 +1876,7 @@ export async function generateWitchAction(
         model: player.agentProfile!.modelRef.model,
         messages,
         promptScope: "gameplay",
+        callType: "night",
         temperature: GAME_TEMPERATURE.ACTION,
         reasoningProfile: "decision",
         response_format: { type: "json_object" },
@@ -1963,6 +1972,7 @@ export async function generateGuardAction(
         model: player.agentProfile!.modelRef.model,
         messages,
         promptScope: "gameplay",
+        callType: "night",
         temperature: GAME_TEMPERATURE.ACTION,
         reasoningProfile: "decision",
         response_format: seatSelectionResponseFormat(player.agentProfile!.modelRef, "guard_action", validSeats),
@@ -2032,6 +2042,7 @@ export async function generateHunterShoot(
         model: player.agentProfile!.modelRef.model,
         messages,
         promptScope: "gameplay",
+        callType: "night",
         temperature: GAME_TEMPERATURE.ACTION,
         response_format: { type: "json_object" },
       }),
@@ -2118,6 +2129,7 @@ export async function generateWhiteWolfKingBoomDecision(
         model: player.agentProfile!.modelRef.model,
         messages,
         promptScope: "gameplay",
+        callType: "night",
         temperature: GAME_TEMPERATURE.ACTION,
         response_format: { type: "json_object" },
       }),

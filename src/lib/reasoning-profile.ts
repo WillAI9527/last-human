@@ -8,7 +8,7 @@ export type ReasoningProfile = "decision";
 
 export type ReasoningConfig = NonNullable<ModelRef["reasoning"]>;
 
-/** 低档思考的投票实测中位约 20 秒、最长 142 秒，普通调用的 60 秒上限会把它截断成弃票；需小于路由的 maxDuration。 */
+/** 低档思考的投票实测中位约 20 秒、最长 142 秒，普通调用的 25 秒上限会把它截断成弃票；需小于路由的 maxDuration。 */
 export const DECISION_TIMEOUT_MS = 240_000;
 
 export function normalizeReasoningProfile(value: unknown): ReasoningProfile | undefined {
