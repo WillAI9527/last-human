@@ -22,7 +22,7 @@ export function MarketingFooter() {
             </p>
             <div className="flex gap-4">
               <a
-                href="https://github.com/oil-oil/wolfcha"
+                href="https://github.com/WillAI9527/last-human"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
@@ -68,7 +68,7 @@ export function MarketingFooter() {
               </li>
               <li>
                 <a 
-                  href="https://github.com/oil-oil/wolfcha/issues" 
+                  href="https://github.com/WillAI9527/last-human/issues" 
                   target="_blank"
                   rel="noopener noreferrer"
                   className="hover:text-[var(--color-gold-dark)] transition-colors"

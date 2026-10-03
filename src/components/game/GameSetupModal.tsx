@@ -26,6 +26,7 @@ interface GameSetupModalProps {
   onSoundEnabledChange: (value: boolean) => void;
   onAiVoiceEnabledChange: (value: boolean) => void;
   onAutoAdvanceDialogueEnabledChange: (value: boolean) => void;
+  onOpenHowToPlay?: () => void;
 }
 
 
@@ -48,6 +49,7 @@ export function GameSetupModal({
   onSoundEnabledChange,
   onAiVoiceEnabledChange,
   onAutoAdvanceDialogueEnabledChange,
+  onOpenHowToPlay,
 }: GameSetupModalProps) {
   const t = useTranslations();
 
@@ -72,6 +74,15 @@ export function GameSetupModal({
             <div className="mt-1 text-xs leading-relaxed text-[var(--text-muted)]">
               2 狼人 · 预言家 · 女巫 · 2 平民。你的身份和大家一样随机，可能是狼人。没有警长。
             </div>
+            {onOpenHowToPlay && (
+              <button
+                type="button"
+                className="mt-2 text-sm text-[#7F8C99] underline-offset-2 hover:underline"
+                onClick={onOpenHowToPlay}
+              >
+                {t("welcome.howToPlay.link")}
+              </button>
+            )}
           </div>
 
           <div className="flex items-start justify-between gap-4">

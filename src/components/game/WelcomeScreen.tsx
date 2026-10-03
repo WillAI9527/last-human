@@ -1,8 +1,7 @@
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
-import { FingerprintSimple, PawPrint, Sparkle, Wrench, GearSix, UserCircle, GithubLogo, Star, EnvelopeSimple, Handshake, DotsThreeOutlineVertical, Users, UsersFour } from "@phosphor-icons/react";
-import { WerewolfIcon } from "@/components/icons/FlatIcons";
+import { PawPrint, Sparkle, Wrench, GearSix, UserCircle, GithubLogo, EnvelopeSimple, Handshake, DotsThreeOutlineVertical, Users, UsersFour } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -36,7 +35,11 @@ import {
   type ModelSource,
 } from "@/lib/api-keys";
 import { loadTokenPayConnectionWithRetry } from "@/lib/tokenpay-client";
-import { reservePublicGame } from "@/lib/demo-game-client";
+import { fetchPublicQuota, reservePublicGame, type PublicQuota } from "@/lib/demo-game-client";
+import { WolfCover } from "@/components/home/WolfCover";
+import { isSealDisabled, nameFieldEnterAction } from "@/components/home/oath-card";
+
+const GITHUB_REPO_URL = "https://github.com/WillAI9527/last-human";
 
 const PUBLIC_DEMO = true;
 import { useAppLocale } from "@/i18n/useAppLocale";
@@ -305,11 +308,9 @@ export function WelcomeScreen({
   } = useCredits();
   const [isSetupOpen, setIsSetupOpen] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
-  const paperRef = useRef<HTMLDivElement | null>(null);
   const sealButtonRef = useRef<HTMLButtonElement | null>(null);
   const isStartingRef = useRef(false);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
-  const [serverNotice, setServerNotice] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -317,10 +318,12 @@ export function WelcomeScreen({
       .then((response) => response.json())
       .then((payload: { zenmuxConfigured?: boolean; message?: string | null }) => {
         if (cancelled) return;
-        setServerNotice(payload.zenmuxConfigured ? null : (payload.message || "服务器未配置，暂时无法开局。"));
+        if (!payload.zenmuxConfigured) {
+          toast.error(payload.message || "服务器未配置，暂时无法开局。");
+        }
       })
       .catch(() => {
-        if (!cancelled) setServerNotice("服务器未配置，暂时无法开局。");
+        if (!cancelled) toast.error("服务器未配置，暂时无法开局。");
       });
     return () => {
       cancelled = true;
@@ -372,7 +375,10 @@ export function WelcomeScreen({
   const [difficulty, setDifficulty] = useAtom(difficultyAtom);
   const [playerCount, setPlayerCount] = useAtom(playerCountAtom);
   const [preferredRole, setPreferredRole] = useAtom(preferredRoleAtom);
-  const [githubStars, setGithubStars] = useState<number | null>(null);
+  const [rulesOpen, setRulesOpen] = useState(false);
+  const [dailyQuota, setDailyQuota] = useState<PublicQuota | null>(null);
+  const [sealHint, setSealHint] = useState(false);
+  const sealHintTimerRef = useRef<number | null>(null);
   const springCampaignRemainingQuota = springCampaign?.remainingQuota ?? 0;
   const springCampaignTotalQuota = springCampaign?.totalQuota ?? 0;
   const springCampaignActiveNow = SPRING_CAMPAIGN_ENABLED
@@ -575,18 +581,14 @@ export function WelcomeScreen({
     setFixedRoles(buildDefaultRoles(playerCount));
   }, [playerCount]);
 
-  // Fetch GitHub stars
   useEffect(() => {
-    fetch('https://api.github.com/repos/oil-oil/wolfcha')
-      .then(res => res.json())
-      .then(data => {
-        if (data.stargazers_count !== undefined) {
-          setGithubStars(data.stargazers_count);
-        }
-      })
-      .catch(() => {
-        // Silently fail, stars will remain null
-      });
+    let cancelled = false;
+    void fetchPublicQuota().then((quota) => {
+      if (!cancelled) setDailyQuota(quota);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const roleConfigValid = useMemo(() => {
@@ -631,64 +633,19 @@ export function WelcomeScreen({
     });
   }, [playerCount, t]);
 
-  const canConfirm = useMemo(() => {
-    return !!humanName.trim() && !isLoading && !isTransitioning && (PUBLIC_DEMO || !creditsLoading);
-  }, [humanName, isLoading, isTransitioning, creditsLoading]);
+  const shownName = mounted ? humanName : "";
+  const sealDisabled = isSealDisabled({
+    name: shownName,
+    quota: dailyQuota,
+    busy: isLoading || isTransitioning || (!PUBLIC_DEMO && creditsLoading),
+  });
 
-  const isAnyModalOpen =
-    isSetupOpen ||
-    isAuthOpen ||
-    (REFERRAL_BONUS_ENABLED && isShareOpen) ||
-    isAccountOpen ||
-    isUserProfileOpen ||
-    isSponsorOpen ||
-    (SPRING_CAMPAIGN_ENABLED && isSpringFestivalOpen) ||
-    isGroupOpen ||
-    isMobileMenuOpen ||
-    isCustomCharacterOpen ||
-    isLowCreditOpen ||
-    isDevConsoleOpen;
-
-  useEffect(() => {
-    const paper = paperRef.current;
-    if (!paper) return;
-
-    if (typeof window === "undefined") return;
-    if ("ontouchstart" in window) return;
-    if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-
-    let rafId: number | null = null;
-    let lastX = 0;
-    let lastY = 0;
-
-    const update = () => {
-      rafId = null;
-      const xAxis = (window.innerWidth / 2 - lastX) / 60;
-      const yAxis = (window.innerHeight / 2 - lastY) / 60;
-      paper.style.setProperty("--wc-tilt-x", `${xAxis}`);
-      paper.style.setProperty("--wc-tilt-y", `${yAxis}`);
-    };
-
-    const onMove = (e: MouseEvent) => {
-      lastX = e.clientX;
-      lastY = e.clientY;
-      if (rafId !== null) return;
-      rafId = window.requestAnimationFrame(update);
-    };
-
-    const onLeave = () => {
-      paper.style.setProperty("--wc-tilt-x", "0");
-      paper.style.setProperty("--wc-tilt-y", "0");
-    };
-
-    window.addEventListener("mousemove", onMove);
-    window.addEventListener("mouseleave", onLeave);
-    return () => {
-      window.removeEventListener("mousemove", onMove);
-      window.removeEventListener("mouseleave", onLeave);
-      if (rafId !== null) window.cancelAnimationFrame(rafId);
-    };
-  }, []);
+  const pulseSeal = () => {
+    if (nameFieldEnterAction() !== "hint-seal" || sealDisabled) return;
+    setSealHint(true);
+    if (sealHintTimerRef.current !== null) window.clearTimeout(sealHintTimerRef.current);
+    sealHintTimerRef.current = window.setTimeout(() => setSealHint(false), 720);
+  };
 
   const createParticles = (element: HTMLElement) => {
     const rect = element.getBoundingClientRect();
@@ -891,7 +848,7 @@ export function WelcomeScreen({
   };
 
   const handleConfirm = async () => {
-    if (!canConfirm) {
+    if (sealDisabled) {
       return;
     }
     if (isStartingRef.current) {
@@ -984,7 +941,20 @@ export function WelcomeScreen({
 
   return (
     <>
-      <div className="wc-contract-screen selection:bg-[var(--color-accent)] selection:text-white">
+      <div className="wc-contract-screen wc-contract-screen--hero selection:bg-[var(--color-accent)] selection:text-white">
+        <WolfCover
+          name={shownName}
+          onNameChange={setHumanName}
+          quota={dailyQuota}
+          sealDisabled={sealDisabled}
+          sealHint={sealHint}
+          sealRef={sealButtonRef}
+          rulesOpen={rulesOpen}
+          onNameEnter={pulseSeal}
+          onSeal={() => { void handleConfirm(); }}
+          onOpenRules={() => setRulesOpen(true)}
+          onCloseRules={() => setRulesOpen(false)}
+        />
         <div className="wc-contract-fog" aria-hidden="true" />
         <div className="wc-contract-vignette" aria-hidden="true" />
 
@@ -1007,6 +977,10 @@ export function WelcomeScreen({
           onSoundEnabledChange={onSoundEnabledChange}
           onAiVoiceEnabledChange={onAiVoiceEnabledChange}
           onAutoAdvanceDialogueEnabledChange={onAutoAdvanceDialogueEnabledChange}
+          onOpenHowToPlay={() => {
+            setIsSetupOpen(false);
+            setRulesOpen(true);
+          }}
         />
         <AuthModal open={isAuthOpen} onOpenChange={setIsAuthOpen} />
         <AccountModal open={isAccountOpen} onOpenChange={setIsAccountOpen} />
@@ -1245,7 +1219,7 @@ export function WelcomeScreen({
               ) : null}
               <Button asChild variant="outline" className="justify-start">
                 <a
-                  href="https://github.com/oil-oil/wolfcha"
+                  href={GITHUB_REPO_URL}
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={() => setIsMobileMenuOpen(false)}
@@ -1303,11 +1277,11 @@ export function WelcomeScreen({
         </div>
         )}
 
-        <div className="wc-welcome-actions absolute top-5 right-5 z-20 flex items-center gap-2">
+        <div className="wc-welcome-actions absolute top-[calc(16px+env(safe-area-inset-top,0px))] right-5 z-30 flex items-center gap-2">
           <div className="hidden sm:flex items-center gap-2">
             <LocaleSwitcher className="shrink-0" />
             <a
-              href="https://github.com/oil-oil/wolfcha"
+              href={GITHUB_REPO_URL}
               target="_blank"
               rel="noopener noreferrer"
               className="hidden sm:flex items-center gap-1.5 rounded-md border-2 border-[var(--border-color)] bg-[var(--bg-card)] px-2 py-1 text-[11px] text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-all group"
@@ -1315,12 +1289,6 @@ export function WelcomeScreen({
             >
               <GithubLogo size={15} className="group-hover:scale-110 transition-transform" />
               <span className="hidden lg:inline">GitHub</span>
-              <span className="flex items-center gap-1 text-[var(--color-gold)]">
-                <Star size={12} weight="fill" className="group-hover:scale-110 transition-transform" />
-                <span className="font-serif text-xs font-bold tabular-nums tracking-tight" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.1)' }}>
-                  {githubStars !== null ? githubStars.toLocaleString() : '···'}
-                </span>
-              </span>
             </a>
             {!PUBLIC_DEMO && (
             <Button
@@ -1437,219 +1405,6 @@ export function WelcomeScreen({
           </div>
         </div>
 
-        <motion.div
-          initial={{ opacity: 0, y: 14, scale: 0.99, filter: "blur(10px)" }}
-          animate={{ opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }}
-          transition={{ duration: 0.65, ease: "easeOut" }}
-          className="relative z-10 w-full max-w-[460px] px-6"
-        >
-          <div ref={paperRef} className="wc-contract-paper">
-            <div className="wc-contract-borders" aria-hidden="true" />
-
-            {locale === "zh" && FREE_ROUNDS_PROMO_ENABLED && (
-              <a
-                href="https://my.feishu.cn/share/base/form/shrcnqLuGo3qyh64vFp2JhCN9CF"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="wc-promo-tag-container"
-                aria-label="赠送次数"
-              >
-                <span className="wc-paper-clip" aria-hidden="true" />
-                <span className="wc-promo-ticket">
-                  <span className="wc-shine-effect" aria-hidden="true" />
-                  <span className="wc-promo-title">赠送次数</span>
-                  <span className="wc-promo-subtitle">Free Rounds</span>
-                </span>
-              </a>
-            )}
-
-            {/* Mobile: inline sponsor stamps at top of paper */}
-            {!PUBLIC_DEMO && (
-            <div className="wc-paper-sponsors sm:hidden">
-              <a
-                href="https://bailian.console.aliyun.com/?ref=wolfcha"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="wc-paper-stamp"
-                style={{ "--stamp-rotate": "4deg" } as React.CSSProperties}
-                onClick={() => void trackSponsorClick("bailian")}
-              >
-                <img src="/sponsor/bailian.png" alt="百炼" className="wc-paper-stamp__logo" />
-                <span className="wc-paper-stamp__name">百炼</span>
-              </a>
-              <a
-                href="https://tokendance.space/?ref=wolfcha"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="wc-paper-stamp wc-paper-stamp--tokendance"
-                style={{ "--stamp-rotate": "-3deg" } as React.CSSProperties}
-                onClick={() => void trackSponsorClick("tokendance")}
-              >
-                <img src="/sponsor/tokendance-icon.svg" alt="TokenDance" className="wc-paper-stamp__logo" />
-                <span className="wc-paper-stamp__name">TokenDance</span>
-              </a>
-              {/* Temporarily hidden: Watcha paper stamp
-              <a
-                href="https://watcha.cn/?ref=wolfcha"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="wc-paper-stamp"
-                style={{ "--stamp-rotate": "6deg" } as React.CSSProperties}
-                onClick={() => void trackSponsorClick("watcha")}
-              >
-                <img src="/sponsor/watcha.svg" alt="观猹" className="wc-paper-stamp__logo" />
-                <span className="wc-paper-stamp__name">观猹</span>
-              </a>
-              */}
-            </div>
-            )}
-
-            <div className="mt-2 text-center">
-              <div className="wc-contract-title">LAST HUMAN</div>
-              <div className="wc-contract-subtitle">{t("welcome.subtitle")}</div>
-              {serverNotice && (
-                <p className="mt-3 text-sm text-[#B3262B]" role="alert">{serverNotice}</p>
-              )}
-            </div>
-
-            <div className="mt-5">
-              {springCampaignActiveNow ? (
-                <div className="relative rotate-[-1deg]">
-                  <div
-                    className="pointer-events-none absolute -top-2 left-6 h-4 w-20 rotate-[-6deg] rounded-sm border border-black/10 bg-white/60 shadow-sm"
-                    aria-hidden="true"
-                  />
-                  <div className="rounded-xl border border-[var(--border-color)] bg-white/60 px-4 py-3 shadow-[0_10px_24px_rgba(0,0,0,0.08)] backdrop-blur-sm">
-                    <div className="flex items-center justify-between gap-3">
-                      <p className="text-sm font-semibold text-[var(--text-primary)]">
-                        {t("welcome.springCampaign.title")}
-                      </p>
-                      <p className="text-xs text-[var(--text-muted)]">
-                        {t("welcome.springCampaign.range")}
-                      </p>
-                    </div>
-                    <p className="mt-1 text-xs leading-snug text-[var(--text-secondary)]">
-                      {user
-                        ? t("welcome.springCampaign.claimedStatus", {
-                          count: springCampaignActiveNow ? effectiveSpringRemainingQuota : SPRING_CAMPAIGN_DAILY_QUOTA,
-                          total: springCampaignActiveNow ? effectiveSpringTotalQuota : SPRING_CAMPAIGN_DAILY_QUOTA,
-                        })
-                        : t("welcome.springCampaign.signInHint")}
-                    </p>
-                  </div>
-                </div>
-              ) : null}
-            </div>
-
-            {/* Temporarily hidden: Watcha official rating badge
-            <div className="mt-5 flex justify-center">
-              <a
-                href="https://watcha.cn/products/wolfcha?tab=review&utm_source=product-badge&utm_content=review"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="wc-watcha-paper-badge"
-                aria-label={t("welcome.watchaRating.ariaLabel")}
-                title={t("welcome.watchaRating.title")}
-              >
-                <img
-                  src="https://watcha.cn/api/v2/products/wolfcha/badge?style=1&dark=false"
-                  alt={t("welcome.watchaRating.title")}
-                  width={360}
-                  loading="lazy"
-                  draggable={false}
-                />
-              </a>
-            </div>
-            */}
-
-            <div className="mt-7 text-center wc-contract-body">
-              <div className="wc-contract-oath">
-                {t("welcome.oath.line1")}
-                <br />
-                {t("welcome.oath.line2")}
-                <br />
-                {t("welcome.oath.line3")}
-              </div>
-
-              <div className="mt-4">
-                <div className="wc-contract-label">{t("welcome.signature.label")}</div>
-                <div className="relative mt-2">
-                  <input
-                    type="text"
-                    value={mounted ? humanName : ""}
-                    onChange={(e) => setHumanName(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key !== "Enter") return;
-                      if (e.nativeEvent.isComposing) return;
-                      if (isAnyModalOpen) return;
-                      e.preventDefault();
-                      void handleConfirm();
-                    }}
-                    placeholder={t("welcome.signature.placeholder")}
-                    className="wc-signature-input"
-                    autoComplete="off"
-                    autoFocus
-                    disabled={isLoading || isTransitioning}
-                  />
-                  <AnimatePresence>
-                    {mounted && !!humanName.trim() && (
-                      <motion.div
-                        initial={{ scale: 0.8, opacity: 0 }}
-                        animate={{ scale: 1, opacity: 1 }}
-                        exit={{ scale: 0.8, opacity: 0 }}
-                        className="wc-signature-ok"
-                      >
-                        <Sparkle weight="fill" size={18} />
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
-              </div>
-            </div>
-
-
-            {/* Custom Character Entry */}
-            {user && (
-              <button
-                type="button"
-                onClick={() => setIsCustomCharacterOpen(true)}
-                className="mt-6 mx-auto flex items-center gap-2 px-3 py-1.5 rounded-md border-2 border-dashed border-[var(--border-color)] text-xs text-[var(--text-secondary)] hover:border-[var(--color-accent)] hover:text-[var(--color-accent)] transition-colors"
-              >
-                <UsersFour size={14} />
-                <span>{t("customCharacter.entryButton")}</span>
-                {selectedCharacterIds.size > 0 && (
-                  <span className="px-1.5 py-0.5 rounded-full bg-[var(--color-accent)] text-white text-[10px] font-medium">
-                    {selectedCharacterIds.size}
-                  </span>
-                )}
-                {customCharacters.characters.length > 0 && selectedCharacterIds.size === 0 && (
-                  <span className="px-1.5 py-0.5 rounded-full bg-[var(--text-muted)]/20 text-[var(--text-muted)] text-[10px] font-medium">
-                    {customCharacters.characters.length}
-                  </span>
-                )}
-              </button>
-            )}
-
-            <div className="mt-4 flex flex-col items-center gap-3">
-              <div className="wc-seal-hint">
-                {canConfirm ? t("welcome.sealHint.ready") : t("welcome.sealHint.waiting")}
-              </div>
-              <button
-                ref={sealButtonRef}
-                type="button"
-                className="wc-wax-seal"
-                onClick={handleConfirm}
-                disabled={!canConfirm}
-              >
-                <FingerprintSimple weight="fill" size={44} className="wc-wax-seal-icon" />
-              </button>
-            </div>
-
-            <div className="wc-corner-mark" aria-hidden="true">
-              <WerewolfIcon size={30} className="text-[var(--color-wolf)] opacity-30" />
-            </div>
-          </div>
-        </motion.div>
 
         <AnimatePresence>
           {isTransitioning && (
