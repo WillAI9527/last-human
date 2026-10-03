@@ -16,6 +16,7 @@ import {
   WhiteWolfKingIcon
 } from "@/components/icons/FlatIcons";
 import { buildSimpleAvatarUrl, getModelLogoUrl } from "@/lib/avatar-config";
+import { ModelBadge } from "@/components/game/ModelBadge";
 import { playerTitle } from "@/lib/player-label";
 import { useTranslations } from "next-intl";
 
@@ -98,7 +99,7 @@ export function PlayerDetailModal({ player, isOpen, onClose, humanPlayer, isGens
     if (!strategy) return strategyLabels.balanced;
     return strategyLabels[strategy] ?? strategyLabels.balanced;
   };
-  const showModelTag = !!modelLabel && isGenshinMode && !renderPlayer?.isHuman;
+  const showModelId = !!modelLabel && !renderPlayer?.isHuman;
 
   if (!renderPlayer) return null;
 
@@ -157,6 +158,9 @@ export function PlayerDetailModal({ player, isOpen, onClose, humanPlayer, isGens
                       <span className="text-white font-bold text-sm bg-black/50 px-2 py-1 rounded">{t("playerDetail.out")}</span>
                     </div>
                   )}
+                  {!renderPlayer.isHuman && modelLabel && (
+                    <ModelBadge modelRef={renderPlayer.agentProfile?.modelRef} />
+                  )}
                 </div>
 
                 {/* 座位号 + 名字 */}
@@ -176,9 +180,13 @@ export function PlayerDetailModal({ player, isOpen, onClose, humanPlayer, isGens
                     {[persona?.occupation, persona?.ageBand, persona?.temperament].filter(Boolean).join(" · ")}
                   </p>
                 )}
-                {showModelTag && (
-                  <div className="mt-1 text-xs font-semibold text-[var(--text-muted)]">
-                    {t("playerDetail.model", { model: modelLabel })}
+                {showModelId && (
+                  <div
+                    className="mt-1 px-2 text-xs font-semibold text-[var(--text-muted)] break-all"
+                    data-testid="seat-model-id"
+                    title={modelLabel}
+                  >
+                    {modelLabel}
                   </div>
                 )}
                 
@@ -209,7 +217,7 @@ export function PlayerDetailModal({ player, isOpen, onClose, humanPlayer, isGens
                       </span>
                       {modelLabel && (
                         <span
-                          className="text-xs px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 font-medium max-w-full truncate"
+                          className="text-xs px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 font-medium max-w-full break-all"
                           title={modelLabel}
                         >
                           {t("playerDetail.model", { model: modelLabel })}

@@ -99,7 +99,7 @@ export function TutorialOverlay({
             <p className="text-amber-300/90">{t("tutorialOverlay.dayIntro.line3")}</p>
           </div>
         ),
-        accent: "var(--color-gold)",
+        accent: "#F2EDE4",
         bg: "rgba(24,18,10,0.88)",
       };
     }

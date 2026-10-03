@@ -70,7 +70,7 @@ export function GameSetupModal({
           <div className="rounded-md border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-3">
             <div className="text-sm font-medium text-[var(--text-primary)]">6 人局</div>
             <div className="mt-1 text-xs leading-relaxed text-[var(--text-muted)]">
-              2 狼人 · 预言家 · 女巫 · 2 平民。你的身份和大家一样随机，可能是狼人。没有警长。
+              2 狼人 · 预言家 · 女巫 · 2 村民。你的身份和大家一样随机，可能是狼人。没有警长。
             </div>
           </div>
 

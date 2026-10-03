@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useRef } from "react";
 import { useTranslations } from "next-intl";
-import { toast } from "sonner";
 import { useAtom, useStore } from "jotai";
 import type { GameState, Player } from "@/types/game";
 import type { PrefetchCriteria, PrefetchedSpeech } from "../useDialogueManager";
@@ -23,10 +22,8 @@ import { resolveVoiceId, type AppLocale } from "@/lib/voice-constants";
 import { getLocale } from "@/i18n/locale-store";
 import { createSpeechRequest, type SpeechRequest } from "@/lib/speech-request";
 import { generateUUID } from "@/lib/utils";
-import { withTimeout } from "@/lib/request-timeout";
-import { isGameSessionExpiredMessage } from "@/lib/llm";
-
-const SPEECH_RETRY_BACKOFF_MS = 600;
+import { GAMEPLAY_CALL_DEADLINE_MS, withTimeout } from "@/lib/request-timeout";
+import { pickFallbackSpeech } from "@/lib/speech-fallback";
 
 export interface DayPhaseCallbacks {
   setDialogue: (speaker: string, text: string, isStreaming?: boolean) => void;
@@ -78,8 +75,7 @@ export function useDayPhase(
   const store = useStore();
   const activeRequestRef = useRef<(SpeechRequest & { controller: AbortController }) | null>(null);
   const prefetchControllerRef = useRef<AbortController | null>(null);
-  const failedRequestRef = useRef<SpeechRequest | null>(null);
-  const isSpeechBlocked = useCallback(() => failedRequestRef.current?.isValid() === true, []);
+  const isSpeechBlocked = useCallback(() => false, []);
 
   useEffect(() => {
     if (activeRequestRef.current && !activeRequestRef.current.isValid()) {
@@ -119,7 +115,7 @@ export function useDayPhase(
   const runAISpeech = useCallback(async (
     state: GameState,
     player: Player,
-    options?: { afterSpeech?: (s: GameState) => Promise<void>; retried?: boolean }
+    options?: { afterSpeech?: (s: GameState) => Promise<void> }
   ) => {
     if (!PHASE_CATEGORIES.SPEECH_PHASES.includes(state.phase as typeof PHASE_CATEGORIES.SPEECH_PHASES[number])) return;
     if (activeRequestRef.current?.isValid()) return;
@@ -129,7 +125,6 @@ export function useDayPhase(
     const request = createSpeechRequest(id, state, player, getToken(), () => store.get(gameStateAtom),
       () => activeRequestRef.current?.id === id);
     activeRequestRef.current = { ...request, controller };
-    failedRequestRef.current = null;
     if (!request.isValid()) return;
     const isValid = () => request.isValid() && !controller.signal.aborted;
     const afterSpeech = options?.afterSpeech as ((s: unknown) => Promise<void>) | undefined;
@@ -142,13 +137,37 @@ export function useDayPhase(
     );
     const ttsProvider: TtsProvider = "minimax";
     const collected: string[] = [];
+    const revisions: number[] = [];
     let displayedCount = 0;
+    const takeFallback = () => {
+      const latest = store.get(gameStateAtom);
+      const picked = pickFallbackSpeech(player.displayName, latest.usedFallbackLines ?? []);
+      setGameState({ ...latest, usedFallbackLines: picked.used });
+      return picked.line;
+    };
     let displayChain = Promise.resolve();
     let audioChain = Promise.resolve();
     let timeoutId: ReturnType<typeof setTimeout> | undefined;
 
     const appendSegment = (segment: string, index: number) => {
-      if (!isValid() || index !== collected.length) return;
+      if (!isValid() || index > collected.length) return;
+      if (index < collected.length && collected[index] === segment) return;
+      const revision = (revisions[index] ?? 0) + 1;
+      revisions[index] = revision;
+      if (index < collected.length) {
+        collected[index] = segment;
+        appendToSpeechQueue(segment, id, index);
+        const latest = store.get(gameStateAtom);
+        const alreadyCommitted = latest.messages.some((message) =>
+          message.segmentIndex === index &&
+          message.playerId === player.playerId &&
+          message.day === state.day &&
+          message.phase === state.phase);
+        if (alreadyCommitted) {
+          setGameState(addPlayerMessage(latest, player.playerId, segment, { id: `${id}:${index}`, segmentIndex: index }));
+        }
+        return;
+      }
       collected.push(segment);
       const task = {
         id: makeAudioTaskId(voiceId, segment, ttsProvider),
@@ -161,15 +180,15 @@ export function useDayPhase(
       };
       // 首段 TTS 等待不能让后续文字先进入队列。后续音频只预加载，不阻塞字幕。
       displayChain = displayChain.then(async () => {
-        if (!isValid()) return;
+        if (!isValid() || revisions[index] !== revision) return;
         let firstAudioReady = false;
         if (index === 0 && audioManager.isEnabled()) {
           try {
-            await withTimeout(audioManager.ensureReady(task), 15000);
-            firstAudioReady = true;
+            const ready = await withTimeout(audioManager.ensureReady(task), 15000);
+            firstAudioReady = ready !== false;
           } catch { /* 保留文字，不重发失败的 TTS 请求 */ }
         }
-        if (!isValid()) return;
+        if (!isValid() || revisions[index] !== revision) return;
         if (index === 0) {
           clearTimeout(timeoutId);
           setIsWaitingForAI(false);
@@ -183,8 +202,9 @@ export function useDayPhase(
           }
           audioChain = audioChain.then(async () => {
             if (!isValid()) return;
-            try { await withTimeout(audioManager.ensureReady(task), 15000); } catch { return; }
-            if (isValid()) audioManager.addToQueue(task);
+            let ready = false;
+            try { ready = (await withTimeout(audioManager.ensureReady(task), 15000)) !== false; } catch { return; }
+            if (isValid() && ready) audioManager.addToQueue(task);
           });
         }
       });
@@ -204,19 +224,24 @@ export function useDayPhase(
         if (!isValid()) { resolve("timeout"); return; }
         controller.abort();
         // 超时兜底仍属于本次请求；关闭网络回调后才能写入。
-        if (displayedCount === 0) appendToSpeechQueue(t("dayPhase.timeout"), id, 0);
+        if (displayedCount === 0) appendToSpeechQueue(takeFallback(), id, 0);
         finalizeSpeechQueue({ requestId: id });
         setIsWaitingForAI(false);
         resolve("timeout");
-      }, 60000);
+      }, GAMEPLAY_CALL_DEADLINE_MS);
     });
 
     try {
       const streamPromise = prefetched
         ? Promise.resolve(prefetched.forEach(appendSegment))
-        : generateAISpeechSegmentsStream(state, player, { signal: controller.signal, onSegmentReceived: appendSegment });
+        : generateAISpeechSegmentsStream(state, player, { signal: controller.signal, onSegmentReceived: appendSegment })
+            .then((segments) => segments)
+            .catch((error: unknown) => {
+              if (controller.signal.aborted) return "aborted" as const;
+              throw error;
+            });
       const result = await Promise.race([streamPromise, timeoutPromise]);
-      if (result === "timeout" || !isValid()) return;
+      if (result === "timeout" || result === "aborted" || !isValid()) return;
       await displayChain;
       if (!isValid()) return;
       const nextSeat = getNextSpeechSeat(state);
@@ -226,41 +251,23 @@ export function useDayPhase(
       // 按相同段落 ID 构造预计状态，已提交的段落不会重复进入预取上下文。
       if (nextSpeakerIsAI && nextPlayer) {
         const postState = collected.reduce((next, segment, index) =>
-          addPlayerMessage(next, player.playerId, segment, { id: `${id}:${index}` }), store.get(gameStateAtom));
+          addPlayerMessage(next, player.playerId, segment, { id: `${id}:${index}`, segmentIndex: index }), store.get(gameStateAtom));
         void prefetchNextAISpeech({ ...postState, currentSpeakerSeat: nextPlayer.seat }, nextPlayer);
       }
-    } catch (error) {
+    } catch {
       if (!isValid()) return;
       await displayChain;
       if (!isValid()) return;
-      // One silent retry before the failure banner. A second failure, or a
-      // failure after lines were already shown, still pauses for a manual retry.
-      if (!options?.retried && collected.length === 0 && request.isValid()) {
-        await new Promise((resolve) => setTimeout(resolve, SPEECH_RETRY_BACKOFF_MS));
-        if (!request.isValid()) return;
-        activeRequestRef.current = null;
-        await runAISpeech(store.get(gameStateAtom), player, { ...options, retried: true });
-        return;
-      }
-      // 错误属于系统，不能记为角色台词。保留已确认段落，阻止自动推进至下一人。
-      failedRequestRef.current = request;
-      if (!collected.length) setDialogue(speakerHost, t(isGameSessionExpiredMessage(String(error))
-        ? "dayPhase.sessionExpired" : "dayPhase.interrupted"), false);
+      // 失败直接用角色口吻的兜底台词继续，玩家看不到报错，也不能手动重试。
+      if (displayedCount === 0 && collected.length === 0) appendToSpeechQueue(takeFallback(), id, 0);
       finalizeSpeechQueue({ requestId: id });
-      toast.error(getLocale() === "zh" ? "发言生成失败，游戏已暂停推进" : "Speech failed. Progress is paused.", {
-        duration: Infinity,
-        action: { label: getLocale() === "zh" ? "重试发言" : "Retry speech", onClick: () => {
-          if (!request.isValid()) return;
-          activeRequestRef.current = null;
-          void runAISpeech(store.get(gameStateAtom), player, options);
-        } },
-      });
+      setIsWaitingForAI(false);
     } finally {
       clearTimeout(timeoutId);
       if (request.isValid()) setIsWaitingForAI(false);
     }
   }, [appendToSpeechQueue, consumePrefetchedSpeech, finalizeSpeechQueue, getToken,
-    initStreamingSpeechQueue, prefetchNextAISpeech, setDialogue, setIsWaitingForAI, speakerHost, store, t]);
+    initStreamingSpeechQueue, prefetchNextAISpeech, setDialogue, setGameState, setIsWaitingForAI, store, t]);
 
   // 更新 ref 以打破循环依赖
   /** 开始遗言阶段 */

@@ -11,12 +11,14 @@ import {
   SpeakerSlash,
 } from "@phosphor-icons/react";
 import { useTypewriter } from "@/hooks/useTypewriter";
+import { useVisualViewportShell } from "@/hooks/useVisualViewportShell";
 import { useGameLogic } from "@/hooks/useGameLogic";
 import type { Phase, Player, Role } from "@/types/game";
 import { isWolfRole } from "@/types/game";
 import { PHASE_CONFIGS, isGameInProgress } from "@/store/game-machine";
 import { getI18n } from "@/i18n/translator";
 import { getSystemMessages, getSystemPatterns } from "@/lib/game-texts";
+import { isNightRoleLeak, publicNightActionLine } from "@/lib/night-public";
 import { useTranslations } from "next-intl";
 import { useAtom } from "jotai";
 import { BADGE_TRANSFER_TORN } from "@/lib/game-master";
@@ -109,10 +111,7 @@ function getRitualCueFromSystemMessage(content: string): { title: string; subtit
   const text = content.trim();
   if (text === systemMessages.gameStart) return { title: t("ritual.gameStart") };
   if (nightFallRegex.test(text)) return { title: text };
-  if (text === systemMessages.guardActionStart) return { title: text };
-  if (text === systemMessages.wolfActionStart) return { title: text };
-  if (text === systemMessages.witchActionStart) return { title: text };
-  if (text === systemMessages.seerActionStart) return { title: text };
+  if (text === publicNightActionLine() || isNightRoleLeak(text)) return { title: publicNightActionLine() };
   if (text === systemMessages.peacefulNight) return { title: systemMessages.peacefulNight };
   if (playerKilledRegex.test(text)) return { title: text };
   if (playerPoisonedRegex.test(text)) return { title: text };
@@ -197,14 +196,24 @@ export default function Home() {
     setActionReceipt({ receipt, phase });
   }, []);
   useEffect(() => {
-    setActionReceipt((current) => (current && current.phase !== gameState.phase ? null : current));
-  }, [gameState.phase]);
+    const humanSeat = gameState.players.find((player) => player.isHuman)?.seat;
+    setActionReceipt((current) => {
+      if (!current || current.phase !== gameState.phase) return null;
+      if (
+        current.receipt.text === receiptForFinishSpeech().text
+        && gameState.currentSpeakerSeat !== humanSeat
+      ) {
+        return null;
+      }
+      return current;
+    });
+  }, [gameState.phase, gameState.currentSpeakerSeat, gameState.players]);
   const visibleActionReceipt = actionReceipt && actionReceipt.phase === gameState.phase ? actionReceipt.receipt : null;
 
   const [visualIsNight, setVisualIsNight] = useState(isNight);
   const visualIsNightRef = useRef(isNight);
   const [isMobile, setIsMobile] = useState(false);
-  const [keyboardOpen, setKeyboardOpen] = useState(false);
+  const keyboardOpen = useVisualViewportShell();
   const [dayNightBlinkPhase, setDayNightBlinkPhase] = useState<null | "closing" | "opening">(null);
   const dayNightBlinkTokenRef = useRef(0);
   const dayNightBlinkTimeoutsRef = useRef<number[]>([]);
@@ -231,19 +240,6 @@ export default function Home() {
     }
     media.addListener(update);
     return () => media.removeListener(update);
-  }, []);
-
-  useEffect(() => {
-    const viewport = window.visualViewport;
-    if (!viewport) return;
-    const sync = () => setKeyboardOpen(window.innerHeight - viewport.height > 140);
-    sync();
-    viewport.addEventListener("resize", sync);
-    viewport.addEventListener("scroll", sync);
-    return () => {
-      viewport.removeEventListener("resize", sync);
-      viewport.removeEventListener("scroll", sync);
-    };
   }, []);
 
   useEffect(() => {
@@ -1240,7 +1236,7 @@ export default function Home() {
   const isWelcomeStage = !gameStarted;
 
   return (
-    <div className={cn("h-screen flex flex-col overflow-hidden bg-transparent", visualIsNight && "lh-room--night")}>
+    <div className={cn("lh-game-shell flex flex-col overflow-hidden bg-transparent", visualIsNight && "lh-room--night", keyboardOpen && "lh-game-shell--keyboard")}>
       <TokenPayRecoveryHost />
       <GameBackground isNight={visualIsNight} isBlinking={!!dayNightBlinkPhase} />
 
@@ -1465,13 +1461,8 @@ export default function Home() {
                       className="lh-role-card-thumb md:hidden"
                     />
                   )}
-                  <div className="wc-topbar__item">
-                    <span className="text-xs uppercase tracking-wider opacity-60">Day</span>
-                    <span className="font-serif text-lg font-bold">{String(gameState.day).padStart(2, '0')}</span>
-                  </div>
-                  <div className="wc-topbar__item">
-                    <span className="text-xs uppercase tracking-wider opacity-60">Alive</span>
-                    <span className="font-serif text-lg font-bold">{gameState.players.filter((p) => p.alive).length}/{gameState.players.length}</span>
+                  <div className="wc-topbar__meta" data-testid="table-meta">
+                    DAY {String(gameState.day).padStart(2, "0")} / ALIVE {gameState.players.filter((p) => p.alive).length}/{gameState.players.length}
                   </div>
                   {gameState.badge.holderSeat !== null && (
                     <div className="wc-topbar__item">
@@ -1487,7 +1478,7 @@ export default function Home() {
                 <div className="hidden md:flex items-center gap-3">
                   <div className="wc-topbar__item wc-topbar__item--role">
                     <span className="text-xs uppercase tracking-wider opacity-60">{t("page.roleLabel")}</span>
-                    <span className="font-bold text-[var(--color-gold)]">
+                    <span className="font-bold text-[#F2EDE4]">
                       {canShowRole ? getRoleLabel(humanPlayer?.role) : t("page.rolePending")}
                     </span>
                   </div>
@@ -1535,10 +1526,7 @@ export default function Home() {
                       className="flex-1 flex flex-col min-h-0 overflow-hidden"
                     >
                 <div className="flex-1 flex flex-col md:flex-row overflow-hidden w-full min-h-0">
-                  <div className={cn(
-                    "min-h-0 md:flex-1",
-                    keyboardOpen ? "h-[104px] shrink-0" : "h-[48vh] min-h-[280px] md:h-auto"
-                  )}>
+                  <div className={cn("lh-table-pane min-h-0", keyboardOpen && "lh-table-pane--keyboard")}>
                     <RoundTable
                       players={allPlayers}
                       gameState={gameState}
@@ -1557,7 +1545,7 @@ export default function Home() {
                     />
                   </div>
 
-                  <div className="flex-1 flex flex-col min-w-0 min-h-0 h-full md:w-[min(440px,38vw)] md:flex-none overflow-hidden">
+                  <div className="lh-dialog-column flex-1 flex flex-col min-w-0 min-h-0 h-full md:w-[min(440px,38vw)] md:flex-none overflow-hidden">
                     <DialogArea
                       roomLayout="round"
                       gameState={gameState}
@@ -1596,6 +1584,7 @@ export default function Home() {
                         await handleBadgeSignup(wants);
                       }}
                       actionReceipt={visibleActionReceipt}
+                      keyboardOpen={keyboardOpen}
                       showHumanRoleCard={canShowRole}
                       onRestart={restartGame}
                       onWhiteWolfKingBoom={handleWhiteWolfKingBoom}

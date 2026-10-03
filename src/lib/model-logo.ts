@@ -13,8 +13,18 @@ const MODEL_LOGO_MAP: Array<{ match: RegExp; key: string }> = [
   { match: /kimi|moonshot/i, key: "kimi" },
 ];
 
-export function getModelLogoPath(modelRef?: ModelRef): string {
+export function getModelLogoKey(modelRef?: ModelRef): string {
   const modelName = modelRef?.model ?? "";
   const match = MODEL_LOGO_MAP.find((entry) => entry.match.test(modelName));
-  return `/models/${match?.key ?? "openai"}.svg`;
+  return match?.key ?? "openai";
+}
+
+export function getModelLogoPath(modelRef?: ModelRef): string {
+  return `/models/${getModelLogoKey(modelRef)}.svg`;
+}
+
+/** Kimi and OpenAI marks are black ink and disappear on the dark badge. */
+export function modelLogoNeedsLightInk(modelRef?: ModelRef): boolean {
+  const key = getModelLogoKey(modelRef);
+  return key === "kimi" || key === "openai";
 }

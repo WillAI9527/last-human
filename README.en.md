@@ -86,8 +86,8 @@ To run this project locally:
 1.  **Clone the repository**
 
 ```bash
-git clone https://github.com/oil-oil/wolfcha.git
-cd wolfcha
+git clone https://github.com/WillAI9527/last-human.git
+cd last-human
 ```
 
 2.  **Install dependencies**

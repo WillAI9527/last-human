@@ -6,13 +6,14 @@
     "dev": "next dev --webpack",
     "build": "next build --webpack",
     "start": "next start",
-    "test:single-player-context": "tsx --test src/lib/ai-logger.test.ts src/lib/api-keys.test.ts src/lib/character-generator-tokenpay.test.ts src/lib/character-generator-structured-output.test.ts src/lib/tokenpay-client.test.ts src/lib/game-master.badge-signup.test.ts src/lib/game-master.player-setup.test.ts src/lib/game-master.stream-logging.test.ts src/lib/game-master.structured-output.test.ts src/lib/game-master.vote-history.test.ts src/lib/hunter-badge-flow.test.ts src/lib/speech-order.test.ts src/game/phases/factual-context.test.ts scripts/single-player-context-audit.test.ts src/lib/prompt-utils.test.ts src/hooks/useDialogueManager.test.ts src/lib/streaming-speech-parser.test.ts src/hooks/game-phases/useDayPhase.test.ts src/game/phases/context-regressions.test.ts src/lib/audio-manager.test.ts src/hooks/game-phases/useBadgePhase.test.ts src/store/game-machine.test.ts src/game/phases/vote-resume.test.ts src/lib/reasoning-profile.test.ts src/lib/concurrency.test.ts src/lib/demo-rate-limit.test.ts src/lib/demo-flow-simulation.test.ts src/lib/village-cast-isolation.test.ts src/lib/phase-bar-copy.test.ts src/lib/action-receipt.test.ts src/lib/human-vote-mark.test.ts src/lib/suspicion.test.ts src/lib/six-player-isolation.test.ts src/lib/six-player-rules.test.ts src/lib/six-player-simulation.test.ts",
+    "test:single-player-context": "tsx --test src/lib/ai-logger.test.ts src/lib/api-keys.test.ts src/lib/character-generator-tokenpay.test.ts src/lib/character-generator-structured-output.test.ts src/lib/tokenpay-client.test.ts src/lib/game-master.badge-signup.test.ts src/lib/game-master.player-setup.test.ts src/lib/game-master.stream-logging.test.ts src/lib/game-master.structured-output.test.ts src/lib/game-deadlines.test.ts src/lib/game-master.vote-history.test.ts src/lib/hunter-badge-flow.test.ts src/lib/speech-order.test.ts src/game/phases/factual-context.test.ts scripts/single-player-context-audit.test.ts src/lib/prompt-utils.test.ts src/hooks/useDialogueManager.test.ts src/lib/streaming-speech-parser.test.ts src/hooks/game-phases/useDayPhase.test.ts src/game/phases/context-regressions.test.ts src/lib/audio-manager.test.ts src/hooks/game-phases/useBadgePhase.test.ts src/store/game-machine.test.ts src/game/phases/vote-resume.test.ts src/lib/reasoning-profile.test.ts src/lib/chat-request-log.test.ts src/lib/concurrency.test.ts src/lib/demo-rate-limit.test.ts src/lib/demo-flow-simulation.test.ts src/lib/village-cast-isolation.test.ts src/lib/phase-bar-copy.test.ts src/lib/speech-reliability.test.ts src/lib/action-receipt.test.ts src/lib/human-vote-mark.test.ts src/lib/suspicion.test.ts src/lib/six-player-isolation.test.ts src/lib/six-player-prompt.test.ts src/lib/six-player-rules.test.ts src/lib/six-player-simulation.test.ts",
     "audit:single-player-context": "tsx scripts/single-player-context-audit.ts",
     "audit:single-player-context:live": "node --env-file=.env.local --import tsx scripts/live-single-player-context-audit.ts",
     "audit:character-generation:live": "node --env-file=.env.local --import tsx scripts/live-character-generation-audit.ts",
     "audit:full-game:live": "node --env-file=.env.local --import tsx scripts/live-full-game-audit.ts",
     "lint": "eslint",
-    "test:tokenpay": "NODE_OPTIONS=--conditions=react-server tsx --test server/tokenpay-*.test.ts server/public-demo-chat.test.ts server/legacy-payments.test.ts server/watcha-*.test.ts server/game-session-*.test.ts server/credit-*.test.ts server/chat-observability-contract.test.ts",
+    "test:mobile": "playwright test",
+    "test:tokenpay": "NODE_OPTIONS=--conditions=react-server tsx --test server/tokenpay-*.test.ts server/public-demo-chat.test.ts server/legacy-payments.test.ts server/watcha-*.test.ts server/game-session-*.test.ts server/credit-*.test.ts server/chat-observability-contract.test.ts src/lib/chat-request-log.test.ts",
     "migrate:game-sessions-user-id": "node scripts/migrate-game-sessions-user-id.mjs"
   },
   "dependencies": {
@@ -57,6 +58,7 @@
     "uuid": "^13.0.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",

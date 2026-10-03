@@ -36,7 +36,7 @@ export function PhaseBar({ gameState, humanPlayer, isWaitingForAI }: PhaseBarPro
         <span>{dayChip.label}</span>
       </div>
       <div className="lh-phase-bar__status">
-        <span className="truncate">{phaseBarStatus(gameState, humanTurn)}</span>
+        <span className="truncate">{phaseBarStatus(gameState, humanTurn, isWaitingForAI)}</span>
         {isWaitingForAI && (
           <span className="lh-phase-bar__dots" aria-hidden="true">
             <i /><i /><i />

@@ -36,8 +36,8 @@ export function OverviewCard({ data, onSelectPlayer }: OverviewCardProps) {
   return (
     <div className="space-y-6">
       {/* 胜负横幅 & 用户信息 */}
-      <section className="text-center space-y-6 relative">
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[120%] h-[120%] bg-[radial-gradient(circle,rgba(197,160,89,0.05)_0%,transparent_70%)] pointer-events-none" />
+      <section className="text-center space-y-6 relative overflow-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(circle,rgba(197,160,89,0.05)_0%,transparent_70%)] pointer-events-none" />
 
         <div className="inline-flex items-center gap-3 px-6 py-2 rounded-full bg-[var(--color-gold)]/10 text-[var(--color-gold)] border border-[var(--color-gold)]/40 shadow-[0_0_20px_rgba(197,160,89,0.15)] backdrop-blur-sm">
           <Crown className="w-4 h-4" />

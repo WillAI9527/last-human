@@ -59,12 +59,11 @@ export function LowCreditModal({
         </DialogHeader>
 
         <div className="space-y-5">
-          <div className="relative rounded-xl border border-[var(--color-gold)]/30 bg-gradient-to-b from-[var(--color-gold)]/5 to-transparent p-5 text-center overflow-hidden">
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,var(--color-gold)_0%,transparent_50%)] opacity-10" />
+          <div className="relative rounded-xl border border-[#A9B2BC]/40 bg-[#1A1714] p-5 text-center overflow-hidden">
             <p className="relative text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">
               {t("currentCredits")}
             </p>
-            <p className="relative mt-2 text-5xl font-bold text-[var(--color-gold)]">
+            <p className="relative mt-2 text-5xl font-bold text-[#F2EDE4]">
               {credits}
             </p>
             <p className="relative mt-1 text-sm text-[var(--text-secondary)]">
@@ -80,7 +79,7 @@ export function LowCreditModal({
             <Button
               type="button"
               onClick={handleTokenPay}
-              className="w-full h-11 gap-2 bg-[var(--color-gold)] text-[var(--bg-primary)] hover:brightness-110 hover:scale-[1.01] active:scale-[0.99] transition-all duration-150 font-medium shadow-lg shadow-[var(--color-gold)]/20"
+              className="w-full h-11 gap-2 bg-[#1A1714] text-[#F2EDE4] border border-[#A9B2BC] hover:bg-[#241f1b] hover:scale-[1.01] active:scale-[0.99] transition-all duration-150 font-medium"
             >
               <LinkSimple size={18} weight="duotone" />
               {t("useTokenPay")}
@@ -99,7 +98,7 @@ export function LowCreditModal({
             <button
               type="button"
               onClick={handleStartGame}
-              className="w-full py-2 text-sm text-[var(--text-muted)] hover:text-[var(--color-gold)] transition-colors flex items-center justify-center gap-2"
+              className="w-full py-2 text-sm text-[var(--text-muted)] hover:text-[#F2EDE4] transition-colors flex items-center justify-center gap-2"
             >
               <Play size={16} />
               {credits === 0 ? t("startGameNoCredits") : t("startGame")}

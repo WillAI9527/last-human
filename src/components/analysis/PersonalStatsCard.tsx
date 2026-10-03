@@ -2,10 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Scroll, Quote, ThumbsUp, Brain, X, ChevronDown, ChevronUp } from "lucide-react";
-import Image from "next/image";
 import type { PersonalStats } from "@/types/analysis";
 import { RADAR_LABELS_VILLAGE, RADAR_LABELS_WOLF } from "@/types/analysis";
-import { TAG_ILLUSTRATIONS, TAG_CONDITIONS, ALL_TAGS } from "./constants";
+import { TAG_CONDITIONS, ALL_TAGS } from "./constants";
+import { AwardSeal } from "./AwardSeal";
 
 
 interface PersonalStatsCardProps {
@@ -63,8 +63,8 @@ function TitleSelectorModal({ isOpen, onClose, currentTag, onSelectTag }: TitleS
                       }}
                       className={`px-2 py-1.5 rounded text-[10px] transition-all ${
                         currentTag === tag
-                          ? "bg-[var(--color-gold)] text-black font-bold"
-                          : "bg-white/10 text-[var(--text-secondary)] hover:bg-[var(--color-gold)]/20 hover:text-[var(--color-gold)]"
+                          ? "bg-[#1A1714] text-[#F2EDE4] border border-[#A9B2BC] font-bold"
+                          : "bg-white/10 text-[var(--text-secondary)] hover:bg-[#A9B2BC]/20 hover:text-[#F2EDE4]"
                       }`}
                     >
                       {tag}
@@ -90,7 +90,6 @@ export function PersonalStatsCard({ stats, overrideTag, onOverrideTagChange }: P
   const isWolf = stats.alignment === "wolf";
   const radarLabels = isWolf ? RADAR_LABELS_WOLF : RADAR_LABELS_VILLAGE;
   const primaryTag = overrideTag || stats.tags[0] || "待评估";
-  const illustrationSrc = TAG_ILLUSTRATIONS[primaryTag] || TAG_ILLUSTRATIONS["default"];
   const tagCondition = TAG_CONDITIONS[primaryTag] || TAG_CONDITIONS["待评估"];
 
   useEffect(() => {
@@ -215,43 +214,17 @@ export function PersonalStatsCard({ stats, overrideTag, onOverrideTagChange }: P
         </h3>
       </div>
 
-      {/* 称号立绘 + 称号名称 */}
-      {illustrationSrc && (
-        <div className="flex flex-col items-center">
-          <div 
-            className="relative w-full max-w-[280px] aspect-[16/10] rounded-lg overflow-hidden border border-[var(--color-gold)]/25 shadow-[0_0_20px_rgba(197,160,89,0.15)]"
-          >
-            <Image
-              src={illustrationSrc}
-              alt={primaryTag}
-              fill
-              className="object-cover"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+      <div className="flex flex-col items-center gap-2">
+        <AwardSeal />
+        <div className="text-center">
+          <div className="text-lg font-black text-[#F2EDE4] tracking-[0.25em]" style={{ fontFamily: "'Noto Serif SC', serif" }}>
+            {primaryTag}
           </div>
-
-          <div className="mt-3 text-center">
-            <div className="relative inline-flex items-center justify-center min-w-[140px] py-1.5 px-5">
-              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-[var(--color-gold)]/12 to-transparent" />
-              <div className="absolute top-0 left-1/4 right-1/4 h-[1px] bg-gradient-to-r from-transparent via-[var(--color-gold)]/50 to-transparent" />
-              <div className="absolute bottom-0 left-1/4 right-1/4 h-[1px] bg-gradient-to-r from-transparent via-[var(--color-gold)]/50 to-transparent" />
-              <span 
-                className="text-lg font-black text-[var(--color-gold)] tracking-[0.25em] relative z-10"
-                style={{ 
-                  textShadow: "0 2px 4px rgba(0,0,0,0.8), 0 0 16px rgba(197,160,89,0.3)",
-                  fontFamily: "'Noto Serif SC', serif"
-                }}
-              >
-                {primaryTag}
-              </span>
-            </div>
-            <div className="text-[10px] text-[var(--text-muted)]/60 mt-1 leading-relaxed">
-              {tagCondition}
-            </div>
+          <div className="text-[10px] text-[var(--text-muted)]/60 mt-1 leading-relaxed">
+            {tagCondition}
           </div>
-
         </div>
-      )}
+      </div>
 
       {/* 综合评分 + 雷达图 */}
       <div className="bg-[#0f0e0c]/60 rounded-lg p-4 border border-[var(--color-gold)]/8">

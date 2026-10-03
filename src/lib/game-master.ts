@@ -1,6 +1,14 @@
 import { areNightResultsVisible } from "./night-visibility";
 import { v4 as uuidv4 } from "uuid";
 import { generateCompletion, generateCompletionBatch, generateCompletionStream, mergeOptionsFromModelRef, stripMarkdownCodeFences, stripReasoningArtifacts, type GenerateOptions, type LLMMessage } from "./llm";
+import { DAILY_SUMMARY_DEADLINE_MS, RequestTimeoutError } from "./request-timeout";
+import {
+  linkSpeechAttempt,
+  pickBackupModel,
+  SPEECH_MODEL_ATTEMPT_MS,
+  speechMentionsSheriff,
+  stripSheriffFromSegments,
+} from "./speech-reliability";
 import type { ChatCompletionResponse } from "./llm";
 import { StreamingSpeechParser } from "./streaming-speech-parser";
 import {
@@ -29,6 +37,8 @@ import { getI18n } from "@/i18n/translator";
 import { getRoleConfiguration } from "@/lib/role-configuration";
 import { appendSuspicion, parseSuspects, suspicionSchemaProperty, type SuspicionEntry } from "@/lib/suspicion";
 import { canWitchSave, checkSideKillWin, isSixPlayerGame } from "@/lib/six-player-rules";
+import { adaptPromptForSixPlayer } from "@/lib/six-player-prompt";
+import { getLocale } from "@/i18n/locale-store";
 import { resolveBadgeElectionWinner } from "@/lib/historical-vote-snapshots";
 import { isVillagerAvatarId } from "@/lib/village-cast";
 
@@ -144,6 +154,9 @@ function resolvePhasePrompt(
   const prompt = phaseManager.getPrompt(phase, { state: overriddenState, extras }, player);
   if (!prompt) {
     throw new Error(`[wolfcha] Missing phase prompt for ${phase}`);
+  }
+  if (isSixPlayerGame(state)) {
+    return adaptPromptForSixPlayer(prompt, getLocale() === "en" ? "en" : "zh");
   }
   return prompt;
 }
@@ -329,6 +342,9 @@ export function addSystemMessage(
   state: GameState,
   content: string
 ): GameState {
+  const last = state.messages[state.messages.length - 1];
+  if (last?.isSystem && last.content === content) return state;
+
   const { t } = getI18n();
   const message: ChatMessage = {
     id: uuidv4(),
@@ -351,7 +367,7 @@ export function addPlayerMessage(
   state: GameState,
   playerId: string,
   content: string,
-  options?: { isLastWords?: boolean; id?: string }
+  options?: { isLastWords?: boolean; id?: string; segmentIndex?: number }
 ): GameState {
   const player = state.players.find((p) => p.playerId === playerId);
   if (!player) return state;
@@ -361,6 +377,25 @@ export function addPlayerMessage(
 
   // Auto-detect last words phase or use explicit flag
   const isLastWords = options?.isLastWords ?? state.phase === "DAY_LAST_WORDS";
+
+  // 同一天、同一阶段、同一座位、同一段落只保留一条。重试替换已写入的半段，不按文字去重。
+  if (options?.segmentIndex !== undefined) {
+    const existingIndex = state.messages.findIndex((message) => {
+      if (message.segmentIndex !== options.segmentIndex) return false;
+      if (message.day !== state.day || message.phase !== state.phase) return false;
+      if (message.playerId === playerId) return true;
+      return state.players.find((candidate) => candidate.playerId === message.playerId)?.seat === player.seat;
+    });
+    if (existingIndex >= 0) {
+      const messages = state.messages.slice();
+      messages[existingIndex] = {
+        ...messages[existingIndex],
+        content: trimmedContent,
+        timestamp: Date.now(),
+      };
+      return { ...state, messages };
+    }
+  }
 
   // 幂等依据请求与段落 ID，不能按文字去重（重复句可能是合法发言）。
   if (options?.id && state.messages.some((m) => m.id === options.id)) return state;
@@ -373,6 +408,7 @@ export function addPlayerMessage(
     timestamp: Date.now(),
     day: state.day,
     phase: state.phase,
+    segmentIndex: options?.segmentIndex,
     speechRound: state.speechRoundStartMessageIndex ?? undefined,
     pkSource: state.pkSource,
     ...(isLastWords && { isLastWords: true }),
@@ -637,13 +673,19 @@ export function formatDailySummaryTranscriptMessage(
 }
 
 export async function generateDailySummary(
-  state: GameState
+  state: GameState,
+  parentSignal?: AbortSignal,
 ): Promise<{ bullets: string[]; voteData?: DailySummaryVoteData }> {
   const { t } = getI18n();
   const startTime = Date.now();
   const summaryModel = getSummaryModel();
   const dayBreakText = t("system.dayBreak");
   const systemSpeaker = t("speakers.system");
+  const controller = new AbortController();
+  const onParentAbort = () => controller.abort(parentSignal?.reason);
+  if (parentSignal?.aborted) onParentAbort();
+  else parentSignal?.addEventListener("abort", onParentAbort, { once: true });
+  const deadline = setTimeout(() => controller.abort(new RequestTimeoutError()), DAILY_SUMMARY_DEADLINE_MS);
 
   const dayStartIndex = (() => {
     for (let i = state.messages.length - 1; i >= 0; i--) {
@@ -671,60 +713,81 @@ export async function generateDailySummary(
   ];
 
   const summaryModelRef = getModelRefForModel(summaryModel);
-  const completion = await generateCompletionAndParse(
-    {
-      model: summaryModel,
-      messages,
-      temperature: GAME_TEMPERATURE.SUMMARY,
-      response_format: structuredResponseFormat(summaryModelRef, "daily_summary", {
-        type: "object",
-        properties: {
-          bullets: {
-            type: "array",
-            items: { type: "string" },
+  try {
+    const completion = await generateCompletionAndParse(
+      {
+        model: summaryModel,
+        messages,
+        temperature: GAME_TEMPERATURE.SUMMARY,
+        callType: "summary",
+        signal: controller.signal,
+        deadlineMs: DAILY_SUMMARY_DEADLINE_MS,
+        maxAttempts: 2,
+        response_format: structuredResponseFormat(summaryModelRef, "daily_summary", {
+          type: "object",
+          properties: {
+            bullets: {
+              type: "array",
+              items: { type: "string" },
+            },
           },
-        },
-        required: ["bullets"],
-        additionalProperties: false,
-      }),
-    },
-    (cleaned) => {
-      const obj = parseLLMJson<{ bullets?: unknown; summary?: unknown }>(cleaned);
-      if (!obj || typeof obj !== "object" || Array.isArray(obj)) return parseFail();
-      if (Array.isArray(obj.bullets)) {
-        const bullets = obj.bullets
-          .filter((bullet): bullet is string => typeof bullet === "string")
-          .map((bullet) => bullet.trim())
-          .filter(Boolean);
-        if (bullets.length > 0) {
-          return parseOk({ bullets, voteData });
+          required: ["bullets"],
+          additionalProperties: false,
+        }),
+      },
+      (cleaned) => {
+        const obj = parseLLMJson<{ bullets?: unknown; summary?: unknown }>(cleaned);
+        if (!obj || typeof obj !== "object" || Array.isArray(obj)) return parseFail();
+        if (Array.isArray(obj.bullets)) {
+          const bullets = obj.bullets
+            .filter((bullet): bullet is string => typeof bullet === "string")
+            .map((bullet) => bullet.trim())
+            .filter(Boolean);
+          if (bullets.length > 0) {
+            return parseOk({ bullets, voteData });
+          }
         }
+        if (typeof obj.summary === "string" && obj.summary.trim()) {
+          return parseOk({ bullets: [obj.summary.trim()], voteData });
+        }
+        return parseFail();
       }
-      if (typeof obj.summary === "string" && obj.summary.trim()) {
-        return parseOk({ bullets: [obj.summary.trim()], voteData });
-      }
-      return parseFail();
-    }
-  );
+    );
 
-  await aiLogger.log({
-    type: "daily_summary",
-    request: {
-      model: summaryModel,
-      messages,
-    },
-    response: {
-      content: completion.cleaned,
-      raw: completion.result.content,
-      rawResponse: JSON.stringify(completion.result.raw, null, 2),
-      finishReason: completion.result.raw.choices?.[0]?.finish_reason,
-      parsed: completion.parsed,
-      duration: Date.now() - startTime,
-    },
-  });
+    await aiLogger.log({
+      type: "daily_summary",
+      request: {
+        model: summaryModel,
+        messages,
+      },
+      response: {
+        content: completion.cleaned,
+        raw: completion.result.content,
+        rawResponse: JSON.stringify(completion.result.raw, null, 2),
+        finishReason: completion.result.raw.choices?.[0]?.finish_reason,
+        parsed: completion.parsed,
+        duration: Date.now() - startTime,
+      },
+    });
 
-  if (completion.parsed) return completion.parsed;
-  return { bullets: [], voteData };
+    if (completion.parsed) return completion.parsed;
+    return { bullets: [], voteData };
+  } catch (error) {
+    await aiLogger.log({
+      type: "daily_summary",
+      request: { model: summaryModel, messages },
+      response: {
+        content: "",
+        parsed: { bullets: [] },
+        duration: Date.now() - startTime,
+      },
+      error: String(error),
+    });
+    return { bullets: [], voteData };
+  } finally {
+    clearTimeout(deadline);
+    parentSignal?.removeEventListener("abort", onParentAbort);
+  }
 }
 
 export async function* generateAISpeechStream(
@@ -742,6 +805,7 @@ export async function* generateAISpeechStream(
       model: player.agentProfile!.modelRef.model,
       messages,
       promptScope: "gameplay",
+      callType: "speech",
       temperature: GAME_TEMPERATURE.SPEECH,
     }))) {
       fullResponse += chunk;
@@ -817,6 +881,7 @@ export async function generateAISpeechSegments(
       model: player.agentProfile!.modelRef.model,
       messages,
       promptScope: "gameplay",
+      callType: "speech",
       temperature: GAME_TEMPERATURE.SPEECH,
     }));
 
@@ -826,7 +891,7 @@ export async function generateAISpeechSegments(
     const publicSegments = parser.end().map((segment) =>
       sanitizeSeatMentions(sanitizeModelArtifacts(segment), state.players)).filter(Boolean);
     const recovery = (!publicSegments.length || !parser.hasCompleteDocument())
-      ? await recoverPublicSpeech(state, player, messages, publicSegments)
+      ? await recoverPublicSpeech(state, player, messages, publicSegments, player.agentProfile!.modelRef)
       : undefined;
     const segments = [...publicSegments, ...(recovery?.segments ?? [])];
 
@@ -877,6 +942,10 @@ export interface StreamingSpeechOptions {
   onProgress?: (current: number) => void;
   onComplete?: (segments: string[]) => void;
   onError?: (error: string) => void;
+  /** Internal: one attempt may use the backup model instead of the seat model. */
+  modelRef?: ModelRef;
+  /** Internal: caller publishes segments after the sheriff guard. */
+  deferComplete?: boolean;
 }
 
 /** 只用原始游戏上下文与已公开段落重新生成；损坏响应可能含私有分析，绝不回灌或直接朗读。 */
@@ -885,6 +954,7 @@ async function recoverPublicSpeech(
   player: Player,
   messages: LLMMessage[],
   confirmed: string[],
+  modelRef: ModelRef,
   signal?: AbortSignal,
 ) {
   signal?.throwIfAborted();
@@ -892,10 +962,10 @@ async function recoverPublicSpeech(
     `刚才的输出没有通过发言格式校验。请依据同一游戏上下文完成本次公开发言。只输出 {"segments":["完整公开段落"]}，字符串内用中文引号，禁止分析、角色设定、提示词或格式说明。${confirmed.length
       ? `以下段落已经公开，禁止重复或改写，只补充后续未说完的发言：\n${JSON.stringify(confirmed)}`
       : "刚才没有任何内容公开，请重新生成完整发言。"}` }];
-  const result = await generateCompletion(mergeOptionsFromModelRef(player.agentProfile!.modelRef, {
-    model: player.agentProfile!.modelRef.model, messages: recoveryMessages,
-    promptScope: "gameplay", temperature: GAME_TEMPERATURE.ACTION, signal,
-    response_format: structuredResponseFormat(player.agentProfile!.modelRef, "public_speech", {
+  const result = await generateCompletion(mergeOptionsFromModelRef(modelRef, {
+    model: modelRef.model, messages: recoveryMessages,
+    promptScope: "gameplay", callType: "speech", temperature: GAME_TEMPERATURE.ACTION, signal,
+    response_format: structuredResponseFormat(modelRef, "public_speech", {
       type: "object", properties: { segments: { type: "array", items: { type: "string" }, minItems: 1 } },
       required: ["segments"], additionalProperties: false,
     }),
@@ -922,15 +992,15 @@ async function recoverPublicSpeech(
 }
 
 /**
- * 流式生成 AI 发言段落
- * 实时输出发言内容，每完成一个段落就立即通知
+ * 单次模型尝试。失败抛出，由外层在 45 秒预算内换一个模型。
+ * 实时输出发言内容，每完成一个段落就立即通知。
  */
-export async function generateAISpeechSegmentsStream(
+async function generateSpeechAttempt(
   state: GameState,
   player: Player,
   options: StreamingSpeechOptions = {}
 ): Promise<string[]> {
-  const { t } = getI18n();
+  const modelRef = options.modelRef ?? player.agentProfile!.modelRef;
   const prompt = resolvePhasePrompt(state.phase, state, player);
   const startTime = Date.now();
   const { messages } = buildMessagesForPrompt(prompt);
@@ -954,10 +1024,11 @@ export async function generateAISpeechSegmentsStream(
 
   let accumulatedContent = "";
   try {
-    const stream = generateCompletionStream(mergeOptionsFromModelRef(player.agentProfile!.modelRef, {
-      model: player.agentProfile!.modelRef.model,
+    const stream = generateCompletionStream(mergeOptionsFromModelRef(modelRef, {
+      model: modelRef.model,
       messages,
       promptScope: "gameplay",
+      callType: "speech",
       temperature: GAME_TEMPERATURE.SPEECH,
       signal: options.signal,
     }));
@@ -984,7 +1055,7 @@ export async function generateAISpeechSegmentsStream(
       await aiLogger.log({
         type: "speech",
         request: {
-          model: player.agentProfile!.modelRef.model,
+          model: modelRef.model,
           messages,
           player: {
             playerId: player.playerId,
@@ -1002,13 +1073,13 @@ export async function generateAISpeechSegmentsStream(
         error: parseError,
       });
 
-      options.onComplete?.(result);
+      if (!options.deferComplete) options.onComplete?.(result);
       return result;
     };
 
     // 完整文档后的多余说明可丢弃；正文中断或完全没有公开内容时只恢复一次。
     if (emittedSegments.length === 0 || !parser.hasCompleteDocument()) {
-      recoveryDetails = await recoverPublicSpeech(state, player, messages, emittedSegments, options.signal);
+      recoveryDetails = await recoverPublicSpeech(state, player, messages, emittedSegments, modelRef, options.signal);
       for (const segment of recoveryDetails.segments) {
         options.signal?.throwIfAborted();
         const index = emittedSegments.length;
@@ -1020,12 +1091,10 @@ export async function generateAISpeechSegmentsStream(
   } catch (error) {
     if (options.signal?.aborted) throw error;
     const raw = String(error);
-    const isRateLimited = raw.includes("429") || raw.includes("limit_requests");
-    const rateLimitResult = isRateLimited && !parseError ? [t("gameMaster.tooManyRequests")] : null;
     await aiLogger.log({
       type: "speech",
       request: {
-        model: player.agentProfile!.modelRef.model,
+        model: modelRef.model,
         messages,
         player: {
           playerId: player.playerId,
@@ -1035,22 +1104,87 @@ export async function generateAISpeechSegmentsStream(
         },
       },
       response: {
-        content: emittedSegments.length ? emittedSegments.join("\n") : rateLimitResult?.join("\n") ?? "",
+        content: emittedSegments.join("\n"),
         raw: accumulatedContent,
         duration: Date.now() - startTime,
       },
       error: raw,
     });
 
-    if (rateLimitResult) {
-      if (emittedSegments.length === 0) options.onSegmentReceived?.(rateLimitResult[0], 0);
-      options.onComplete?.(emittedSegments.length ? emittedSegments : rateLimitResult);
-      return emittedSegments.length ? emittedSegments : rateLimitResult;
-    }
-
     options.onError?.(String(error));
     throw error;
   }
+}
+
+/**
+ * 座位模型先说。约 20 秒没结果，或请求失败（4xx 且非 429 不在同一模型上再试），
+ * 就换池子里的另一个模型再试一次。6 人局没有警长，带出警徽说法时在预算内重写一次，仍有则删句。
+ */
+export async function generateAISpeechSegmentsStream(
+  state: GameState,
+  player: Player,
+  options: StreamingSpeechOptions = {}
+): Promise<string[]> {
+  if (!player.agentProfile) throw new Error("缺少角色模型，无法生成发言");
+  const seatModel = player.agentProfile.modelRef;
+  const parent = options.signal;
+  const sixPlayer = state.players.length === 6;
+
+  const run = async (modelRef: ModelRef, signal: AbortSignal | undefined, publish: boolean) => {
+    return generateSpeechAttempt(state, player, {
+      ...options,
+      signal,
+      modelRef,
+      deferComplete: !publish,
+      onSegmentReceived: publish ? options.onSegmentReceived : undefined,
+    });
+  };
+
+  const once = async (modelRef: ModelRef, timeoutMs: number | undefined, publish: boolean) => {
+    const linked = linkSpeechAttempt(parent, timeoutMs);
+    try {
+      return await run(modelRef, linked.signal, publish);
+    } finally {
+      linked.release();
+    }
+  };
+
+  const publish = (segments: string[]) => {
+    segments.forEach((segment, index) => options.onSegmentReceived?.(segment, index));
+    options.onComplete?.(segments);
+    return segments;
+  };
+
+  let model = seatModel;
+  let segments: string[];
+  try {
+    segments = await once(seatModel, SPEECH_MODEL_ATTEMPT_MS, !sixPlayer);
+  } catch (error) {
+    if (parent?.aborted) throw error;
+    const backup = pickBackupModel(seatModel, PLAYER_MODELS);
+    if (!backup) throw error;
+    model = backup;
+    segments = await once(backup, undefined, !sixPlayer);
+  }
+
+  if (!sixPlayer) return segments;
+
+  let cleaned = segments;
+  if (speechMentionsSheriff(segments.join("\n"))) {
+    try {
+      if (parent?.aborted) throw parent.reason ?? new Error("aborted");
+      const regenerated = await once(model, undefined, false);
+      cleaned = speechMentionsSheriff(regenerated.join("\n"))
+        ? stripSheriffFromSegments(regenerated)
+        : regenerated;
+      if (!cleaned.length) cleaned = stripSheriffFromSegments(segments);
+    } catch (error) {
+      if (parent?.aborted) throw error;
+      cleaned = stripSheriffFromSegments(segments);
+    }
+  }
+  if (!cleaned.length) throw new Error("6人局发言清理后没有可公开的句子");
+  return publish(cleaned);
 }
 
 export async function generateAIVote(
@@ -1094,6 +1228,7 @@ export async function generateAIVote(
         model: player.agentProfile!.modelRef.model,
         messages,
         promptScope: "gameplay",
+        callType: "vote",
         temperature: GAME_TEMPERATURE.ACTION,
         reasoningProfile: "decision",
         response_format: seatSelectionResponseFormat(player.agentProfile!.modelRef, "day_vote", validSeats, suspectSeats),
@@ -1431,6 +1566,7 @@ export async function generateAIBadgeVote(
         model: player.agentProfile!.modelRef.model,
         messages,
         promptScope: "gameplay",
+        callType: "vote",
         temperature: GAME_TEMPERATURE.ACTION,
         reasoningProfile: "decision",
         response_format: seatSelectionResponseFormat(player.agentProfile!.modelRef, "badge_vote", validSeats),
@@ -1595,6 +1731,7 @@ export async function generateSeerAction(
         model: player.agentProfile!.modelRef.model,
         messages,
         promptScope: "gameplay",
+        callType: "night",
         temperature: GAME_TEMPERATURE.ACTION,
         reasoningProfile: "decision",
         response_format: seatSelectionResponseFormat(player.agentProfile!.modelRef, "seer_action", validSeats),
@@ -1666,6 +1803,7 @@ export async function generateWolfAction(
         model: player.agentProfile!.modelRef.model,
         messages,
         promptScope: "gameplay",
+        callType: "night",
         temperature: GAME_TEMPERATURE.ACTION,
         reasoningProfile: "decision",
         response_format: seatSelectionResponseFormat(player.agentProfile!.modelRef, "wolf_action", validSeats),
@@ -1741,6 +1879,7 @@ export async function generateWitchAction(
         model: player.agentProfile!.modelRef.model,
         messages,
         promptScope: "gameplay",
+        callType: "night",
         temperature: GAME_TEMPERATURE.ACTION,
         reasoningProfile: "decision",
         response_format: { type: "json_object" },
@@ -1836,6 +1975,7 @@ export async function generateGuardAction(
         model: player.agentProfile!.modelRef.model,
         messages,
         promptScope: "gameplay",
+        callType: "night",
         temperature: GAME_TEMPERATURE.ACTION,
         reasoningProfile: "decision",
         response_format: seatSelectionResponseFormat(player.agentProfile!.modelRef, "guard_action", validSeats),
@@ -1905,6 +2045,7 @@ export async function generateHunterShoot(
         model: player.agentProfile!.modelRef.model,
         messages,
         promptScope: "gameplay",
+        callType: "night",
         temperature: GAME_TEMPERATURE.ACTION,
         response_format: { type: "json_object" },
       }),
@@ -1991,6 +2132,7 @@ export async function generateWhiteWolfKingBoomDecision(
         model: player.agentProfile!.modelRef.model,
         messages,
         promptScope: "gameplay",
+        callType: "night",
         temperature: GAME_TEMPERATURE.ACTION,
         response_format: { type: "json_object" },
       }),

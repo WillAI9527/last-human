@@ -10,7 +10,8 @@ const NIGHT_ACTION_PHASES = new Set<GameState["phase"]>([
   "NIGHT_SEER_ACTION",
 ]);
 
-const OTHER_PLAYERS_ACTING = "夜晚 · 其他玩家正在行动";
+const OTHER_PLAYERS_ACTING = "夜色中有人在行动…";
+const HUMAN_NIGHT_STATUS = "请按提示行动";
 
 /** Day/night chip follows the phase, not the lagged blink animation. */
 export function phaseBarDayChip(phase: GameState["phase"], day: number): { night: boolean; label: string } {
@@ -21,15 +22,18 @@ export function phaseBarDayChip(phase: GameState["phase"], day: number): { night
   };
 }
 
-export function phaseBarStatus(gameState: GameState, humanMustAct: boolean): string {
+export function phaseBarStatus(gameState: GameState, humanMustAct: boolean, waitingForAI = false): string {
   const phase = gameState.phase;
-  if (NIGHT_ACTION_PHASES.has(phase)) return humanMustAct ? "夜晚" : OTHER_PLAYERS_ACTING;
+  if (NIGHT_ACTION_PHASES.has(phase)) return humanMustAct ? HUMAN_NIGHT_STATUS : OTHER_PLAYERS_ACTING;
   if (phase === "NIGHT_RESOLVE" || phase === "DAY_START") return "天亮了，正在公布昨夜结果";
   if (phase === "DAY_BADGE_SIGNUP") return "警长竞选报名中";
   if (phase === "DAY_BADGE_SPEECH" || phase === "DAY_SPEECH" || phase === "DAY_PK_SPEECH") {
     const speaker = gameState.players.find((player) => player.seat === gameState.currentSpeakerSeat);
-    if (speaker) return `${playerTitle(speaker.seat, speaker.displayName)} 正在发言`;
-    return "玩家正在发言";
+    if (speaker) {
+      const thinking = waitingForAI && !humanMustAct;
+      return `${playerTitle(speaker.seat, speaker.displayName)} ${thinking ? "正在思考…" : "正在发言"}`;
+    }
+    return waitingForAI && !humanMustAct ? "玩家正在思考…" : "玩家正在发言";
   }
   if (phase === "DAY_LAST_WORDS") {
     const speaker = gameState.players.find((player) => player.seat === gameState.currentSpeakerSeat);
@@ -66,7 +70,7 @@ export function phaseBarCapsule(phase: GameState["phase"]): string | null {
     case "DAY_SPEECH":
     case "DAY_PK_SPEECH":
     case "DAY_LAST_WORDS":
-      return "轮到你发言了";
+      return "请发言";
     case "DAY_BADGE_ELECTION":
     case "DAY_VOTE":
       return "请投票";

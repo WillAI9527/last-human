@@ -153,7 +153,7 @@ export function ShareModal({ isOpen, onClose, data, overrideTag }: ShareModalPro
           <button
             onClick={handleSavePoster}
             disabled={isGeneratingPoster}
-            className="w-full flex items-center justify-center gap-2 bg-[var(--color-gold)]/90 text-[#1a1614] font-bold py-3 rounded-lg hover:bg-[var(--color-gold)] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full flex items-center justify-center gap-2 bg-[#1A1714] text-[#F2EDE4] border border-[#A9B2BC] font-bold py-3 rounded-lg hover:bg-[#241f1b] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isGeneratingPoster ? (
               <Loader2 className="w-4 h-4 animate-spin" />

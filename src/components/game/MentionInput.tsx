@@ -75,7 +75,11 @@ function createSuggestionItems(players: Player[]) {
   };
 }
 
-function renderSuggestionList(isGenshinMode: boolean, onOpenChange?: (open: boolean) => void) {
+function renderSuggestionList(
+  isGenshinMode: boolean,
+  onOpenChange?: (open: boolean) => void,
+  onPicked?: () => void,
+) {
   let el: HTMLDivElement | null = null;
   let selectedIndex = 0;
   let lastItems: MentionCandidate[] = [];
@@ -144,8 +148,8 @@ function renderSuggestionList(isGenshinMode: boolean, onOpenChange?: (open: bool
           const row = document.createElement("button");
           row.type = "button";
           row.className =
-            "w-full text-left px-3 py-2 rounded-md text-sm text-[var(--text-primary)] hover:bg-[var(--color-gold)]/15 transition-colors flex items-center gap-2 whitespace-nowrap " +
-            (idx === selectedIndex ? "bg-[var(--color-gold)]/20" : "");
+            "w-full text-left px-3 py-2 rounded-md text-sm text-[var(--text-primary)] hover:bg-[#A9B2BC]/15 transition-colors flex items-center gap-2 whitespace-nowrap " +
+            (idx === selectedIndex ? "bg-[#A9B2BC]/25" : "");
           
           // Avatar
           const avatarUrl =
@@ -202,6 +206,9 @@ function renderSuggestionList(isGenshinMode: boolean, onOpenChange?: (open: bool
           return true;
         }
         if (props.event.key === "Enter") {
+          props.event.preventDefault();
+          props.event.stopPropagation();
+          onPicked?.();
           lastCommand?.(items[selectedIndex]);
           return true;
         }
@@ -234,6 +241,7 @@ export function MentionInput({
 }: MentionInputProps) {
   const items = useMemo(() => createSuggestionItems(players), [players]);
   const [isSuggestionOpen, setIsSuggestionOpen] = useState(false);
+  const justPickedRef = useRef(false);
 
   const holdTimerRef = useRef<number | null>(null);
   const holdingSlashRef = useRef(false);
@@ -244,6 +252,8 @@ export function MentionInput({
   const suggestionRenderer = useMemo(() => {
     return () => renderSuggestionList(isGenshinMode, (open) => {
       setIsSuggestionOpen(open);
+    }, () => {
+      justPickedRef.current = true;
     });
   }, [isGenshinMode]);
 
@@ -274,7 +284,7 @@ export function MentionInput({
     editorProps: {
       attributes: {
         class:
-          "wc-input-field w-full min-h-[44px] max-h-[120px] text-base focus:outline-none transition-all cursor-text",
+          "wc-input-field w-full min-w-0 min-h-[44px] max-h-[120px] text-base focus:outline-none transition-all cursor-text",
       },
     },
     onUpdate: ({ editor }) => {
@@ -307,7 +317,7 @@ export function MentionInput({
   if (!editor) return null;
 
   return (
-    <div className="w-full flex-1 relative">
+    <div className="w-full min-w-0 flex-1 relative">
       {(!value || value.trim().length === 0) && placeholder ? (
         <div
           className={
@@ -387,8 +397,11 @@ export function MentionInput({
           }
 
           if (e.key === "Enter" && !e.shiftKey) {
-            // Don't send if suggestion popup is open
-            if (isSuggestionOpen) return;
+            if (isSuggestionOpen || justPickedRef.current) {
+              justPickedRef.current = false;
+              e.preventDefault();
+              return;
+            }
             e.preventDefault();
             onSend();
           }

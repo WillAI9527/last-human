@@ -1,4 +1,5 @@
 import Script from "next/script";
+import { absoluteUrl, getSiteUrl } from "@/lib/site-url";
 
 interface JsonLdProps {
   id?: string;
@@ -17,14 +18,16 @@ export function JsonLd({ id = "json-ld", data }: JsonLdProps) {
 }
 
 export function getGameJsonLd() {
+  const siteUrl = getSiteUrl();
   return {
     "@context": "https://schema.org",
     "@type": "VideoGame",
     name: "LAST HUMAN · 最后的真人",
     alternateName: ["最后的真人", "AI Werewolf", "AI狼人杀"],
+    url: siteUrl,
     description:
       "Play Werewolf with AI opponents. A single-player social deduction game where AI players reason, bluff, accuse, defend, and vote through the full Werewolf flow.",
-    image: "/og-image.png",
+    image: absoluteUrl("/og-image.png"),
     genre: ["Social Deduction", "Strategy", "Party Game", "AI Game"],
     gamePlatform: ["Web Browser", "Mobile Browser"],
     applicationCategory: "Game",
@@ -52,16 +55,18 @@ export function getGameJsonLd() {
 }
 
 export function getWebsiteJsonLd() {
+  const siteUrl = getSiteUrl();
   return {
     "@context": "https://schema.org",
     "@type": "WebSite",
     name: "LAST HUMAN · 最后的真人",
     alternateName: "最后的真人",
+    url: siteUrl,
     description:
       "Play Werewolf with AI opponents online. A single-player social deduction game with classic roles, AI dialogue, voting, bluffing, and optional voice acting.",
     potentialAction: {
       "@type": "PlayAction",
-      target: "/",
+      target: siteUrl,
       name: "Play AI Werewolf",
     },
   };
@@ -72,8 +77,9 @@ export function getOrganizationJsonLd() {
     "@context": "https://schema.org",
     "@type": "Organization",
     name: "LAST HUMAN",
-    logo: "/logo.png",
-    sameAs: ["https://github.com/oil-oil/wolfcha"],
+    url: getSiteUrl(),
+    logo: absoluteUrl("/logo.png"),
+    sameAs: ["https://github.com/WillAI9527/last-human"],
   };
 }
 
@@ -133,7 +139,7 @@ export function getHowToJsonLd() {
     name: "How to Play AI Werewolf",
     description:
       "Learn how to play Werewolf with AI opponents in this single-player social deduction game.",
-    image: "/og-image.png",
+    image: absoluteUrl("/og-image.png"),
     totalTime: "PT15M",
     step: [
       {

@@ -7,6 +7,7 @@ import type { Player } from "@/types/game";
 import { isWolfRole } from "@/types/game";
 import { cn } from "@/lib/utils";
 import { buildSimpleAvatarUrl, getModelLogoUrl } from "@/lib/avatar-config";
+import { ModelBadge } from "@/components/game/ModelBadge";
 import { playerTitle, seatNumberLabel } from "@/lib/player-label";
 import { useTranslations } from "next-intl";
 
@@ -133,14 +134,17 @@ export function PlayerCardCompact({
       case "hunter":
         return "border-[var(--color-warning)] shadow-[0_0_0_2px_var(--color-warning)]";
       case "badge":
-        return "border-[#A9B2BC] shadow-[0_0_0_2px_rgba(169,178,188,0.35)]";
       case "vote":
-        return "border-[#A9B2BC] shadow-[0_0_0_2px_rgba(169,178,188,0.35)]";
+        return "lh-seat-selected";
       default:
         return "border-[#A9B2BC] shadow-[0_0_0_2px_rgba(169,178,188,0.35)]";
     }
   })();
 
+  const voteDimmed = (selectionTone === "vote" || selectionTone === "badge")
+    && isInSelectionPhase
+    && !isSelected
+    && isReady;
   const modelLabel = player.agentProfile?.modelRef?.model;
 
   const isModelAvatar = isGenshinMode && !player.isHuman;
@@ -152,7 +156,7 @@ export function PlayerCardCompact({
   const avatarClassName = cn(
     "w-full h-full transition-transform duration-500",
     isModelAvatar ? "object-contain p-2 bg-[var(--bg-secondary)]" : "object-cover group-hover:scale-110",
-    isSpeaking && "border-[var(--color-gold)]"
+    isSpeaking && isMe && "border-[var(--human-gold)]"
   );
 
   const handleClick = (e: React.MouseEvent) => {
@@ -180,7 +184,7 @@ export function PlayerCardCompact({
               y: 0,
               scale: [1, 1.08, 1.03, 1],
             }
-          : { opacity: 1, y: 0, scale: 1 }
+          : { opacity: voteDimmed ? 0.4 : 1, y: 0, scale: 1 }
       }
       transition={
         revealPop
@@ -202,7 +206,8 @@ export function PlayerCardCompact({
         isSpeaking && !isMe && "wc-player-card--speaking-ai",
         isMe && "wc-player-card--me",
         isWolfTeammate && "border-[var(--color-blood)]/70 bg-[var(--color-wolf-bg)]",
-        isDisabledInSelection && "wc-player-card--disabled opacity-50 grayscale-[0.3] pointer-events-none",
+        isDisabledInSelection && !voteDimmed && "wc-player-card--disabled opacity-50 grayscale-[0.3] pointer-events-none",
+        voteDimmed && "lh-seat-dimmed",
         canClick && isReady && "wc-player-card--selectable cursor-pointer",
         isSelected && "scale-[1.02]",
         isSelected && selectionClass
@@ -264,7 +269,7 @@ export function PlayerCardCompact({
             >
               <div className="relative flex items-center justify-center">
                 <motion.div
-                  className="absolute inset-0 rounded-full border border-[var(--color-gold)]/25"
+                  className="absolute inset-0 rounded-full border border-[#A9B2BC]/40"
                   style={{ width: 46, height: 46 }}
                   animate={{ rotate: 360 }}
                   transition={{ duration: 6, repeat: Infinity, ease: "linear" }}
@@ -274,7 +279,7 @@ export function PlayerCardCompact({
                   animate={{ rotate: -360, opacity: [0.4, 0.9, 0.4] }}
                   transition={{ duration: 4.8, repeat: Infinity, ease: "linear" }}
                 />
-                <div className="absolute inset-0 bg-[var(--color-gold)]/20 blur-xl rounded-full animate-pulse" />
+                <div className="absolute inset-0 bg-[#A9B2BC]/20 blur-xl rounded-full animate-pulse" />
                 <Sparkle
                   size={22}
                   weight="fill"
@@ -290,13 +295,11 @@ export function PlayerCardCompact({
         )}
       </motion.div>
       {isReady && !isMe && (
-        <span className="lh-model-badge" title={modelLabel || ""}>
-          <img src={getModelLogoUrl(player.agentProfile?.modelRef)} alt="" />
-        </span>
+        <ModelBadge modelRef={player.agentProfile?.modelRef} />
       )}
       {isMe && isReady && !isDead && <SeatCandle night={isNight} />}
       {isMe && isReady && (
-        <span className="lh-you-capsule">你 · {seatNumberLabel(player.seat)}</span>
+        <span className="lh-you-capsule">你</span>
       )}
       {showVoteSeal && isReady && (
         <span className="lh-wax-seal" aria-label="你的票">票</span>
@@ -341,14 +344,14 @@ export function PlayerCardCompact({
       {/* 信息区 */}
       <div className="wc-player-card__info relative z-10">
         {variant === "round" ? (
-          <div className="wc-player-card__name lh-round-name" title={player.displayName}>
-            {isReady ? player.displayName : t("playerCard.joining")}
+          <div className="wc-player-card__name lh-round-name" title={isReady ? playerTitle(player.seat, player.displayName) : player.displayName}>
+            {isReady ? playerTitle(player.seat, player.displayName) : t("playerCard.joining")}
           </div>
         ) : variant === "mobile" ? (
           <div className="wc-player-card__name relative flex items-center gap-1 min-w-0" title={playerTitle(player.seat, player.displayName)}>
             <span className={cn(
               "wc-seat-badge transition-colors duration-300",
-              isSpeaking && isMe ? "bg-[var(--color-gold)] text-[#0F0D0C]" : "bg-black/20 text-[var(--text-secondary)]",
+              isSpeaking && isMe ? "bg-[#1A1714] text-[#F2EDE4] border border-[#A9B2BC]" : "bg-black/20 text-[var(--text-secondary)]",
               !isReady && "opacity-50"
             )}>{seatNumberLabel(player.seat)}</span>
             <AnimatePresence mode="wait">
@@ -429,7 +432,7 @@ export function PlayerCardCompact({
               transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
               className="text-[var(--text-muted)] text-xs flex items-center gap-1"
             >
-              <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-gold)]/60" />
+              <span className="w-1.5 h-1.5 rounded-full bg-[#A9B2BC]" />
               {t("playerCard.joining")}
             </motion.div>
           )}

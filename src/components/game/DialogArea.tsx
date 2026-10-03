@@ -15,6 +15,7 @@ import { VoiceRecorder, type VoiceRecorderHandle } from "./VoiceRecorder";
 import { EventLog } from "./EventLog";
 import { buildSimpleAvatarUrl, getModelLogoUrl } from "@/lib/avatar-config";
 import { playerTitle } from "@/lib/player-label";
+import { redactNightRoleLeak } from "@/lib/night-public";
 import { roleCardUrl } from "@/lib/role-card";
 import type { ActionReceipt } from "@/lib/action-receipt";
 import { RoleRevealHistoryCard, type RoleRevealEntry } from "@/components/game/RoleRevealHistoryCard";
@@ -290,6 +291,7 @@ interface DialogAreaProps {
   roomLayout?: "classic" | "round";
   transcriptExpanded?: boolean;
   onTranscriptExpandedChange?: (open: boolean) => void;
+  keyboardOpen?: boolean;
 }
 
 // 等待状态动画组件已移除，与当前简洁风格不符
@@ -312,13 +314,17 @@ function NightActionStatus({ phase, humanRole }: { phase: string; humanRole?: st
       (phase === "NIGHT_SEER_ACTION" && humanRole === "Seer") ||
       (phase === "HUNTER_SHOOT" && humanRole === "Hunter");
     
+    if (!isMyPhase && phase !== "HUNTER_SHOOT") {
+      return { icon: null, text: t("system.publicNightAction"), color: "text-[var(--text-secondary)]" };
+    }
+
     switch (phase) {
       case "NIGHT_WOLF_ACTION":
-        return { icon: WerewolfIcon, text: isMyPhase ? t("dialog.nightAction.wolfAwake") : t("dialog.nightAction.wolfActing"), color: "text-red-500" };
+        return { icon: WerewolfIcon, text: t("dialog.nightAction.wolfAwake"), color: "text-red-500" };
       case "NIGHT_WITCH_ACTION":
-        return { icon: Drop, text: isMyPhase ? t("dialog.nightAction.witchAwake") : t("dialog.nightAction.witchActing"), color: "text-purple-500" };
+        return { icon: Drop, text: t("dialog.nightAction.witchAwake"), color: "text-purple-500" };
       case "NIGHT_SEER_ACTION":
-        return { icon: Eye, text: isMyPhase ? t("dialog.nightAction.seerAwake") : t("dialog.nightAction.seerChecking"), color: "text-blue-500" };
+        return { icon: Eye, text: t("dialog.nightAction.seerAwake"), color: "text-blue-500" };
       case "HUNTER_SHOOT":
         return { icon: Crosshair, text: isMyPhase ? t("dialog.nightAction.hunterAwake") : t("dialog.nightAction.hunterActing"), color: "text-orange-500" };
       default:
@@ -410,6 +416,7 @@ export function DialogArea({
   roomLayout = "classic",
   transcriptExpanded,
   onTranscriptExpandedChange,
+  keyboardOpen = false,
 }: DialogAreaProps) {
   const t = useTranslations();
   const isGenshinMode = !!gameState.isGenshinMode;
@@ -480,9 +487,16 @@ export function DialogArea({
   }, [phase, waitingForNextRound, humanPlayer?.role, gameState.nightActions.seerTarget, currentDialogue?.text]);
 
   const visibleMessages = useMemo(() => {
-    return gameState.messages.filter(
+    const filtered = gameState.messages.filter(
       (m) => !(m.isSystem && isTurnPromptSystemMessage(m.content, t))
     );
+    const collapsed: typeof filtered = [];
+    for (const message of filtered) {
+      const previous = collapsed[collapsed.length - 1];
+      if (message.isSystem && previous?.isSystem && previous.content === message.content) continue;
+      collapsed.push(message);
+    }
+    return collapsed;
   }, [gameState.messages, t]);
   const transcriptOpen = roomLayout !== "round" || (transcriptExpanded ?? transcriptOpenUncontrolled);
   const toggleTranscript = () => {
@@ -490,7 +504,14 @@ export function DialogArea({
     if (transcriptExpanded === undefined) setTranscriptOpenUncontrolled(next);
     onTranscriptExpandedChange?.(next);
   };
-  const shownMessages = roomLayout === "round" && !transcriptOpen ? visibleMessages.slice(-3) : visibleMessages;
+  const shownMessages = roomLayout === "round" && !transcriptOpen
+    ? (keyboardOpen ? visibleMessages.filter((message) => !message.isSystem).slice(-2) : visibleMessages.slice(-3))
+    : visibleMessages;
+
+  useEffect(() => {
+    if (!keyboardOpen || !historyRef.current) return;
+    historyRef.current.scrollTop = historyRef.current.scrollHeight;
+  }, [keyboardOpen, shownMessages.length]);
   const hiddenTranscriptCount = roomLayout === "round" && !transcriptOpen
     ? Math.max(0, visibleMessages.length - shownMessages.length)
     : 0;
@@ -894,7 +915,7 @@ export function DialogArea({
         <div className="relative flex flex-col items-center">
           <div className="relative mb-6">
             <motion.div
-              className="absolute inset-0 rounded-full border border-[var(--color-gold)]/20"
+              className="absolute inset-0 rounded-full border border-[#A9B2BC]/40"
               style={{ width: 180, height: 180 }}
               animate={{ rotate: 360 }}
               transition={{ duration: 18, repeat: Infinity, ease: "linear" }}
@@ -905,7 +926,7 @@ export function DialogArea({
               transition={{ duration: 14, repeat: Infinity, ease: "linear" }}
             />
             <motion.div
-              className="absolute inset-10 rounded-full border border-[var(--color-gold)]/20"
+              className="absolute inset-10 rounded-full border border-[#A9B2BC]/40"
               animate={{ scale: [0.96, 1.04, 0.96], opacity: [0.35, 0.7, 0.35] }}
               transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
             />
@@ -915,8 +936,8 @@ export function DialogArea({
               animate={{ y: [0, -6, 0] }}
               transition={{ duration: 3.2, repeat: Infinity, ease: "easeInOut" }}
             >
-              <div className="absolute inset-0 rounded-full bg-[radial-gradient(circle_at_center,rgba(197,160,89,0.12),rgba(0,0,0,0)_70%)]" />
-              <WerewolfIcon size={56} className="text-[var(--color-gold)]/60 drop-shadow-[0_0_18px_rgba(197,160,89,0.3)]" />
+              <div className="absolute inset-0 rounded-full bg-[radial-gradient(circle_at_center,rgba(169,178,188,0.16),rgba(0,0,0,0)_70%)]" />
+              <WerewolfIcon size={56} className="text-[#F2EDE4]/80" />
             </motion.div>
           </div>
           <motion.div
@@ -925,7 +946,7 @@ export function DialogArea({
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, ease: "easeOut" }}
           >
-            <div className="text-sm font-serif tracking-[0.2em] text-[var(--color-gold)]/80 uppercase">
+            <div className="text-sm font-serif tracking-[0.2em] text-[#F2EDE4]/80 uppercase">
               {t("dialog.emptyState.summoning")}
             </div>
             <div className="text-base font-semibold text-[var(--text-primary)]/85">
@@ -933,7 +954,7 @@ export function DialogArea({
             </div>
             <div className="flex items-center gap-2 text-xs text-[var(--text-muted)]">
               <motion.span
-                className="inline-block w-2 h-2 rounded-full bg-[var(--color-gold)]/60"
+                className="inline-block w-2 h-2 rounded-full bg-[#A9B2BC]"
                 animate={{ scale: [1, 1.4, 1], opacity: [0.4, 0.9, 0.4] }}
                 transition={{ duration: 1.4, repeat: Infinity, ease: "easeInOut" }}
               />
@@ -967,7 +988,7 @@ export function DialogArea({
     : (displayedText || currentSpeaker?.text || "");
   // When human has voted in badge election, show "你已经投票给 x 号" instead of "点击头像投票选警徽"
   const humanBadgeVote = humanPlayer ? gameState.badge.votes[humanPlayer.playerId] : undefined;
-  const dialogueText =
+  const rawDialogueText =
     phase === "DAY_BADGE_ELECTION" &&
     humanPlayer &&
     typeof humanBadgeVote === "number" &&
@@ -977,7 +998,13 @@ export function DialogArea({
           return t("dialog.alreadyVotedFor", { seat: humanBadgeVote + 1, name: vp?.displayName || "" });
         })()
       : baseDialogueText;
-  const shouldShowDialogue = waitingForNextRound || dialogueText.trim().length > 0;
+  const dialogueText = redactNightRoleLeak(rawDialogueText);
+  const hostLineAlreadyPosted = Boolean(
+    dialogueText
+    && (dialogueText === t("system.dayBreak") || dialogueText === t("system.peacefulNight"))
+    && visibleMessages.some((message) => message.isSystem && message.content === dialogueText)
+  );
+  const shouldShowDialogue = !hostLineAlreadyPosted && (waitingForNextRound || dialogueText.trim().length > 0);
   const isNightActionPhase = [
     "NIGHT_GUARD_ACTION",
     "NIGHT_WOLF_ACTION",
@@ -1047,12 +1074,13 @@ export function DialogArea({
     && selectedSeat === null
     && !(phase === "NIGHT_WITCH_ACTION" && humanPlayer?.role === "Witch" && !isWaitingForAI);
 
+  const voteBarConfirm = showActionConfirm && (phase === "DAY_VOTE" || phase === "DAY_BADGE_ELECTION");
   const shouldShowDialogPanel = showGameEnd
     || showBadgeSignup
     || showBadgeSignupWaiting
     || showBadgeTransferOption
     || showHunterPassOption
-    || showActionConfirm
+    || (showActionConfirm && !voteBarConfirm)
     || showWitchPanel
     || showWolfSkip
     || showHumanInput
@@ -1060,12 +1088,12 @@ export function DialogArea({
     || showNightWaiting;
 
   return (
-    <div className={cn("wc-dialog-area h-full w-full flex flex-col min-h-0 justify-start", roomLayout === "round" && "lh-dialog-round")}>
+    <div className={cn("wc-dialog-area h-full w-full flex flex-col min-h-0 justify-start", roomLayout === "round" && "lh-dialog-round", voteBarConfirm && "pb-[76px]")}>
       {/* 上方区域：左侧立绘 + 右侧历史记录 */}
       <div className={cn(
         "w-full",
         roomLayout === "round"
-          ? (transcriptOpen ? "flex-1 min-h-0 px-3 pt-2" : "shrink-0 px-3 pt-2")
+          ? (transcriptOpen ? "flex-1 min-h-0 px-3 pt-2" : "min-h-0 flex-1 md:flex-none md:shrink-0 px-3 pt-2")
           : "flex-1 min-h-0 -mb-1"
       )}>
         <div className={cn(
@@ -1090,7 +1118,8 @@ export function DialogArea({
           {/* 右侧：聊天历史记录 */}
           <div className={cn(
             "wc-dialog-history flex-1 min-w-0 relative",
-            roomLayout === "round" && !transcriptOpen && "h-[156px]",
+            roomLayout === "round" && !transcriptOpen && "lh-transcript-peek",
+            roomLayout === "round" && !transcriptOpen && keyboardOpen && "lh-transcript-peek--keyboard",
             roomLayout === "round" && transcriptOpen && "h-full min-h-0",
             roomLayout !== "round" && "min-h-0"
           )}>
@@ -1110,7 +1139,7 @@ export function DialogArea({
                     ? "border-white/15 bg-black/25 text-white/75 hover:bg-black/35 hover:text-white"
                     : "border-[var(--border-color)] bg-white/75 text-[var(--text-secondary)] hover:border-[var(--color-accent)] hover:text-[var(--color-accent)]",
                   isEventLogOpen && (isNight
-                    ? "border-[var(--color-gold)]/40 text-[var(--color-gold)]"
+                    ? "border-[#A9B2BC] text-[#F2EDE4]"
                     : "border-[var(--color-accent)] text-[var(--color-accent)]")
                 )}
               >
@@ -1123,7 +1152,7 @@ export function DialogArea({
               ref={historyRef}
               className={cn(
                 "absolute inset-0 overflow-y-scroll pb-4 scrollbar-hide transition-opacity duration-200",
-                roomLayout === "round" ? "pt-12" : "pt-10",
+                roomLayout === "round" ? (keyboardOpen ? "pt-8" : "pt-12") : "pt-10",
                 isEventLogOpen && "pointer-events-none opacity-0"
               )}
               style={{
@@ -1181,7 +1210,7 @@ export function DialogArea({
             
             {/* 新消息提示：底部分割线 + 文案 */}
             <AnimatePresence>
-              {unreadCount > 0 && !isAtBottom && !isEventLogOpen && (
+              {unreadCount > 0 && !isAtBottom && !isEventLogOpen && transcriptOpen && (
                 <motion.div
                   initial={{ opacity: 0, y: 10, scale: 0.9 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -1221,10 +1250,10 @@ export function DialogArea({
       </div>
 
       {/* 下方：对话框 - 固定在底部 */}
-      <div className="wc-dialog-bottom mt-auto shrink-0 px-4 lg:px-6 pb-4 lg:pb-6 pt-0">
+      <div className="wc-dialog-bottom lh-action-dock mt-auto shrink-0 px-4 lg:px-6 pb-4 lg:pb-6 pt-0">
         {/* 投票进度 */}
-        {(gameState.phase === "DAY_VOTE" || gameState.phase === "DAY_BADGE_ELECTION") && (
-          <div className="mb-3 bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg p-3">
+        {(gameState.phase === "DAY_VOTE" || gameState.phase === "DAY_BADGE_ELECTION") && selectedSeat === null && (
+          <div className="lh-vote-progress mb-3 bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg p-3">
             <div className="text-sm font-semibold text-[var(--text-primary)] mb-2 flex items-center gap-2">
               <span className="w-2 h-2 bg-[var(--color-accent)] rounded-full animate-pulse" />
               {gameState.phase === "DAY_BADGE_ELECTION" ? t("dialog.badgeElectionInProgress") : t("dialog.voteInProgress")}
@@ -1249,7 +1278,7 @@ export function DialogArea({
         {/* 对话气泡 - 简化结构，移除嵌套 */}
         <div
           className={cn(
-            "wc-panel wc-panel--strong rounded-xl p-5 relative transition-opacity min-h-[160px]",
+            "wc-panel wc-panel--strong rounded-xl p-5 relative transition-opacity min-h-0 md:min-h-[160px]",
             shouldShowDialogPanel
               ? "opacity-100"
               : "opacity-0 pointer-events-none bg-transparent border-transparent shadow-none"
@@ -1455,6 +1484,7 @@ export function DialogArea({
               {/* 选择确认面板 - 文字形式 */}
               {(() => {
                 if (!showActionConfirm || selectedSeat === null) return null;
+                if (phase === "DAY_VOTE" || phase === "DAY_BADGE_ELECTION") return null;
 
                 const targetPlayer = gameState.players.find(p => p.seat === selectedSeat);
                 const targetName = targetPlayer ? t("ui.seatWithName", { seat: selectedSeat + 1, name: targetPlayer.displayName }) : t("ui.seatOnly", { seat: selectedSeat + 1 });
@@ -1494,10 +1524,10 @@ export function DialogArea({
                     <div className="text-lg leading-relaxed text-[var(--text-primary)]">
                       {t("dialog.actionConfirmQuestion", { action: actionText })} <span className={`font-semibold ${actionColor}`}>{targetName}</span>
                     </div>
-                    <div className={`flex items-center justify-end gap-3 mt-4 pt-3 border-t ${isNight ? "border-white/10" : "border-black/5"}`}>
+                    <div className={`lh-action-confirm flex items-center justify-end gap-3 mt-4 pt-3 border-t ${isNight ? "border-white/10" : "border-black/5"}`}>
                       <button
                         onClick={onCancelSelection}
-                        className="wc-action-btn text-sm h-9 px-4"
+                        className="wc-action-btn text-sm h-9 px-4 shrink-0"
                         type="button"
                       >
                         <X size={14} weight="bold" />
@@ -1505,7 +1535,8 @@ export function DialogArea({
                       </button>
                       <button
                         onClick={onConfirmAction}
-                        className={`wc-action-btn text-sm h-9 px-4 ${phase.includes("WOLF") || phase === "HUNTER_SHOOT" ? "wc-action-btn--danger" : "wc-action-btn--primary"}`}
+                        data-testid="action-confirm"
+                        className={`wc-action-btn text-sm h-9 px-4 shrink-0 ${phase.includes("WOLF") || phase === "HUNTER_SHOOT" ? "wc-action-btn--danger" : "wc-action-btn--primary"}`}
                         type="button"
                       >
                         {t("dialog.actionConfirm", { action: actionText })}
@@ -1659,7 +1690,7 @@ export function DialogArea({
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -10 }}
-                  className="space-y-3"
+                  className="space-y-3 min-w-0"
                 >
                   {/* 白狼王自爆按钮 - 在发言阶段显示 */}
                   {humanPlayer?.role === "WhiteWolfKing" && humanPlayer?.alive && !gameState.roleAbilities.whiteWolfKingBoomUsed && ["DAY_SPEECH", "DAY_BADGE_SPEECH", "DAY_PK_SPEECH"].includes(phase) && (
@@ -1674,30 +1705,31 @@ export function DialogArea({
                       </button>
                     </div>
                   )}
-                  <div className="wc-input-box relative" style={{ minHeight: "112px", alignItems: "flex-start", padding: "14px 16px 56px" }}>
-                    <MentionInput
-                      key={`mention-input-${gameState.phase}-${gameState.currentSpeakerSeat}`}
-                      value={inputText}
-                      onChange={(t) => onInputChange?.(t)}
-                      onSend={() => onSendMessage?.()}
-                      onFinishSpeaking={onFinishSpeaking}
-                      onVoiceHoldPrepare={() => {
-                        voiceRecorderRef.current?.prepare();
-                      }}
-                      onVoiceHoldStart={() => {
-                        voiceRecorderRef.current?.start();
-                      }}
-                      onVoiceHoldEnd={() => {
-                        voiceRecorderRef.current?.stop();
-                      }}
-                      placeholder={gameState.phase === "DAY_LAST_WORDS" ? t("dialog.input.lastWordsPlaceholder") : t("dialog.input.defaultPlaceholder")}
-                      isNight={isNight}
-                      isGenshinMode={isGenshinMode}
-                      players={gameState.players.filter((p) => p.alive)}
-                    />
-                    
-                    {/* 底部按钮栏 - 在输入框内部右下角 */}
-                    <div className="absolute bottom-3 right-3 flex items-center gap-2">
+                  <div className="wc-composer-row">
+                    <div className="wc-input-box">
+                      <MentionInput
+                        key={`mention-input-${gameState.phase}-${gameState.currentSpeakerSeat}`}
+                        value={inputText}
+                        onChange={(t) => onInputChange?.(t)}
+                        onSend={() => onSendMessage?.()}
+                        onFinishSpeaking={onFinishSpeaking}
+                        onVoiceHoldPrepare={() => {
+                          voiceRecorderRef.current?.prepare();
+                        }}
+                        onVoiceHoldStart={() => {
+                          voiceRecorderRef.current?.start();
+                        }}
+                        onVoiceHoldEnd={() => {
+                          voiceRecorderRef.current?.stop();
+                        }}
+                        placeholder={gameState.phase === "DAY_LAST_WORDS" ? t("dialog.input.lastWordsPlaceholder") : t("dialog.input.defaultPlaceholder")}
+                        isNight={isNight}
+                        isGenshinMode={isGenshinMode}
+                        players={gameState.players.filter((p) => p.alive && p.playerId !== humanPlayer?.playerId)}
+                      />
+                    </div>
+
+                    <div className="wc-composer-actions">
                       <VoiceRecorder
                         ref={voiceRecorderRef}
                         disabled={!isHumanTurn}
@@ -1712,7 +1744,8 @@ export function DialogArea({
                       <button
                         onClick={onSendMessage}
                         disabled={!inputText?.trim()}
-                        className="h-8 px-3 rounded text-xs font-medium bg-[var(--color-gold)] text-[#1a1614] hover:bg-[#d4b06a] disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center gap-1.5 cursor-pointer"
+                        data-testid="speech-send"
+                        className="h-8 px-3 rounded text-xs font-medium bg-[#1A1714] text-[#F2EDE4] border border-[#A9B2BC] hover:bg-[#241f1b] disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center gap-1.5 cursor-pointer shrink-0"
                         title={t("dialog.input.send")}
                       >
                         <PaperPlaneTilt size={14} weight="fill" />
@@ -1721,7 +1754,7 @@ export function DialogArea({
 
                       <button
                         onClick={handleFinishSpeaking}
-                        className="h-8 px-3 rounded text-xs font-medium border border-[var(--color-gold)]/50 text-[var(--color-gold)] bg-transparent hover:bg-[var(--color-gold)]/10 transition-all flex items-center gap-1.5 cursor-pointer"
+                        className="h-8 px-3 rounded text-xs font-medium border border-[#A9B2BC] text-[#F2EDE4] bg-[#1A1714] hover:bg-[#241f1b] transition-all flex items-center gap-1.5 cursor-pointer shrink-0"
                         title={t("dialog.input.finishSpeech")}
                       >
                         <CheckCircle size={14} weight="fill" />
@@ -1752,18 +1785,18 @@ export function DialogArea({
                               className="w-full h-full object-cover"
                             />
                           </div>
-                          <div className={cn("text-sm font-semibold", currentSpeaker.player.isHuman ? "text-[var(--color-gold)]" : "text-[var(--text-primary)]")}>
+                          <div className="text-sm font-semibold text-[var(--text-primary)]">
                             {playerTitle(currentSpeaker.player.seat, currentSpeaker.player.displayName)}
                           </div>
                         </div>
-                        <div className={cn("hidden md:block text-base font-bold mb-2 font-serif tracking-wide", currentSpeaker.player.isHuman ? "text-[var(--color-gold)]" : "text-[var(--text-primary)]")}>
+                        <div className="hidden md:block text-base font-bold mb-2 font-serif tracking-wide text-[var(--text-primary)]">
                           {playerTitle(currentSpeaker.player.seat, currentSpeaker.player.displayName)}
                         </div>
                       </>
                     )}
                     
                     {/* 对话内容 - 带玩家标签，逐字输入效果，文字调大；流式时也用 * 渲染斜体 */}
-                    <div className="text-xl leading-relaxed text-[var(--text-primary)] flex-1 pr-1 whitespace-pre-wrap break-words">
+                    <div className="lh-speech-scroll text-xl leading-relaxed text-[var(--text-primary)] flex-1 pr-1 whitespace-pre-wrap break-words">
                       {isTyping ? (
                         renderStreamingMarkdown(
                           waitingForNextRound ? t("dialog.nextRoundHint") : dialogueText,
@@ -1857,6 +1890,31 @@ export function DialogArea({
           )}
         </div>
       </div>
+      {voteBarConfirm && selectedSeat !== null && (() => {
+        const targetPlayer = gameState.players.find((player) => player.seat === selectedSeat);
+        const target = targetPlayer
+          ? playerTitle(selectedSeat, targetPlayer.displayName)
+          : t("ui.seatOnly", { seat: selectedSeat + 1 });
+        return (
+          <div className="lh-vote-bar" data-testid="vote-bar">
+            <button
+              type="button"
+              onClick={onCancelSelection}
+              className="lh-vote-bar__cancel"
+            >
+              {t("dialog.cancel")}
+            </button>
+            <button
+              type="button"
+              onClick={onConfirmAction}
+              data-testid="action-confirm"
+              className="lh-vote-bar__confirm"
+            >
+              {t("dialog.confirmVoteTarget", { target })}
+            </button>
+          </div>
+        );
+      })()}
     </div>
   );
 }
@@ -1949,7 +2007,7 @@ function ChatMessageItem({
       <div className="flex justify-center my-3">
         <div className="text-xs text-center py-2 px-4 rounded-lg border text-[var(--text-secondary)] bg-[var(--glass-bg-weak)] border-[var(--glass-border)]">
           <MentionsMarkdown
-            content={msg.content}
+            content={redactNightRoleLeak(msg.content)}
             players={players}
             isNight={isNight}
             isGenshinMode={isGenshinMode}
@@ -1995,7 +2053,7 @@ function ChatMessageItem({
         )}>
           <div className={cn(
             "mb-1 text-xs font-serif font-bold",
-            isHuman ? "text-[var(--color-gold)]" : "text-[var(--text-primary)]"
+            "text-[var(--text-primary)]"
           )}>
             {player ? playerTitle(player.seat, player.displayName) : msg.playerName}
           </div>

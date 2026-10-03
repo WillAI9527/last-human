@@ -55,11 +55,80 @@ test("清队列不会先启动下一条旧语音，失效任务不播放", async
   } finally { h.restore(); }
 });
 
+test("TTS 遇到 503、403、429 或超时时静默跳过，并中止未完成的请求", async (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const { AudioManager } = await import("./audio-manager");
+  const manager = new AudioManager();
+  manager.setEnabled(true);
+  manager.isEnabled = () => true;
+  const originalFetch = globalThis.fetch;
+  const originalError = console.error;
+  const errors: unknown[] = [];
+  console.error = (...args: unknown[]) => { errors.push(args); };
+  const calls: Array<{ status: number; signal?: AbortSignal | null }> = [];
+  const script = [503, 403, 429, 0];
+  globalThis.fetch = async (input, init) => {
+    const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+    if (url.endsWith("/api/demo-config")) {
+      return Response.json({ active: false, enabled: false });
+    }
+    if (!url.includes("/api/tts")) {
+      return Response.json({});
+    }
+    const status = script[calls.length] ?? 503;
+    calls.push({ status, signal: init?.signal });
+    if (status === 0) {
+      return new Promise<Response>((_resolve, reject) => {
+        const signal = init?.signal;
+        const onAbort = () => reject(signal?.reason instanceof Error ? signal.reason : new Error("aborted"));
+        if (signal?.aborted) onAbort();
+        else signal?.addEventListener("abort", onAbort, { once: true });
+      });
+    }
+    return new Response("unavailable", { status });
+  };
+  const task = (id: string) => ({ id, text: id, voiceId: "voice", playerId: "player" });
+  const untilSettled = async (pending: Promise<boolean>, budgetMs: number) => {
+    let settled: { value: boolean } | undefined;
+    void pending.then((value) => { settled = { value }; }, () => { settled = { value: false }; });
+    for (let elapsed = 0; !settled && elapsed <= budgetMs; elapsed += 500) {
+      t.mock.timers.tick(500);
+      for (let i = 0; i < 8; i += 1) await Promise.resolve();
+    }
+    assert.ok(settled, "TTS should settle inside its budget");
+    return settled.value;
+  };
+  try {
+    assert.equal(await untilSettled(manager.ensureReady(task("503")), 15_000), false);
+    assert.equal(await untilSettled(manager.ensureReady(task("403")), 15_000), false);
+    assert.equal(await untilSettled(manager.ensureReady(task("429")), 15_000), false);
+    const hanging = manager.ensureReady(task("timeout"));
+    let settled = false;
+    void hanging.then(() => { settled = true; });
+    for (let elapsed = 0; elapsed < 11_000; elapsed += 1_000) {
+      t.mock.timers.tick(1_000);
+      for (let i = 0; i < 8; i += 1) await Promise.resolve();
+    }
+    assert.equal(settled, false);
+    assert.equal(await untilSettled(hanging, 3_000), false);
+    assert.equal(calls.at(-1)?.signal?.aborted, true);
+    const queued = manager.ensureReady(task("queued-skip"));
+    manager.addToQueue(task("queued-skip"));
+    assert.equal(await untilSettled(queued, 15_000), false);
+    assert.equal(errors.length, 0);
+  } finally {
+    console.error = originalError;
+    globalThis.fetch = originalFetch;
+    manager.clearQueue();
+    t.mock.timers.reset();
+  }
+});
+
 test("旧 TTS 加载失败不能清掉已开始的新语音任务", async () => {
   const h = await setup();
   let rejectOld!: (error: Error) => void;
   h.manager.ensureReady = (task) => task.id === "旧加载"
-    ? new Promise<void>((_, reject) => { rejectOld = reject; }) : Promise.resolve();
+    ? new Promise<boolean>((_, reject) => { rejectOld = reject; }) : Promise.resolve(true);
   try {
     h.manager.addToQueue(h.task("旧加载", "a:0"));
     h.manager.clearQueue();

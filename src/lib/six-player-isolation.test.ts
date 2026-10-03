@@ -126,6 +126,9 @@ for (const locale of ["zh", "en"] as const) {
       for (const phase of ["DAY_SPEECH", "DAY_VOTE"] as Phase[]) {
         for (const { seat, full } of await promptsFor(phase)) {
           assert.doesNotMatch(full, /警长[是为：:]\s*\d+号|current sheriff is Seat \d+/i, `${phase} ${seat + 1}号 出现了警长`);
+          if (phase === "DAY_SPEECH") {
+            assert.match(full, locale === "zh" ? /没有警长竞选/ : /no sheriff election/i);
+          }
         }
       }
     } finally { setLocale("zh"); }

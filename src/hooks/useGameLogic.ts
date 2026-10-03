@@ -2299,6 +2299,7 @@ export function useGameLogic() {
     if (currentSegment && currentSegment.trim().length > 0 && !isCurrentSegmentCommitted()) {
       nextState = addPlayerMessage(nextState, player.playerId, currentSegment, {
         id: queue.request ? `${queue.request.id}:${currentIndex}` : undefined,
+        segmentIndex: currentIndex,
       });
       setGameState(nextState);
       markCurrentSegmentCommitted();

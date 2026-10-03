@@ -50,8 +50,8 @@ Wolfcha 诞生于 **观猹 × 魔搭环球黑客松**。名字由 **Wolf（狼�
 需要安装 Node.js 和 [pnpm](https://pnpm.io/)。
 
 ```bash
-git clone https://github.com/oil-oil/wolfcha.git
-cd wolfcha
+git clone https://github.com/WillAI9527/last-human.git
+cd last-human
 pnpm install
 cp .env.example .env.local
 pnpm dev

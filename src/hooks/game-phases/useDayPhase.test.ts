@@ -29,7 +29,7 @@ function harness(tts = false) {
   let serial = 0;
   let organizingTimeout: (() => void) | undefined;
   const scheduleTimeout = (fn: () => void, ms: number) => {
-    if (ms === 60000) organizingTimeout = fn;
+    if (ms === 45000) organizingTimeout = fn;
     return setTimeout(fn, ms);
   };
   const requireMock = (id: string): any => {
@@ -62,7 +62,10 @@ function harness(tts = false) {
     if (id === "@/lib/llm") return { isGameSessionExpiredMessage: () => false };
     if (id === "@/lib/utils") return { generateUUID: () => `request-${++serial}` };
     if (id === "@/lib/speech-request") return speechRequest;
-    if (id === "@/lib/request-timeout") return { withTimeout };
+    if (id === "@/lib/request-timeout") return { withTimeout, GAMEPLAY_CALL_DEADLINE_MS: 45000 };
+    if (id === "@/lib/speech-fallback") return {
+      pickFallbackSpeech: (_name: string, used: string[] = []) => ({ line: "我再听听，先过。", used: [...used, "我再听听，先过。"] }),
+    };
     throw new Error(`未配置依赖 ${id}`);
   };
   const load = (file: string) => {
@@ -171,38 +174,66 @@ test("首段已收到但 TTS 尚未就绪时超时，仍给出可推进的兜底
     h.timeout();
     await running;
     const queue = h.dialogue.getSpeechQueue();
-    assert.deepEqual([...queue.segments], ["dayPhase.timeout"]);
+    assert.deepEqual([...queue.segments], ["我再听听，先过。"]);
     assert.equal(queue.isFinalized, true);
     h.readiness.get("等待语音的首段")!.resolve();
     await tick();
-    assert.deepEqual([...queue.segments], ["dayPhase.timeout"]);
+    assert.deepEqual([...queue.segments], ["我再听听，先过。"]);
     assert.deepEqual(h.audio, []);
   } finally { h.dispose(); }
 });
 
 
-test("发言失败先静默重试一次，再次失败才暂停，错误不作为角色台词", async () => {
+test("发言失败不出现报错横幅和重试按钮，直接用兜底台词继续", async () => {
   const h = harness();
   try {
     const running = h.day.runAISpeech(h.state, h.first);
     h.pending[0].reject(new Error("公开发言格式恢复失败"));
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    assert.equal(h.failures.length, 0);
-    assert.equal(h.pending.length, 1);
-    await new Promise((resolve) => setTimeout(resolve, 700));
-    assert.equal(h.pending.length, 2);
-    assert.equal(h.failures.length, 0);
-    h.pending[1].reject(new Error("公开发言格式恢复失败"));
     await running;
-    assert.equal(h.day.isSpeechBlocked(), true);
-    assert.deepEqual([...h.dialogue.getSpeechQueue().segments], []);
-    assert.equal(h.failures.length, 1);
-    h.failures[0].action.onClick();
-    assert.equal(h.pending.length, 3);
+    assert.equal(h.pending.length, 1);
+    assert.equal(h.failures.length, 0);
     assert.equal(h.day.isSpeechBlocked(), false);
-    h.pending[2].options.onSegmentReceived("重试后的公开发言", 0);
-    h.pending[2].resolve(["重试后的公开发言"]);
-    await tick();
-    assert.deepEqual([...h.dialogue.getSpeechQueue().segments], ["重试后的公开发言"]);
+    const queue = h.dialogue.getSpeechQueue();
+    assert.deepEqual([...queue.segments], ["我再听听，先过。"]);
+    assert.equal(queue.isFinalized, true);
+    assert.equal(JSON.stringify(h.dialogue).includes("发言生成失败"), false);
+    assert.equal(JSON.stringify(h.dialogue).includes("重试发言"), false);
   } finally { h.dispose(); }
+});
+
+test("同一座位同一段落的重试替换队列，不追加第二句", async () => {
+  const h = harness();
+  try {
+    const running = h.day.runAISpeech(h.state, h.first);
+    h.pending[0].options.onSegmentReceived("半句", 0);
+    await tick();
+    h.pending[0].options.onSegmentReceived("完整的一句。", 0);
+    await tick();
+    assert.deepEqual([...h.dialogue.getSpeechQueue().segments], ["完整的一句。"]);
+    h.pending[0].resolve(["完整的一句。"]);
+    await running;
+    assert.equal(h.dialogue.getSpeechQueue().isFinalized, true);
+    assert.deepEqual([...h.dialogue.getSpeechQueue().segments], ["完整的一句。"]);
+  } finally { h.dispose(); }
+});
+
+test("发言请求一直不返回时，45 秒内改用兜底台词并中止请求", async (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const h = harness();
+  try {
+    const running = h.day.runAISpeech(h.state, h.first);
+    t.mock.timers.tick(44_000);
+    for (let i = 0; i < 8; i += 1) await Promise.resolve();
+    assert.equal(h.dialogue.getSpeechQueue().isFinalized, false);
+    assert.equal(h.pending[0].options.signal.aborted, false);
+    t.mock.timers.tick(1_000);
+    await running;
+    assert.equal(h.pending[0].options.signal.aborted, true);
+    assert.deepEqual([...h.dialogue.getSpeechQueue().segments], ["我再听听，先过。"]);
+    assert.equal(h.dialogue.getSpeechQueue().isFinalized, true);
+    assert.equal(h.failures.length, 0);
+  } finally {
+    h.dispose();
+    t.mock.timers.reset();
+  }
 });

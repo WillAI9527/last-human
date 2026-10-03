@@ -164,6 +164,8 @@ export interface ChatMessage {
   phase?: Phase;
   isSystem?: boolean;
   isStreaming?: boolean;
+  /** Public speech slot. Retries replace the same day, phase, seat, and index. */
+  segmentIndex?: number;
   speechRound?: number;
   pkSource?: "badge" | "vote";
   isLastWords?: boolean;  // Flag for last words (遗言) messages
@@ -256,6 +258,8 @@ export interface GameState {
   dailySummaries: Record<number, string[]>; // day -> summary bullet list
   dailySummaryFacts: Record<number, DailySummaryFact[]>; // day -> structured facts
   dailySummaryVoteData?: Record<number, DailySummaryVoteData>;
+  /** Fallback lines already spoken this game, so the same sentence is not reused. */
+  usedFallbackLines?: string[];
   nightActions: {
     guardTarget?: number;        // 守卫保护的目标
     lastGuardTarget?: number;    // 上一晚守卫保护的目标（不能连续保护同一人）

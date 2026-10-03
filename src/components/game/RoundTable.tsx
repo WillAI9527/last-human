@@ -62,7 +62,9 @@ export function RoundTable({
 
   const count = players.length || 6;
   const humanSeat = players.find((player) => player.isHuman)?.seat ?? humanPlayer?.seat ?? 0;
-  const radius = Math.min(size.w, size.h) * 0.4;
+  const cardReach = 76;
+  const fitRadius = Math.max(36, Math.min(size.w, size.h) / 2 - cardReach);
+  const radius = Math.min(Math.min(size.w, size.h) * 0.38, fitRadius);
 
   const renderCard = (player: Player, index: number) => {
     const checkResult =
@@ -108,7 +110,11 @@ export function RoundTable({
     });
     return (
       <div ref={frameRef} className={cn("lh-roundtable lh-roundtable--strip", visualIsNight && "lh-roundtable--night")}>
-        {strip.map((player, index) => renderCard(player, index))}
+        {strip.map((player, index) => (
+          <div key={player.playerId} className="lh-round-seat" data-testid={`seat-${player.seat}`}>
+            {renderCard(player, index)}
+          </div>
+        ))}
       </div>
     );
   }
@@ -133,6 +139,7 @@ export function RoundTable({
           <div
             key={player.playerId}
             className="lh-round-seat"
+            data-testid={`seat-${player.seat}`}
             style={{ left: x, top: y, zIndex: speaking ? 5 : 2 }}
           >
             {renderCard(player, index)}

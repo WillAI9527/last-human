@@ -434,6 +434,7 @@ const buildVoteGroupsFromSeatTargets = (
 };
 
 const shouldIncludeHistoricalSystemLine = (content: string): boolean => {
+  const { t } = getI18n();
   const systemMessages = getSystemMessages();
   const systemPatterns = getSystemPatterns();
   const excluded = new Set([
@@ -453,6 +454,11 @@ const shouldIncludeHistoricalSystemLine = (content: string): boolean => {
     systemMessages.wolfActionStart,
     systemMessages.witchActionStart,
     systemMessages.seerActionStart,
+    t("system.publicNightAction"),
+    t("ui.guardActing"),
+    t("ui.wolfActing"),
+    t("ui.witchActing"),
+    t("ui.seerChecking"),
   ]);
 
   if (!content || content.startsWith("[VOTE_RESULT]") || excluded.has(content)) return false;

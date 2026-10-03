@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { UserCircle } from "@phosphor-icons/react";
 import type { ModelRef, Player, Role } from "@/types/game";
 import { buildSimpleAvatarUrl, getModelLogoUrl } from "@/lib/avatar-config";
+import { ModelBadge } from "@/components/game/ModelBadge";
 import { useTranslations } from "next-intl";
 import {
   WerewolfIcon,
@@ -97,15 +98,18 @@ export function RoleRevealHistoryCard({
                 isNight ? "bg-white/5 border-white/10" : "bg-white border-[var(--border-color)]"
               }`}
             >
-              {matchedPlayer ? (
-                <img
-                  src={getPlayerAvatarUrl(matchedPlayer, isGenshinMode)}
-                  alt={displayName}
-                  className="w-11 h-11 rounded-full object-cover"
-                />
-              ) : (
-                <div className="w-11 h-11 rounded-full bg-black/10" aria-hidden="true" />
-              )}
+              <div className="relative shrink-0">
+                {matchedPlayer ? (
+                  <img
+                    src={getPlayerAvatarUrl(matchedPlayer, isGenshinMode)}
+                    alt={displayName}
+                    className="w-11 h-11 rounded-full object-cover"
+                  />
+                ) : (
+                  <div className="w-11 h-11 rounded-full bg-black/10" aria-hidden="true" />
+                )}
+                {modelRef && <ModelBadge modelRef={modelRef} />}
+              </div>
 
               <div className="min-w-0 flex-1">
                 <div className="flex items-start justify-between gap-4">
@@ -128,16 +132,9 @@ export function RoleRevealHistoryCard({
 
                   <div className="flex items-center gap-2 text-[10px] text-[var(--text-muted)] shrink-0">
                     {modelRef ? (
-                      <>
-                        <img
-                          src={getModelLogoUrl(modelRef)}
-                          alt={modelRef.model}
-                          className="w-4 h-4 object-contain"
-                        />
-                        <span className="truncate max-w-[220px]" title={modelRef.model}>
-                          {modelRef.model}
-                        </span>
-                      </>
+                      <span className="truncate max-w-[220px]" title={modelRef.model}>
+                        {modelRef.model}
+                      </span>
                     ) : (
                       <>
                         <UserCircle size={12} />

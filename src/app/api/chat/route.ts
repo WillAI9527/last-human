@@ -37,6 +37,17 @@ import {
   normalizeReasoningProfile,
   resolveReasoning,
 } from "@/lib/reasoning-profile";
+import {
+  createChatRequestLog,
+  extractChatTokenUsage,
+  logChatRequest,
+  NORMAL_ATTEMPT_TIMEOUT_MS,
+  normalizeChatCallType,
+  openUpstreamAttempt,
+  upstreamFailureStatus,
+  type ChatCallType,
+  type ChatRequestLog,
+} from "@/lib/chat-request-log";
 
 // 9 人完整角色画像的正常流式输出实测可超过 80 秒。未启用 Fluid
 // Compute 的 Vercel 项目默认上限可能只有 60 秒，必须显式放宽；这只延长
@@ -51,8 +62,6 @@ const ZENMUX_API_URL = "https://zenmux.ai/api/v1/chat/completions";
 const DASHSCOPE_API_BASE_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1";
 const DASHSCOPE_CHAT_COMPLETIONS_URL = `${DASHSCOPE_API_BASE_URL}/chat/completions`;
 
-// API 调用超时时间（毫秒）
-const API_TIMEOUT_MS = 60000;
 const MAX_BATCH_REQUESTS = 12;
 
 const REQUEST_ID_HEADER = "X-Request-ID";
@@ -70,9 +79,11 @@ type AttemptContext = {
   provider: Provider;
   model: string;
   promptScope: PromptScope;
+  callType: ChatCallType;
   mode: "completion" | "batch" | "stream";
   startedAt: number;
   inputChars: number;
+  log: ChatRequestLog;
 };
 
 type AttemptOutcome = "success" | "http_error" | "network_error" | "cancelled" | "interrupted" | "error";
@@ -155,10 +166,15 @@ async function recordAttempt(context: AttemptContext, outcome: AttemptOutcome, e
   }
 }
 
+function requestSignal(init: RequestInit): AbortSignal | undefined {
+  return init.signal instanceof AbortSignal ? init.signal : undefined;
+}
+
 async function fetchProvider(url: string, init: RequestInit, context: AttemptContext): Promise<Response> {
   try {
     const response = await fetch(url, init);
     if (!response.ok) {
+      logChatRequest(context.log, response.status);
       await recordAttempt(context, "http_error", {
         httpStatus: response.status,
         errorCode: `http_${response.status}`,
@@ -166,21 +182,94 @@ async function fetchProvider(url: string, init: RequestInit, context: AttemptCon
     }
     return response;
   } catch (error) {
+    const signal = requestSignal(init);
+    const status = upstreamFailureStatus(signal);
+    logChatRequest(context.log, status);
+    const aborted = error instanceof Error && (error.name === "AbortError" || error.name === "TimeoutError");
     await recordAttempt(context, "network_error", {
-      errorCode: error instanceof DOMException && error.name === "AbortError" ? "aborted" : "network_error",
+      errorCode: status === "timeout" ? "timeout" : aborted ? "aborted" : "network_error",
     });
     throw error;
   }
 }
 
-async function trackedStreamResponse(response: Response, context: AttemptContext): Promise<Response> {
+async function readProviderJson(
+  response: Response,
+  context: AttemptContext,
+  signal: AbortSignal,
+): Promise<unknown> {
+  try {
+    const result = await response.json();
+    logChatRequest(context.log, response.status, extractChatTokenUsage(result));
+    await recordAttempt(context, "success", responseUsage(result));
+    return result;
+  } catch (error) {
+    logChatRequest(context.log, signal.aborted ? upstreamFailureStatus(signal) : response.status);
+    await recordAttempt(context, "error", {
+      errorCode: signal.aborted
+        ? (signal.reason === "timeout" ? "timeout" : "aborted")
+        : "invalid_response",
+    });
+    throw error;
+  }
+}
+
+type UpstreamCall = {
+  response: Response;
+  signal: AbortSignal;
+  release: () => void;
+};
+
+async function fetchUpstream(
+  url: string,
+  init: Omit<RequestInit, "signal">,
+  context: AttemptContext,
+  parentSignal: AbortSignal | undefined,
+  timeoutMs: number,
+): Promise<UpstreamCall> {
+  const upstream = openUpstreamAttempt(parentSignal, timeoutMs);
+  try {
+    const response = await fetchProvider(url, { ...init, signal: upstream.signal }, context);
+    upstream.releaseTimer();
+    return { response, signal: upstream.signal, release: () => upstream.dispose() };
+  } catch (error) {
+    upstream.dispose();
+    throw error;
+  }
+}
+
+function releaseAfterAbort(response: Response, signal: AbortSignal, release: () => void): () => void {
+  const cancel = () => {
+    response.body?.cancel().catch(() => undefined);
+  };
+  if (signal.aborted) cancel();
+  else signal.addEventListener("abort", cancel, { once: true });
+  return () => {
+    signal.removeEventListener("abort", cancel);
+    release();
+  };
+}
+
+async function trackedStreamResponse(
+  response: Response,
+  context: AttemptContext,
+  onSettled?: () => void,
+): Promise<Response> {
+  const settle = () => {
+    onSettled?.();
+  };
   if (!response.body) {
+    logChatRequest(context.log, response.status);
+    settle();
     await recordAttempt(context, "error", { errorCode: "missing_response_body" });
     return new Response(null, { status: response.status, headers: response.headers });
   }
-  return trackSseAttempt(response, ({ outcome, outputChars, errorCode }) =>
-    recordAttempt(context, outcome, { outputChars, errorCode })
-  );
+  return trackSseAttempt(response, ({ outcome, outputChars, errorCode, usage }) => {
+    const status = outcome === "cancelled" || errorCode === "aborted" ? "abort" : response.status;
+    logChatRequest(context.log, status, extractChatTokenUsage({ usage }));
+    settle();
+    return recordAttempt(context, outcome, { outputChars, errorCode });
+  });
 }
 
 function normalizePromptScope(value: unknown): PromptScope {
@@ -394,6 +483,7 @@ type ChatRequestPayload = {
   messages: unknown[];
   request_id?: unknown;
   prompt_scope?: PromptScope;
+  call_type?: unknown;
   temperature?: number;
   max_tokens?: number;
   stream?: boolean;
@@ -418,6 +508,7 @@ async function runBatchItem(
   headerTokendanceKey: string | null,
   headerTokendanceBaseUrl: string | null,
   meta: RequestMeta,
+  parentSignal?: AbortSignal,
 ): Promise<
   | { ok: true; data: unknown }
   | {
@@ -455,6 +546,8 @@ async function runBatchItem(
     return { ok: false, status: 400, error: "Invalid chat request" };
   }
 
+  const startedAt = Date.now();
+  const callType = normalizeChatCallType(payload.call_type);
   const context: AttemptContext = {
     userId: meta.userId,
     sessionId: meta.sessionId,
@@ -464,9 +557,11 @@ async function runBatchItem(
     provider: modelProvider,
     model,
     promptScope: normalizePromptScope(payload.prompt_scope),
+    callType,
     mode: "batch",
-    startedAt: Date.now(),
+    startedAt,
     inputChars: countMessageChars(messages),
+    log: createChatRequestLog({ model, attempt: meta.attempt, callType, startedAt }),
   };
 
   const isDefaultModel = PROJECT_MODELS.some((ref) => ref.model === model);
@@ -505,7 +600,7 @@ async function runBatchItem(
   // 思考中的决策调用在返回响应头之前就可能超过普通上限
   const providerTimeoutMs = reasoningProfile === "decision" && effectiveReasoning?.enabled === true
     ? DECISION_TIMEOUT_MS
-    : API_TIMEOUT_MS;
+    : NORMAL_ATTEMPT_TIMEOUT_MS;
 
   let processedMessages: unknown[] = messages;
   if (!supportsMultipartContent(model)) {
@@ -552,47 +647,37 @@ async function runBatchItem(
       requestBody.response_format = response_format;
     }
 
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
+    const upstream = await fetchUpstream(DASHSCOPE_CHAT_COMPLETIONS_URL, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${dashscopeApiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(requestBody),
+    }, context, parentSignal, providerTimeoutMs);
 
-    let response: Response;
     try {
-      response = await fetchProvider(DASHSCOPE_CHAT_COMPLETIONS_URL, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${dashscopeApiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(requestBody),
-        signal: controller.signal,
-      }, context);
-    } finally {
-      clearTimeout(timeoutId);
-    }
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      let parsed: unknown = undefined;
-      try {
-        parsed = JSON.parse(errorText);
-      } catch {
-        // ignore
+      const response = upstream.response;
+      if (!response.ok) {
+        const errorText = await response.text();
+        let parsed: unknown = undefined;
+        try {
+          parsed = JSON.parse(errorText);
+        } catch {
+          // ignore
+        }
+        return {
+          ok: false,
+          status: response.status,
+          error: `DashScope API error: ${response.status}`,
+          details: parsed ?? errorText,
+        };
       }
-      return {
-        ok: false,
-        status: response.status,
-        error: `DashScope API error: ${response.status}`,
-        details: parsed ?? errorText,
-      };
-    }
 
-    try {
-      const result = await response.json();
-      await recordAttempt(context, "success", responseUsage(result));
+      const result = await readProviderJson(response, context, upstream.signal);
       return { ok: true, data: result };
-    } catch (error) {
-      await recordAttempt(context, "error", { errorCode: "invalid_response" });
-      throw error;
+    } finally {
+      upstream.release();
     }
   }
 
@@ -634,50 +719,40 @@ async function runBatchItem(
       applyTokenDanceResponseFormat(requestBody, response_format);
     }
 
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), providerTimeoutMs);
+    const upstream = await fetchUpstream(tokendanceUrl, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${tokendanceApiKey}`,
+        "Content-Type": "application/json",
+        "X-App-URL": getTokenPayAppUrl(),
+      },
+      body: JSON.stringify(requestBody),
+    }, context, parentSignal, providerTimeoutMs);
 
-    let response: Response;
     try {
-      response = await fetchProvider(tokendanceUrl, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${tokendanceApiKey}`,
-          "Content-Type": "application/json",
-          "X-App-URL": getTokenPayAppUrl(),
-        },
-        body: JSON.stringify(requestBody),
-        signal: controller.signal,
-      }, context);
-    } finally {
-      clearTimeout(timeoutId);
-    }
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      const recoveryAction = readTokenPayRecoveryAction(response);
-      let parsed: unknown = undefined;
-      try {
-        parsed = JSON.parse(errorText);
-      } catch {
-        // ignore
+      const response = upstream.response;
+      if (!response.ok) {
+        const errorText = await response.text();
+        const recoveryAction = readTokenPayRecoveryAction(response);
+        let parsed: unknown = undefined;
+        try {
+          parsed = JSON.parse(errorText);
+        } catch {
+          // ignore
+        }
+        return {
+          ok: false,
+          status: response.status,
+          error: `TokenDance error: ${response.status}`,
+          details: parsed ?? errorText,
+          ...(recoveryAction ? { recoveryAction } : {}),
+        };
       }
-      return {
-        ok: false,
-        status: response.status,
-        error: `TokenDance error: ${response.status}`,
-        details: parsed ?? errorText,
-        ...(recoveryAction ? { recoveryAction } : {}),
-      };
-    }
 
-    try {
-      const result = await response.json();
-      await recordAttempt(context, "success", responseUsage(result));
+      const result = await readProviderJson(response, context, upstream.signal);
       return { ok: true, data: result };
-    } catch (error) {
-      await recordAttempt(context, "error", { errorCode: "invalid_response" });
-      throw error;
+    } finally {
+      upstream.release();
     }
   }
 
@@ -714,40 +789,30 @@ async function runBatchItem(
     requestBody.response_format = response_format;
   }
 
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
-
-  let response: Response;
-  try {
-    response = await fetchProvider(ZENMUX_API_URL, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(requestBody),
-      signal: controller.signal,
-    }, context);
-  } finally {
-    clearTimeout(timeoutId);
-  }
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    return {
-      ok: false,
-      status: response.status,
-      error: `ZenMux API error: ${response.status} - ${errorText}`,
-    };
-  }
+  const upstream = await fetchUpstream(ZENMUX_API_URL, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(requestBody),
+  }, context, parentSignal, providerTimeoutMs);
 
   try {
-    const result = await response.json();
-    await recordAttempt(context, "success", responseUsage(result));
+    const response = upstream.response;
+    if (!response.ok) {
+      const errorText = await response.text();
+      return {
+        ok: false,
+        status: response.status,
+        error: `ZenMux API error: ${response.status} - ${errorText}`,
+      };
+    }
+
+    const result = await readProviderJson(response, context, upstream.signal);
     return { ok: true, data: result };
-  } catch (error) {
-    await recordAttempt(context, "error", { errorCode: "invalid_response" });
-    throw error;
+  } finally {
+    upstream.release();
   }
 }
 
@@ -810,6 +875,7 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  let activeLog: ChatRequestLog | null = null;
   try {
     const body = await request.json();
     const rawSessionId = request.headers.get("x-game-session-id")?.trim() || null;
@@ -852,6 +918,7 @@ export async function POST(request: NextRequest) {
             attempt: requestAttempt,
             requestId: request.headers.get(REQUEST_ID_HEADER),
           },
+          request.signal,
         ).catch(() => ({
           ok: false as const,
           status: 502,
@@ -875,6 +942,7 @@ export async function POST(request: NextRequest) {
       messages,
       request_id,
       prompt_scope,
+      call_type,
       temperature,
       max_tokens,
       stream,
@@ -927,7 +995,9 @@ export async function POST(request: NextRequest) {
     // 思考中的决策调用在返回响应头之前就可能超过普通上限
     const providerTimeoutMs = reasoningProfile === "decision" && effectiveReasoning?.enabled === true
       ? DECISION_TIMEOUT_MS
-      : API_TIMEOUT_MS;
+      : NORMAL_ATTEMPT_TIMEOUT_MS;
+    const startedAt = Date.now();
+    const callType = normalizeChatCallType(call_type);
     const attemptContext: AttemptContext = {
       userId: auth.user.id,
       sessionId,
@@ -937,10 +1007,13 @@ export async function POST(request: NextRequest) {
       provider: modelProvider,
       model,
       promptScope: normalizePromptScope(prompt_scope),
+      callType,
       mode: stream ? "stream" : "completion",
-      startedAt: Date.now(),
+      startedAt,
       inputChars: countMessageChars(messages),
+      log: createChatRequestLog({ model, attempt: requestAttempt, callType, startedAt }),
     };
+    activeLog = attemptContext.log;
 
     // Process messages based on model capabilities
     let processedMessages = messages;
@@ -1025,26 +1098,19 @@ export async function POST(request: NextRequest) {
         requestBody.response_format = response_format;
       }
 
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
-
-      let response: Response;
-      try {
-        response = await fetchProvider(dashscopeApiUrl, {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${dashscopeApiKey}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(requestBody),
-          signal: controller.signal,
-        }, attemptContext);
-      } finally {
-        clearTimeout(timeoutId);
-      }
+      const upstream = await fetchUpstream(dashscopeApiUrl, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${dashscopeApiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(requestBody),
+      }, attemptContext, request.signal, providerTimeoutMs);
+      const response = upstream.response;
 
       if (!response.ok) {
         const errorText = await response.text();
+        upstream.release();
         let parsed: unknown = undefined;
         try {
           parsed = JSON.parse(errorText);
@@ -1067,16 +1133,18 @@ export async function POST(request: NextRequest) {
         headers.set("Cache-Control", "no-cache");
         headers.set("Connection", "keep-alive");
 
-        return trackedStreamResponse(new Response(response.body, { headers }), attemptContext);
+        return trackedStreamResponse(
+          new Response(response.body, { headers }),
+          attemptContext,
+          releaseAfterAbort(response, upstream.signal, () => upstream.release()),
+        );
       }
 
       try {
-        const result = await response.json();
-        await recordAttempt(attemptContext, "success", responseUsage(result));
+        const result = await readProviderJson(response, attemptContext, upstream.signal);
         return NextResponse.json(result);
-      } catch (error) {
-        await recordAttempt(attemptContext, "error", { errorCode: "invalid_response" });
-        throw error;
+      } finally {
+        upstream.release();
       }
     }
 
@@ -1132,28 +1200,21 @@ export async function POST(request: NextRequest) {
         applyTokenDanceResponseFormat(requestBody, response_format);
       }
 
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), providerTimeoutMs);
-
-      let response: Response;
-      try {
-        response = await fetchProvider(tokendanceUrl, {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${tokendanceApiKey}`,
-            "Content-Type": "application/json",
-            "X-App-URL": getTokenPayAppUrl(),
-          },
-          body: JSON.stringify(requestBody),
-          signal: controller.signal,
-        }, attemptContext);
-      } finally {
-        clearTimeout(timeoutId);
-      }
+      const upstream = await fetchUpstream(tokendanceUrl, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${tokendanceApiKey}`,
+          "Content-Type": "application/json",
+          "X-App-URL": getTokenPayAppUrl(),
+        },
+        body: JSON.stringify(requestBody),
+      }, attemptContext, request.signal, providerTimeoutMs);
+      const response = upstream.response;
 
       if (!response.ok) {
         const errorText = await response.text();
         const recoveryAction = readTokenPayRecoveryAction(response);
+        upstream.release();
         if (tokenPayRequested && recoveryAction === "reauthorize_api_key") {
           await markTokenPayConnectionForReauthorization(auth.user.id);
         }
@@ -1183,16 +1244,18 @@ export async function POST(request: NextRequest) {
         headers.set("Cache-Control", "no-cache");
         headers.set("Connection", "keep-alive");
 
-        return trackedStreamResponse(new Response(response.body, { headers }), attemptContext);
+        return trackedStreamResponse(
+          new Response(response.body, { headers }),
+          attemptContext,
+          releaseAfterAbort(response, upstream.signal, () => upstream.release()),
+        );
       }
 
       try {
-        const result = await response.json();
-        await recordAttempt(attemptContext, "success", responseUsage(result));
+        const result = await readProviderJson(response, attemptContext, upstream.signal);
         return NextResponse.json(result);
-      } catch (error) {
-        await recordAttempt(attemptContext, "error", { errorCode: "invalid_response" });
-        throw error;
+      } finally {
+        upstream.release();
       }
     }
 
@@ -1240,26 +1303,19 @@ export async function POST(request: NextRequest) {
       requestBody.response_format = response_format;
     }
 
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
-
-    let response: Response;
-    try {
-      response = await fetchProvider(ZENMUX_API_URL, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(requestBody),
-        signal: controller.signal,
-      }, attemptContext);
-    } finally {
-      clearTimeout(timeoutId);
-    }
+    const upstream = await fetchUpstream(ZENMUX_API_URL, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(requestBody),
+    }, attemptContext, request.signal, providerTimeoutMs);
+    const response = upstream.response;
 
     if (!response.ok) {
       const errorText = await response.text();
+      upstream.release();
       return NextResponse.json(
         { error: `ZenMux API error: ${response.status} - ${errorText}` },
         { status: response.status }
@@ -1273,19 +1329,30 @@ export async function POST(request: NextRequest) {
       headers.set("Cache-Control", "no-cache");
       headers.set("Connection", "keep-alive");
 
-      return trackedStreamResponse(new Response(response.body, { headers }), attemptContext);
+      return trackedStreamResponse(
+        new Response(response.body, { headers }),
+        attemptContext,
+        releaseAfterAbort(response, upstream.signal, () => upstream.release()),
+      );
     }
 
     try {
-      const result = await response.json();
-      await recordAttempt(attemptContext, "success", responseUsage(result));
+      const result = await readProviderJson(response, attemptContext, upstream.signal);
       return NextResponse.json(result);
-    } catch (error) {
-      await recordAttempt(attemptContext, "error", { errorCode: "invalid_response" });
-      throw error;
+    } finally {
+      upstream.release();
     }
   } catch (error) {
-    console.error("[api/chat] Error:", error);
+    if (!activeLog?.logged) {
+      logChatRequest(
+        activeLog ?? createChatRequestLog({
+          model: "unknown",
+          attempt: positiveAttempt(request.headers.get(ATTEMPT_HEADER)),
+          callType: "other",
+        }),
+        "abort",
+      );
+    }
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Unknown error" },
       { status: 500 }

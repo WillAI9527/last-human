@@ -204,10 +204,21 @@ export function useDialogueManager() {
   const appendToSpeechQueue = useCallback((segment: string, requestId?: string, index?: number) => {
     const queue = speechQueueRef.current;
     if (!queue || queue.request?.id !== requestId || (queue.request && !queue.request.isValid())) return;
-    // 网络重放按段落位置去重，相同文字出现在不同位置时保留。
-    if (index !== undefined && index !== queue.segments.length) return;
     const trimmed = segment.trim();
     if (!trimmed) return;
+    // 同一位置的重试替换已有半段，不能再追加一条。不同位置的相同文字仍然保留。
+    if (index !== undefined && index < queue.segments.length) {
+      queue.segments[index] = trimmed;
+      if (queue.currentIndex === index) {
+        setCurrentDialogue({
+          speaker: queue.player.displayName,
+          text: trimmed,
+          isStreaming: true,
+        });
+      }
+      return;
+    }
+    if (index !== undefined && index !== queue.segments.length) return;
 
     // 在添加新段落前检查是否在等待下一段
     // 如果 currentIndex 指向当前最后一个段落，说明用户在等待
