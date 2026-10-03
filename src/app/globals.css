@@ -5461,3 +5461,10 @@ input[type="submit"]:not(:disabled),
     overflow: hidden;
   }
 }
+
+/* While typing, the brand bar yields so Send stays inside the visual viewport. */
+@media (max-width: 768px) {
+  .lh-game-shell--keyboard .wc-topbar {
+    display: none !important;
+  }
+}
