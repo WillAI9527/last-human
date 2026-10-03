@@ -37,6 +37,8 @@ import { getI18n } from "@/i18n/translator";
 import { getRoleConfiguration } from "@/lib/role-configuration";
 import { appendSuspicion, parseSuspects, suspicionSchemaProperty, type SuspicionEntry } from "@/lib/suspicion";
 import { canWitchSave, checkSideKillWin, isSixPlayerGame } from "@/lib/six-player-rules";
+import { adaptPromptForSixPlayer } from "@/lib/six-player-prompt";
+import { getLocale } from "@/i18n/locale-store";
 import { resolveBadgeElectionWinner } from "@/lib/historical-vote-snapshots";
 import { isVillagerAvatarId } from "@/lib/village-cast";
 
@@ -152,6 +154,9 @@ function resolvePhasePrompt(
   const prompt = phaseManager.getPrompt(phase, { state: overriddenState, extras }, player);
   if (!prompt) {
     throw new Error(`[wolfcha] Missing phase prompt for ${phase}`);
+  }
+  if (isSixPlayerGame(state)) {
+    return adaptPromptForSixPlayer(prompt, getLocale() === "en" ? "en" : "zh");
   }
   return prompt;
 }
