@@ -34,7 +34,9 @@ function useWolfHead(
 ) {
   const targetRef = useRef({ x: 0, y: 0 });
   const currentRef = useRef({ x: 0, y: 0 });
+  const pointerRef = useRef({ x: 0, y: 0 });
   const reducedRef = useRef(false);
+  const pausedRef = useRef(false);
   const kickRef = useRef<() => void>(() => {});
   const orientationCleanupRef = useRef<(() => void) | null>(null);
 
@@ -111,13 +113,26 @@ function useWolfHead(
       });
     };
 
+    let revealed = false;
+    let revealTimer = 0;
+    const reveal = () => {
+      if (revealed || !art || !canvas || reducedRef.current) return;
+      revealed = true;
+      art.dataset.head = "gl";
+      const finish = () => {
+        if (art.dataset.head === "gl") art.dataset.head = "live";
+      };
+      canvas.addEventListener("transitionend", finish, { once: true });
+      revealTimer = window.setTimeout(finish, 500);
+    };
+
     const showFrame = () => {
       if (!renderer || !art || reducedRef.current) return false;
       const rect = art.getBoundingClientRect();
       if (rect.width < 2 || rect.height < 2) return false;
       renderer.resize(rect.width, rect.height, window.devicePixelRatio || 1);
       paint(currentRef.current.x, currentRef.current.y);
-      art.dataset.head = "gl";
+      reveal();
       return true;
     };
 
@@ -176,10 +191,12 @@ function useWolfHead(
 
     const lookAt = (clientX: number, clientY: number) => {
       if (reducedRef.current) return;
-      targetRef.current = {
+      pointerRef.current = {
         x: clamp(clientX / window.innerWidth * 2 - 1, -1, 1),
         y: clamp(clientY / window.innerHeight * 2 - 1, -1, 1),
       };
+      if (pausedRef.current) return;
+      targetRef.current = pointerRef.current;
       kick();
     };
     const onPointerMove = (event: PointerEvent) => lookAt(event.clientX, event.clientY);
@@ -202,16 +219,29 @@ function useWolfHead(
       showFrame();
     });
     if (art) observer.observe(art);
+    let cancelIdle = () => {};
     if (media.matches) {
       restEyes();
       paint(0, 0);
       if (art) art.dataset.head = "static";
-    } else {
-      boot();
+    } else if (art) {
+      art.dataset.head = "static";
+      const start = () => {
+        if (!disposed && !reducedRef.current) boot();
+      };
+      if (typeof window.requestIdleCallback === "function") {
+        const idle = window.requestIdleCallback(start, { timeout: 1000 });
+        cancelIdle = () => window.cancelIdleCallback(idle);
+      } else {
+        const idle = window.setTimeout(start, 0);
+        cancelIdle = () => window.clearTimeout(idle);
+      }
     }
 
     return () => {
       disposed = true;
+      cancelIdle();
+      window.clearTimeout(revealTimer);
       window.cancelAnimationFrame(frame);
       kickRef.current = () => {};
       media.removeEventListener("change", syncReduced);
@@ -235,10 +265,12 @@ function useWolfHead(
       if (orientationCleanupRef.current || reducedRef.current) return;
       const onOrientation = (event: DeviceOrientationEvent) => {
         if (reducedRef.current || event.gamma == null) return;
-        targetRef.current = {
+        pointerRef.current = {
           x: clamp(event.gamma / 30, -1, 1),
           y: clamp(((event.beta ?? 0) - 45) / 30, -1, 1),
         };
+        if (pausedRef.current) return;
+        targetRef.current = pointerRef.current;
         kickRef.current();
       };
       window.addEventListener("deviceorientation", onOrientation);
@@ -261,7 +293,20 @@ function useWolfHead(
     if (coarse) attach();
   }, []);
 
-  return enableOrientation;
+  const setGazePaused = useCallback((paused: boolean) => {
+    const wasPaused = pausedRef.current;
+    pausedRef.current = paused;
+    if (artRef.current) artRef.current.dataset.gazePaused = paused ? "1" : "0";
+    if (paused) {
+      if (!wasPaused) targetRef.current = { ...currentRef.current };
+      return;
+    }
+    if (!wasPaused) return;
+    targetRef.current = { ...pointerRef.current };
+    kickRef.current();
+  }, [artRef]);
+
+  return { enableOrientation, setGazePaused };
 }
 
 function Eye({
@@ -328,7 +373,7 @@ export function WolfCover({
   const leftPupilRef = useRef<HTMLDivElement>(null);
   const rightPupilRef = useRef<HTMLDivElement>(null);
   const chromeRef = useRef<HTMLDivElement>(null);
-  const enableOrientation = useWolfHead(
+  const { enableOrientation, setGazePaused } = useWolfHead(
     artRef,
     canvasRef,
     leftEyeRef,
@@ -347,7 +392,9 @@ export function WolfCover({
       const inset = keyboardInset(window.innerHeight, viewport.height, viewport.offsetTop);
       chrome.style.setProperty("--wolf-keyboard-inset", `${inset}px`);
       const input = chrome.querySelector("input");
-      if (input && document.activeElement === input) {
+      const focused = Boolean(input && document.activeElement === input);
+      setGazePaused(focused || inset > 0);
+      if (focused && input) {
         input.scrollIntoView({ block: "center", inline: "nearest" });
       }
     };
@@ -359,7 +406,7 @@ export function WolfCover({
       viewport.removeEventListener("scroll", sync);
       chrome.style.removeProperty("--wolf-keyboard-inset");
     };
-  }, []);
+  }, [setGazePaused]);
 
   useEffect(() => {
     if (!rulesOpen) return;
@@ -380,7 +427,7 @@ export function WolfCover({
     <section className="wolf-cover" aria-label="LAST HUMAN">
       <link rel="preload" as="image" href={COVER_SRC} type="image/webp" fetchPriority="high" />
       <div className="wolf-cover__stage">
-        <div className="wolf-cover__art" ref={artRef} data-wolf-art="">
+        <div className="wolf-cover__art" ref={artRef} data-wolf-art="" data-head="static">
           <img
             src={COVER_SRC}
             alt={t("welcome.cover.imageAlt")}
@@ -396,7 +443,7 @@ export function WolfCover({
         </div>
       </div>
       <div className="wolf-cover__vignette" />
-      <div className="wolf-cover__chrome" ref={chromeRef}>
+      <div className="wolf-cover__chrome" ref={chromeRef} data-wolf-chrome="">
         <h1 className="wolf-cover__title">
           LAST HUMAN
           <span className="wolf-cover__line">{t("welcome.cover.line")}</span>
@@ -411,7 +458,11 @@ export function WolfCover({
           enterKeyHint="done"
           onChange={(event) => onNameChange(event.target.value)}
           onFocus={(event) => {
+            setGazePaused(true);
             event.currentTarget.scrollIntoView({ block: "center", inline: "nearest" });
+          }}
+          onBlur={() => {
+            setGazePaused(false);
           }}
           onKeyDown={(event) => {
             if (event.key !== "Enter" || event.nativeEvent.isComposing) return;

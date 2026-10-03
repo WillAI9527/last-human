@@ -32,7 +32,7 @@
   top: 50%;
   width: max(100%, calc(100dvh * 16 / 9));
   aspect-ratio: 16 / 9;
-  transform: translate3d(-50%, -50%, 0);
+  transform: translate3d(-50%, -50%, 0) scale(var(--wolf-art-scale, 1));
 }
 
 .wolf-cover__art img,
@@ -48,14 +48,16 @@
 .wolf-cover__canvas {
   position: absolute;
   inset: 0;
-  display: none;
+  opacity: 0;
+  transition: opacity 0.32s ease;
 }
 
-.wolf-cover__art[data-head="gl"] .wolf-cover__canvas {
-  display: block;
+.wolf-cover__art[data-head="gl"] .wolf-cover__canvas,
+.wolf-cover__art[data-head="live"] .wolf-cover__canvas {
+  opacity: 1;
 }
 
-.wolf-cover__art[data-head="gl"] > img {
+.wolf-cover__art[data-head="live"] > img {
   visibility: hidden;
 }
 
@@ -400,7 +402,9 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .wolf-cover__canvas,
   .wolf-cover__pupil {
+    transition: none;
     will-change: auto;
   }
 }
