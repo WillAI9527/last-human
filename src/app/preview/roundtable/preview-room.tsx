@@ -157,7 +157,7 @@ export function PreviewRoom() {
 
   return (
     <main
-      className="lh-game-shell overflow-hidden flex flex-col"
+      className={cn("lh-game-shell overflow-hidden flex flex-col", keyboard && "lh-game-shell--keyboard")}
       data-testid="game-shell"
       data-cast-seat={receipt?.kind === "commit" ? String(selectedSeat ?? "") : ""}
     >

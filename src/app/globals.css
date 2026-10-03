@@ -2411,7 +2411,8 @@ input[type="submit"]:not(:disabled),
 
 .wc-player-card.lh-seat-selected {
   animation: none;
-  box-shadow: 0 0 0 2px #F2EDE4;
+  transition: none;
+  box-shadow: 0 0 0 2px rgb(242, 237, 228);
 }
 
 .wc-player-card--selectable:hover {
@@ -5396,6 +5397,10 @@ input[type="submit"]:not(:disabled),
     flex: 0 0 64px;
     height: 64px;
     max-height: 64px;
+  }
+
+  .lh-game-shell--keyboard .wc-topbar {
+    display: none;
   }
 
   .lh-dialog-round {

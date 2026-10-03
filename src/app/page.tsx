@@ -1236,7 +1236,7 @@ export default function Home() {
   const isWelcomeStage = !gameStarted;
 
   return (
-    <div className={cn("lh-game-shell flex flex-col overflow-hidden bg-transparent", visualIsNight && "lh-room--night")}>
+    <div className={cn("lh-game-shell flex flex-col overflow-hidden bg-transparent", visualIsNight && "lh-room--night", keyboardOpen && "lh-game-shell--keyboard")}>
       <TokenPayRecoveryHost />
       <GameBackground isNight={visualIsNight} isBlinking={!!dayNightBlinkPhase} />
 
