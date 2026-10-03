@@ -132,9 +132,12 @@ function useWolfHead(
         }
         renderer = next;
         if (!showFrame()) paint(currentRef.current.x, currentRef.current.y);
-      }).catch(() => {
+      }).catch((error: unknown) => {
         booting = false;
         renderer = null;
+        if (process.env.NODE_ENV !== "production") {
+          console.warn("wolf head parallax fallback", error);
+        }
         if (!disposed && art) art.dataset.head = "fallback";
         paint(currentRef.current.x, currentRef.current.y);
       });
