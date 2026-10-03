@@ -73,7 +73,7 @@ export function getOrganizationJsonLd() {
     "@type": "Organization",
     name: "LAST HUMAN",
     logo: "/logo.png",
-    sameAs: ["https://github.com/oil-oil/wolfcha"],
+    sameAs: ["https://github.com/WillAI9527/last-human"],
   };
 }
 

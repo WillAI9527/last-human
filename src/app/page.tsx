@@ -1286,7 +1286,7 @@ export default function Home() {
             animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
             exit={{ opacity: 0, y: -10, filter: "blur(10px)" }}
             transition={{ duration: 0.45, ease: "easeOut" }}
-            className="h-full w-full"
+            className="h-[100dvh] w-full"
           >
             <WelcomeScreen
               humanName={humanName}

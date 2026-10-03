@@ -9,6 +9,7 @@ import {
   TESTER_TOKEN_HEADER,
   consumeDemoLlmCall,
   dailyLimitMessage,
+  readDailyQuota,
   resetDemoRateLimitForTests,
   startDemoGame,
 } from "./demo-rate-limit";
@@ -233,6 +234,41 @@ test("?tester= 会保存，并在开局请求里带上同一个 header", async (
     globalThis.fetch = originalFetch;
     if (originalWindow) Object.defineProperty(globalThis, "window", originalWindow);
     else Reflect.deleteProperty(globalThis, "window");
+  }
+});
+
+test("只读配额不消耗当日局数，测试令牌标记为不限", async () => {
+  process.env.ZENMUX_API_KEY = "test-key";
+  delete process.env.DAILY_GAME_LIMIT;
+  process.env.RATE_LIMIT_BYPASS_TOKEN = "qa-secret";
+  resetDemoRateLimitForTests();
+  const ip = "203.0.113.80";
+  try {
+    const first = await readDailyQuota(requestFrom(ip));
+    assert.equal(first.unlimited, false);
+    assert.equal(first.limit, GAMES_PER_IP_PER_DAY);
+    assert.equal(first.remaining, GAMES_PER_IP_PER_DAY);
+    const started = await startDemoGame(requestFrom(ip));
+    assert.equal(started.ok, true);
+    if (!started.ok) return;
+    const cookie = started.cookies.map((item) => item.split(";")[0]).join("; ");
+    const after = await readDailyQuota(requestFrom(ip, cookie));
+    assert.equal(after.remaining, GAMES_PER_IP_PER_DAY - 1);
+    const again = await readDailyQuota(requestFrom(ip, cookie));
+    assert.equal(again.remaining, after.remaining);
+    assert.equal(again.used, after.used);
+    const tester = await readDailyQuota(new Request("http://localhost/api/games/quota", {
+      headers: {
+        "x-forwarded-for": ip,
+        [TESTER_TOKEN_HEADER]: "qa-secret",
+        cookie,
+      },
+    }));
+    assert.equal(tester.unlimited, true);
+    const still = await readDailyQuota(requestFrom(ip, cookie));
+    assert.equal(still.remaining, GAMES_PER_IP_PER_DAY - 1);
+  } finally {
+    delete process.env.RATE_LIMIT_BYPASS_TOKEN;
   }
 });
 

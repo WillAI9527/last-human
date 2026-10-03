@@ -1,7 +1,7 @@
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
-import { FingerprintSimple, PawPrint, Sparkle, Wrench, GearSix, UserCircle, GithubLogo, Star, EnvelopeSimple, Handshake, DotsThreeOutlineVertical, Users, UsersFour } from "@phosphor-icons/react";
+import { FingerprintSimple, PawPrint, Sparkle, Wrench, GearSix, UserCircle, GithubLogo, EnvelopeSimple, Handshake, DotsThreeOutlineVertical, Users, UsersFour } from "@phosphor-icons/react";
 import { WerewolfIcon } from "@/components/icons/FlatIcons";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -36,7 +36,10 @@ import {
   type ModelSource,
 } from "@/lib/api-keys";
 import { loadTokenPayConnectionWithRetry } from "@/lib/tokenpay-client";
-import { reservePublicGame } from "@/lib/demo-game-client";
+import { fetchPublicQuota, reservePublicGame, type PublicQuota } from "@/lib/demo-game-client";
+import { WolfCover } from "@/components/home/WolfCover";
+
+const GITHUB_REPO_URL = "https://github.com/WillAI9527/last-human";
 
 const PUBLIC_DEMO = true;
 import { useAppLocale } from "@/i18n/useAppLocale";
@@ -372,7 +375,9 @@ export function WelcomeScreen({
   const [difficulty, setDifficulty] = useAtom(difficultyAtom);
   const [playerCount, setPlayerCount] = useAtom(playerCountAtom);
   const [preferredRole, setPreferredRole] = useAtom(preferredRoleAtom);
-  const [githubStars, setGithubStars] = useState<number | null>(null);
+  const [oathOpen, setOathOpen] = useState(false);
+  const [reduceMotion, setReduceMotion] = useState(false);
+  const [dailyQuota, setDailyQuota] = useState<PublicQuota | null>(null);
   const springCampaignRemainingQuota = springCampaign?.remainingQuota ?? 0;
   const springCampaignTotalQuota = springCampaign?.totalQuota ?? 0;
   const springCampaignActiveNow = SPRING_CAMPAIGN_ENABLED
@@ -575,19 +580,33 @@ export function WelcomeScreen({
     setFixedRoles(buildDefaultRoles(playerCount));
   }, [playerCount]);
 
-  // Fetch GitHub stars
   useEffect(() => {
-    fetch('https://api.github.com/repos/oil-oil/wolfcha')
-      .then(res => res.json())
-      .then(data => {
-        if (data.stargazers_count !== undefined) {
-          setGithubStars(data.stargazers_count);
-        }
-      })
-      .catch(() => {
-        // Silently fail, stars will remain null
-      });
+    const media = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const sync = () => setReduceMotion(media.matches);
+    sync();
+    media.addEventListener("change", sync);
+    return () => media.removeEventListener("change", sync);
   }, []);
+
+  useEffect(() => {
+    if (!oathOpen) return;
+    let cancelled = false;
+    void fetchPublicQuota().then((quota) => {
+      if (!cancelled) setDailyQuota(quota);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [oathOpen]);
+
+  useEffect(() => {
+    if (!oathOpen) return;
+    if (window.matchMedia("(pointer: coarse)").matches) return;
+    const id = window.setTimeout(() => {
+      paperRef.current?.querySelector<HTMLInputElement>("input")?.focus();
+    }, reduceMotion ? 0 : 420);
+    return () => window.clearTimeout(id);
+  }, [oathOpen, reduceMotion]);
 
   const roleConfigValid = useMemo(() => {
     if (fixedRoles.length !== playerCount) return false;
@@ -634,20 +653,6 @@ export function WelcomeScreen({
   const canConfirm = useMemo(() => {
     return !!humanName.trim() && !isLoading && !isTransitioning && (PUBLIC_DEMO || !creditsLoading);
   }, [humanName, isLoading, isTransitioning, creditsLoading]);
-
-  const isAnyModalOpen =
-    isSetupOpen ||
-    isAuthOpen ||
-    (REFERRAL_BONUS_ENABLED && isShareOpen) ||
-    isAccountOpen ||
-    isUserProfileOpen ||
-    isSponsorOpen ||
-    (SPRING_CAMPAIGN_ENABLED && isSpringFestivalOpen) ||
-    isGroupOpen ||
-    isMobileMenuOpen ||
-    isCustomCharacterOpen ||
-    isLowCreditOpen ||
-    isDevConsoleOpen;
 
   useEffect(() => {
     const paper = paperRef.current;
@@ -984,7 +989,8 @@ export function WelcomeScreen({
 
   return (
     <>
-      <div className="wc-contract-screen selection:bg-[var(--color-accent)] selection:text-white">
+      <div className="wc-contract-screen wc-contract-screen--hero selection:bg-[var(--color-accent)] selection:text-white">
+        <WolfCover sheetOpen={oathOpen} onEnter={() => setOathOpen(true)} />
         <div className="wc-contract-fog" aria-hidden="true" />
         <div className="wc-contract-vignette" aria-hidden="true" />
 
@@ -1245,7 +1251,7 @@ export function WelcomeScreen({
               ) : null}
               <Button asChild variant="outline" className="justify-start">
                 <a
-                  href="https://github.com/oil-oil/wolfcha"
+                  href={GITHUB_REPO_URL}
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={() => setIsMobileMenuOpen(false)}
@@ -1303,11 +1309,11 @@ export function WelcomeScreen({
         </div>
         )}
 
-        <div className="wc-welcome-actions absolute top-5 right-5 z-20 flex items-center gap-2">
+        <div className="wc-welcome-actions absolute top-[calc(16px+env(safe-area-inset-top,0px))] right-5 z-30 flex items-center gap-2">
           <div className="hidden sm:flex items-center gap-2">
             <LocaleSwitcher className="shrink-0" />
             <a
-              href="https://github.com/oil-oil/wolfcha"
+              href={GITHUB_REPO_URL}
               target="_blank"
               rel="noopener noreferrer"
               className="hidden sm:flex items-center gap-1.5 rounded-md border-2 border-[var(--border-color)] bg-[var(--bg-card)] px-2 py-1 text-[11px] text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-all group"
@@ -1315,12 +1321,6 @@ export function WelcomeScreen({
             >
               <GithubLogo size={15} className="group-hover:scale-110 transition-transform" />
               <span className="hidden lg:inline">GitHub</span>
-              <span className="flex items-center gap-1 text-[var(--color-gold)]">
-                <Star size={12} weight="fill" className="group-hover:scale-110 transition-transform" />
-                <span className="font-serif text-xs font-bold tabular-nums tracking-tight" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.1)' }}>
-                  {githubStars !== null ? githubStars.toLocaleString() : '···'}
-                </span>
-              </span>
             </a>
             {!PUBLIC_DEMO && (
             <Button
@@ -1438,10 +1438,14 @@ export function WelcomeScreen({
         </div>
 
         <motion.div
-          initial={{ opacity: 0, y: 14, scale: 0.99, filter: "blur(10px)" }}
-          animate={{ opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }}
-          transition={{ duration: 0.65, ease: "easeOut" }}
-          className="relative z-10 w-full max-w-[460px] px-6"
+          id="oath-card"
+          initial={false}
+          animate={{ y: oathOpen ? 0 : "105%" }}
+          transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 280, damping: 32 }}
+          className="wolf-oath-sheet"
+          style={{ pointerEvents: oathOpen ? "auto" : "none" }}
+          aria-hidden={!oathOpen}
+          inert={oathOpen ? undefined : true}
         >
           <div ref={paperRef} className="wc-contract-paper">
             <div className="wc-contract-borders" aria-hidden="true" />
@@ -1507,6 +1511,10 @@ export function WelcomeScreen({
             <div className="mt-2 text-center">
               <div className="wc-contract-title">LAST HUMAN</div>
               <div className="wc-contract-subtitle">{t("welcome.subtitle")}</div>
+              <p className="wolf-rules">{t("welcome.rules")}</p>
+              {dailyQuota && !dailyQuota.unlimited && (
+                <p className="wolf-quota">{t("welcome.quotaRemaining", { count: dailyQuota.remaining })}</p>
+              )}
               {serverNotice && (
                 <p className="mt-3 text-sm text-[#B3262B]" role="alert">{serverNotice}</p>
               )}
@@ -1578,17 +1586,9 @@ export function WelcomeScreen({
                     type="text"
                     value={mounted ? humanName : ""}
                     onChange={(e) => setHumanName(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key !== "Enter") return;
-                      if (e.nativeEvent.isComposing) return;
-                      if (isAnyModalOpen) return;
-                      e.preventDefault();
-                      void handleConfirm();
-                    }}
                     placeholder={t("welcome.signature.placeholder")}
                     className="wc-signature-input"
                     autoComplete="off"
-                    autoFocus
                     disabled={isLoading || isTransitioning}
                   />
                   <AnimatePresence>

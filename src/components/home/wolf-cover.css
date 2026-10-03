@@ -1,0 +1,250 @@
+.wc-contract-screen--hero {
+  height: 100%;
+  min-height: 100%;
+  background: #0f0d0c;
+}
+
+.wc-contract-screen--hero > .wc-welcome-actions {
+  z-index: 30;
+}
+
+.wolf-cover {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  overflow: hidden;
+  background: #0f0d0c;
+  color: #f2ede4;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.wolf-cover__stage {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  perspective: 900px;
+  touch-action: none;
+}
+
+.wolf-cover__art {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: max(100%, calc(100dvh * 16 / 9));
+  aspect-ratio: 16 / 9;
+  transform: translate3d(-50%, -50%, 0);
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+
+.wolf-cover__art img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+  pointer-events: none;
+  -webkit-user-drag: none;
+}
+
+.wolf-cover__eye {
+  position: absolute;
+  width: 2.1%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  background: radial-gradient(circle at 50% 50%, #ffd27a 0, #e2a440 45%, #8a5a18 80%, #3a2408 100%);
+  box-shadow: 0 0 0.6vw rgba(255, 190, 90, 0.55);
+  overflow: hidden;
+  filter: saturate(0.8) brightness(0.9);
+  pointer-events: none;
+}
+
+.wolf-cover__eye--l {
+  left: 45.1%;
+  top: 31.1%;
+  clip-path: polygon(0 18%, 100% 46%, 100% 100%, 0 100%);
+}
+
+.wolf-cover__eye--r {
+  left: 54.8%;
+  top: 31%;
+  clip-path: polygon(0 46%, 100% 18%, 100% 100%, 0 100%);
+}
+
+.wolf-cover__pupil {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 26%;
+  height: 62%;
+  border-radius: 50%;
+  background: #120a04;
+  transform: translate3d(-50%, -50%, 0);
+  will-change: transform;
+}
+
+.wolf-cover__glint {
+  position: absolute;
+  left: 30%;
+  top: 22%;
+  width: 18%;
+  height: 18%;
+  border-radius: 50%;
+  background: rgba(255, 245, 220, 0.85);
+}
+
+.wolf-cover__vignette {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  background: radial-gradient(ellipse at 50% 35%, transparent 42%, rgba(15, 13, 12, 0.82) 100%);
+}
+
+.wolf-cover__chrome {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 0 20px calc(16px + env(safe-area-inset-bottom, 0px));
+  pointer-events: none;
+}
+
+.wolf-cover.is-sheet .wolf-cover__chrome {
+  visibility: hidden;
+}
+
+.wolf-cover__title {
+  margin: 0;
+  text-align: center;
+  font-family: "Cormorant Garamond", "Noto Serif SC", ui-serif, Georgia, serif;
+  font-weight: 600;
+  font-size: clamp(28px, 5vw, 56px);
+  line-height: 1.1;
+  letter-spacing: 0.35em;
+  color: #f2ede4;
+  text-indent: 0.35em;
+  text-shadow: 0 0 18px #000;
+}
+
+.wolf-cover__line {
+  display: block;
+  margin-top: 0.65em;
+  font-family: "Noto Serif SC", ui-serif, Georgia, serif;
+  font-size: clamp(13px, 3.4vw, 18px);
+  font-weight: 600;
+  letter-spacing: 0.28em;
+  text-indent: 0.28em;
+  color: #a9b2bc;
+}
+
+.wolf-cover__enter {
+  pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 4px 12px 2px;
+  border: 0;
+  background: transparent;
+  color: #f2ede4;
+  touch-action: manipulation;
+}
+
+.wolf-cover__seal {
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background:
+    radial-gradient(circle at 32% 28%, rgba(255, 255, 255, 0.28), transparent 38%),
+    radial-gradient(circle at 50% 58%, #b3262b 0%, #b3262b 42%, #7d151b 100%);
+  box-shadow:
+    0 10px 22px rgba(0, 0, 0, 0.45),
+    inset 2px 2px 6px rgba(255, 255, 255, 0.24),
+    inset -3px -4px 8px rgba(0, 0, 0, 0.38);
+}
+
+.wolf-cover__mark {
+  width: 54px;
+  height: 54px;
+  display: block;
+}
+
+.wolf-cover__enter-label {
+  font-family: "Noto Serif SC", ui-serif, Georgia, serif;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.42em;
+  text-indent: 0.42em;
+  text-shadow: 0 2px 8px #000;
+}
+
+.wolf-oath-sheet {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 16;
+  max-height: 60dvh;
+  overflow-x: hidden;
+  overflow-y: auto;
+  transform: translateY(105%);
+  pointer-events: none;
+  overscroll-behavior: contain;
+  padding: 8px 16px calc(10px + env(safe-area-inset-bottom, 0px));
+  -webkit-overflow-scrolling: touch;
+}
+
+.wc-contract-screen--hero .wolf-oath-sheet .wc-contract-paper {
+  width: min(460px, calc(100vw - 32px));
+  min-height: 0;
+  margin: 0 auto;
+}
+
+.wolf-rules {
+  margin-top: 8px;
+  text-align: center;
+  font-size: 13px;
+  line-height: 1.7;
+  color: rgba(44, 24, 16, 0.78);
+}
+
+.wolf-quota {
+  margin-top: 10px;
+  text-align: center;
+  font-size: 13px;
+  letter-spacing: 0.14em;
+  color: #8a1c1c;
+}
+
+@media (max-height: 520px) {
+  .wolf-cover__seal {
+    width: 58px;
+    height: 58px;
+  }
+
+  .wolf-cover__mark {
+    width: 40px;
+    height: 40px;
+  }
+
+  .wolf-cover__chrome {
+    gap: 8px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wolf-cover__art,
+  .wolf-cover__pupil {
+    will-change: auto;
+  }
+}

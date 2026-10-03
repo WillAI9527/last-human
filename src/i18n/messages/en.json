@@ -117,6 +117,13 @@
     "settings": "Settings",
     "tutorial": "How to play",
     "subtitle": "You are the only human",
+    "rules": "Everyone else is AI. Find the werewolves, or fool them all. Write your name, then press the seal to begin.",
+    "quotaRemaining": "{count} games left today",
+    "cover": {
+      "line": "It already has its eyes on you.",
+      "enter": "Enter",
+      "imageAlt": "A werewolf staring at you"
+    },
     "oath": {
       "line1": "I willingly enter this game of deception and truth.",
       "line2": "When darkness falls, I shall conceal my identity;",

@@ -117,6 +117,13 @@
     "settings": "设置",
     "tutorial": "玩法教学",
     "subtitle": "全场只有你一个真人",
+    "rules": "其余都是 AI。找出狼人，或者骗过所有 AI。写下名字，按下血印，才会开局。",
+    "quotaRemaining": "今天还剩 {count} 局",
+    "cover": {
+      "line": "它已经盯上你了",
+      "enter": "入局",
+      "imageAlt": "盯着你的狼人"
+    },
     "oath": {
       "line1": "我自愿加入这场关于谎言与真相的游戏。",
       "line2": "当夜幕降临，我将隐藏我的身份；",
