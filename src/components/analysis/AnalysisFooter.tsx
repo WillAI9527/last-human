@@ -12,14 +12,14 @@ export function AnalysisFooter({ onShare, onReturn }: AnalysisFooterProps) {
     <footer className="pt-2 pb-6 flex flex-col gap-4">
       <button
         onClick={onShare}
-        className="w-full bg-[var(--color-gold)]/90 text-[#1a1614] font-bold py-4 rounded-lg shadow-[0_4px_14px_rgba(197,160,89,0.3)] hover:bg-[var(--color-gold)] hover:translate-y-[-1px] transition-all flex items-center justify-center gap-2 tracking-wider"
+        className="w-full bg-[#1A1714] text-[#F2EDE4] border border-[#A9B2BC] font-bold py-4 rounded-lg hover:bg-[#241f1b] hover:translate-y-[-1px] transition-all flex items-center justify-center gap-2 tracking-wider"
       >
         <Share2 className="w-4 h-4" />
         分享海报
       </button>
       <button
         onClick={onReturn}
-        className="w-full bg-transparent text-[var(--color-gold)]/60 font-bold py-4 rounded-lg hover:bg-white/5 hover:text-[var(--color-gold)] transition border border-[var(--color-gold)]/20 tracking-wider"
+        className="w-full bg-[#1A1714] text-[#F2EDE4] font-bold py-4 rounded-lg hover:bg-[#241f1b] transition border border-[#A9B2BC] tracking-wider"
       >
         返回大厅
       </button>

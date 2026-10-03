@@ -52,6 +52,18 @@ import {
   SPRING_CAMPAIGN_ENABLED,
 } from "@/lib/welfare-config";
 
+const GITHUB_REPO_URL = "https://github.com/WillAI9527/wolfcha";
+
+function GitHubLink({ className }: { className?: string }) {
+  return (
+    <Button asChild variant="outline" className={className ?? "h-8 text-xs"}>
+      <a href={GITHUB_REPO_URL} target="_blank" rel="noopener noreferrer">
+        GitHub
+      </a>
+    </Button>
+  );
+}
+
 type SponsorCardProps = {
   sponsorId: string;
   href: string;
@@ -1175,6 +1187,7 @@ export function WelcomeScreen({
               <DialogDescription>{t("welcome.mobileMenu.description")}</DialogDescription>
             </DialogHeader>
             <div className="grid gap-2">
+              <GitHubLink className="h-9 justify-start text-sm" />
               {!PUBLIC_DEMO && (
               <Button
                 type="button"
@@ -1357,6 +1370,7 @@ export function WelcomeScreen({
               <GearSix size={16} />
               {t("welcome.settings")}
             </Button>
+            <GitHubLink />
           </div>
 
           <div className="flex sm:hidden items-center gap-2">
@@ -1383,6 +1397,7 @@ export function WelcomeScreen({
               {t("welcome.group.short")}
             </Button>
             )}
+            <GitHubLink />
             <Button
               type="button"
               variant="outline"

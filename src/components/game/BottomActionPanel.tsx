@@ -96,7 +96,7 @@ export function BottomActionPanel({
                 )}
                 
                 {phase === "DAY_BADGE_ELECTION" && (
-                  <button onClick={onConfirmAction} className="inline-flex items-center justify-center h-10 text-base font-medium rounded-sm border-none cursor-pointer active:scale-[0.98] transition-all duration-150 bg-[var(--color-gold)] text-[var(--bg-dark)] hover:bg-[#b8860b] flex-[2]">
+                  <button onClick={onConfirmAction} className="inline-flex items-center justify-center h-10 text-base font-medium rounded-sm border-none cursor-pointer active:scale-[0.98] transition-all duration-150 bg-[#B3262B] text-white hover:bg-[#9a1f24] flex-[2]">
                     <VoteIcon size={18} className="mr-1" />
                     {t("bottomAction.confirmVote", { seat: selectedSeat + 1 })}
                   </button>

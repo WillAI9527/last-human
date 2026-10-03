@@ -31,7 +31,7 @@ export default function AnalysisPage() {
           <div className="flex gap-3 justify-center">
             <button
               onClick={() => triggerAnalysis()}
-              className="px-5 py-2.5 rounded-lg text-sm font-bold bg-[var(--color-gold)] text-black hover:bg-[var(--color-gold)]/90 transition-colors"
+              className="px-5 py-2.5 rounded-lg text-sm font-bold bg-[#1A1714] text-[#F2EDE4] border border-[#A9B2BC] hover:bg-[#241f1b] transition-colors"
             >
               重试
             </button>

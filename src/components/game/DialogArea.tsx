@@ -1745,7 +1745,7 @@ export function DialogArea({
                         onClick={onSendMessage}
                         disabled={!inputText?.trim()}
                         data-testid="speech-send"
-                        className="h-8 px-3 rounded text-xs font-medium bg-[var(--color-gold)] text-[#1a1614] hover:bg-[#d4b06a] disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center gap-1.5 cursor-pointer shrink-0"
+                        className="h-8 px-3 rounded text-xs font-medium bg-[#1A1714] text-[#F2EDE4] border border-[#A9B2BC] hover:bg-[#241f1b] disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center gap-1.5 cursor-pointer shrink-0"
                         title={t("dialog.input.send")}
                       >
                         <PaperPlaneTilt size={14} weight="fill" />
@@ -1754,7 +1754,7 @@ export function DialogArea({
 
                       <button
                         onClick={handleFinishSpeaking}
-                        className="h-8 px-3 rounded text-xs font-medium border border-[var(--color-gold)]/50 text-[var(--color-gold)] bg-transparent hover:bg-[var(--color-gold)]/10 transition-all flex items-center gap-1.5 cursor-pointer shrink-0"
+                        className="h-8 px-3 rounded text-xs font-medium border border-[#A9B2BC] text-[#F2EDE4] bg-[#1A1714] hover:bg-[#241f1b] transition-all flex items-center gap-1.5 cursor-pointer shrink-0"
                         title={t("dialog.input.finishSpeech")}
                       >
                         <CheckCircle size={14} weight="fill" />
@@ -1785,11 +1785,11 @@ export function DialogArea({
                               className="w-full h-full object-cover"
                             />
                           </div>
-                          <div className={cn("text-sm font-semibold", currentSpeaker.player.isHuman ? "text-[var(--color-gold)]" : "text-[var(--text-primary)]")}>
+                          <div className="text-sm font-semibold text-[var(--text-primary)]">
                             {playerTitle(currentSpeaker.player.seat, currentSpeaker.player.displayName)}
                           </div>
                         </div>
-                        <div className={cn("hidden md:block text-base font-bold mb-2 font-serif tracking-wide", currentSpeaker.player.isHuman ? "text-[var(--color-gold)]" : "text-[var(--text-primary)]")}>
+                        <div className="hidden md:block text-base font-bold mb-2 font-serif tracking-wide text-[var(--text-primary)]">
                           {playerTitle(currentSpeaker.player.seat, currentSpeaker.player.displayName)}
                         </div>
                       </>
@@ -2053,7 +2053,7 @@ function ChatMessageItem({
         )}>
           <div className={cn(
             "mb-1 text-xs font-serif font-bold",
-            isHuman ? "text-[var(--color-gold)]" : "text-[var(--text-primary)]"
+            "text-[var(--text-primary)]"
           )}>
             {player ? playerTitle(player.seat, player.displayName) : msg.playerName}
           </div>

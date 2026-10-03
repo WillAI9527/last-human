@@ -1461,13 +1461,8 @@ export default function Home() {
                       className="lh-role-card-thumb md:hidden"
                     />
                   )}
-                  <div className="wc-topbar__item">
-                    <span className="text-xs uppercase tracking-wider opacity-60">Day</span>
-                    <span className="font-serif text-lg font-bold">{String(gameState.day).padStart(2, '0')}</span>
-                  </div>
-                  <div className="wc-topbar__item">
-                    <span className="text-xs uppercase tracking-wider opacity-60">Alive</span>
-                    <span className="font-serif text-lg font-bold">{gameState.players.filter((p) => p.alive).length}/{gameState.players.length}</span>
+                  <div className="wc-topbar__meta" data-testid="table-meta">
+                    DAY {String(gameState.day).padStart(2, "0")} / ALIVE {gameState.players.filter((p) => p.alive).length}/{gameState.players.length}
                   </div>
                   {gameState.badge.holderSeat !== null && (
                     <div className="wc-topbar__item">
@@ -1483,7 +1478,7 @@ export default function Home() {
                 <div className="hidden md:flex items-center gap-3">
                   <div className="wc-topbar__item wc-topbar__item--role">
                     <span className="text-xs uppercase tracking-wider opacity-60">{t("page.roleLabel")}</span>
-                    <span className="font-bold text-[var(--color-gold)]">
+                    <span className="font-bold text-[#F2EDE4]">
                       {canShowRole ? getRoleLabel(humanPlayer?.role) : t("page.rolePending")}
                     </span>
                   </div>

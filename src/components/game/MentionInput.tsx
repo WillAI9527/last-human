@@ -148,8 +148,8 @@ function renderSuggestionList(
           const row = document.createElement("button");
           row.type = "button";
           row.className =
-            "w-full text-left px-3 py-2 rounded-md text-sm text-[var(--text-primary)] hover:bg-[var(--color-gold)]/15 transition-colors flex items-center gap-2 whitespace-nowrap " +
-            (idx === selectedIndex ? "bg-[var(--color-gold)]/20" : "");
+            "w-full text-left px-3 py-2 rounded-md text-sm text-[var(--text-primary)] hover:bg-[#A9B2BC]/15 transition-colors flex items-center gap-2 whitespace-nowrap " +
+            (idx === selectedIndex ? "bg-[#A9B2BC]/25" : "");
           
           // Avatar
           const avatarUrl =

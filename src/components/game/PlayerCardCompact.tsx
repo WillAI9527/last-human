@@ -351,7 +351,7 @@ export function PlayerCardCompact({
           <div className="wc-player-card__name relative flex items-center gap-1 min-w-0" title={playerTitle(player.seat, player.displayName)}>
             <span className={cn(
               "wc-seat-badge transition-colors duration-300",
-              isSpeaking && isMe ? "bg-[var(--color-gold)] text-[#0F0D0C]" : "bg-black/20 text-[var(--text-secondary)]",
+              isSpeaking && isMe ? "bg-[#1A1714] text-[#F2EDE4] border border-[#A9B2BC]" : "bg-black/20 text-[var(--text-secondary)]",
               !isReady && "opacity-50"
             )}>{seatNumberLabel(player.seat)}</span>
             <AnimatePresence mode="wait">

@@ -107,7 +107,7 @@ async function decodeToWav(blob: Blob): Promise<Uint8Array> {
 
 function WaveBars({ tone }: { tone: "gold" | "danger" }) {
   const barColor =
-    tone === "danger" ? "bg-[var(--color-danger)]/80" : "bg-[var(--color-gold)]/80";
+    tone === "danger" ? "bg-[var(--color-danger)]/80" : "bg-[#F2EDE4]/80";
   return (
     <span className="inline-flex items-end gap-0.5 mr-1" aria-hidden="true">
       {[0, 1, 2, 3].map((i) => (
@@ -372,7 +372,7 @@ export const VoiceRecorder = forwardRef<VoiceRecorderHandle, VoiceRecorderProps>
     sttDisabled || isBusy ? "opacity-40 cursor-not-allowed" : "",
     isRecording
       ? "border-[var(--color-danger)]/50 text-[var(--color-danger)] bg-transparent hover:bg-[var(--color-danger)]/10"
-      : "border-[var(--color-gold)]/50 text-[var(--color-gold)] bg-transparent hover:bg-[var(--color-gold)]/10"
+      : "border-[#A9B2BC] text-[#F2EDE4] bg-[#1A1714] hover:bg-[#241f1b]"
   );
 
   return (

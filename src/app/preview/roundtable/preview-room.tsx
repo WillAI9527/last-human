@@ -11,6 +11,7 @@ import { DialogArea } from "@/components/game/DialogArea";
 import { PhaseBar } from "@/components/game/PhaseBar";
 import { PlayerDetailModal } from "@/components/game/PlayerDetailModal";
 import { SuspicionReview } from "@/components/analysis/SuspicionReview";
+import { PersonalStatsCard } from "@/components/analysis/PersonalStatsCard";
 import type { SuspicionEntry } from "@/lib/suspicion";
 import { useVisualViewportShell } from "@/hooks/useVisualViewportShell";
 import { cn } from "@/lib/utils";
@@ -133,12 +134,26 @@ export function PreviewRoom() {
   if (review) {
     return (
       <main className="min-h-screen bg-[#12100e] text-[var(--text-primary)] px-4 py-8">
-        <div className="max-w-xl mx-auto">
+        <div className="max-w-xl mx-auto space-y-6">
+          <PersonalStatsCard
+            stats={{
+              role: "Villager",
+              userName: "克拉拉",
+              avatar: "f-01",
+              alignment: "village",
+              tags: ["明察秋毫"],
+              radarStats: { logic: 80, speech: 72, survival: 64, skillOrHide: 40, voteOrTicket: 70 },
+              highlightQuote: "先听完，再决定今天出谁。",
+              totalScore: 82,
+            }}
+          />
           <SuspicionReview log={suspicion} phase="GAME_END" players={players} humanSeat={2} />
         </div>
       </main>
     );
   }
+
+  const alive = players.filter((player) => player.alive).length;
 
   return (
     <main
@@ -147,6 +162,15 @@ export function PreviewRoom() {
       data-cast-seat={receipt?.kind === "commit" ? String(selectedSeat ?? "") : ""}
     >
       <GameBackground isNight={night} />
+      <div className="wc-topbar wc-topbar--responsive shrink-0">
+        <div className="wc-topbar__title">
+          <img src="/brand/mark.svg" alt="" width={22} height={22} />
+          <span>LAST HUMAN</span>
+        </div>
+        <div className="wc-topbar__meta" data-testid="table-meta">
+          DAY {String(state.day).padStart(2, "0")} / ALIVE {alive}/{players.length}
+        </div>
+      </div>
       <PhaseBar gameState={state} humanPlayer={human} isWaitingForAI={false} />
       <div className={cn("flex-1 min-h-0 flex flex-col md:flex-row", night && "lh-roundtable--night")}>
         <div className={cn("lh-table-pane min-h-0", keyboard && "lh-table-pane--keyboard")}>

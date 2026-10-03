@@ -15,7 +15,7 @@ export function AnalysisHeader({ gameId }: AnalysisHeaderProps) {
         <div className="w-9 h-9 border border-[var(--color-gold)]/30 rounded flex items-center justify-center bg-black/20">
           <Scroll className="w-5 h-5 text-[var(--color-gold)]" />
         </div>
-        <h1 className="font-bold text-xl text-[var(--color-gold)] tracking-wider drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
+        <h1 className="font-bold text-xl text-[#F2EDE4] tracking-wider">
           LAST HUMAN
         </h1>
       </div>

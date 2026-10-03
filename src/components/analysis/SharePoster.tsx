@@ -1,12 +1,13 @@
 "use client";
 
-import { forwardRef, useState, useEffect } from "react";
+import { forwardRef } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { Crown, Scroll } from "lucide-react";
 import type { GameAnalysisData } from "@/types/analysis";
 import { ROLE_NAMES } from "./constants";
 import { buildSimpleAvatarUrl } from "@/lib/avatar-config";
 import { useSiteUrl } from "@/components/seo/SiteUrlProvider";
+import { AwardSeal } from "./AwardSeal";
 
 export type PosterMode = "radar" | "portrait";
 
@@ -17,40 +18,6 @@ interface SharePosterProps {
 }
 
 const SITE_URL = "LAST HUMAN";
-
-const ROLE_PORTRAITS: Record<string, string> = {
-  Werewolf: "/lihui/wolf.png",
-  Seer: "/lihui/seer_dx.png",
-  Witch: "/lihui/witch.png",
-  Hunter: "/lihui/hunter.png",
-  Guard: "/lihui/guard.png",
-  Villager: "/lihui/villager.png",
-};
-
-const ROLE_CN_NAMES: Record<string, string> = {
-  Werewolf: "狼人",
-  Seer: "预言家",
-  Witch: "女巫",
-  Hunter: "猎人",
-  Guard: "守卫",
-  Villager: "平民",
-};
-
-const DEFAULT_TAG_PHOTO = "/lihui/analysis_bg.png";
-
-const VILLAGER_TAGS = ["明察秋毫", "随波逐流", "全场划水"];
-const WOLF_TAGS = ["嗜血猎手", "长夜难明", "完美猎杀", "演技大师", "绝命赌徒", "绝地反击", "孤狼啸月", "出师未捷"];
-
-function getTagPhotoUrl(role: string, tag: string): string {
-  if (VILLAGER_TAGS.includes(tag)) {
-    return `/tag_photo/平民_${tag}.png`;
-  }
-  if (WOLF_TAGS.includes(tag)) {
-    return `/tag_photo/狼人_${tag}.png`;
-  }
-  const roleCN = ROLE_CN_NAMES[role] || "平民";
-  return `/tag_photo/${roleCN}_${tag}.png`;
-}
 
 interface RadarChartProps {
   stats: GameAnalysisData["personalStats"]["radarStats"];
@@ -140,19 +107,6 @@ export const SharePoster = forwardRef<HTMLDivElement, SharePosterProps>(
     const primaryTag = overrideTag || personalStats.tags[0] || "待评估";
     const avatarUrl = buildSimpleAvatarUrl(personalStats.avatar);
     const { radarStats } = personalStats;
-    const portraitUrl = ROLE_PORTRAITS[personalStats.role] || ROLE_PORTRAITS.Villager;
-    const [tagPhotoSrc, setTagPhotoSrc] = useState(() => getTagPhotoUrl(personalStats.role, primaryTag));
-    
-    useEffect(() => {
-      setTagPhotoSrc(getTagPhotoUrl(personalStats.role, primaryTag));
-    }, [personalStats.role, primaryTag]);
-    
-    const handleTagPhotoError = () => {
-      if (tagPhotoSrc !== DEFAULT_TAG_PHOTO) {
-        setTagPhotoSrc(DEFAULT_TAG_PHOTO);
-      }
-    };
-
     const formatDuration = (seconds: number): string => {
       const mins = Math.floor(seconds / 60);
       const secs = seconds % 60;
@@ -246,17 +200,11 @@ export const SharePoster = forwardRef<HTMLDivElement, SharePosterProps>(
         ) : (
           <div className="flex-1 px-4 py-1 flex flex-col">
             <div className="rounded-lg border border-[#c5a059]/10 flex-1 flex flex-col overflow-hidden">
-              <div className="flex-1 relative overflow-hidden">
-                <img
-                  src={tagPhotoSrc}
-                  alt="称号立绘"
-                  className="absolute inset-0 w-full h-full object-cover object-center"
-                  onError={handleTagPhotoError}
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-[#0f0e0d] via-[#0f0e0d]/50 to-transparent" />
-                <div className="absolute inset-0 flex flex-col items-center justify-end pb-4">
-                  <div className="text-[10px] text-[#c5a059]/70 tracking-widest mb-1">本局称号</div>
-                  <div className="text-2xl font-bold text-[#c5a059] tracking-wider drop-shadow-lg">{primaryTag}</div>
+              <div className="flex-1 relative overflow-hidden bg-[#14110F]">
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4">
+                  <AwardSeal />
+                  <div className="text-[10px] text-[#A9B2BC] tracking-widest">本局称号</div>
+                  <div className="text-2xl font-bold text-[#F2EDE4] tracking-wider">{primaryTag}</div>
                   {personalStats.tags.length > 1 && (
                     <div className="flex flex-wrap gap-1.5 justify-center mt-2">
                       {personalStats.tags.slice(1).map((tag, idx) => (
