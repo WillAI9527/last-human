@@ -5,17 +5,18 @@ import { useTranslations } from "next-intl";
 import { SixSeatMark } from "@/components/home/SixSeatMark";
 import { keyboardInset } from "@/components/home/oath-card";
 import {
-  WOLF_PARALLAX_EYES,
-  WOLF_PARALLAX_LERP,
-  createWolfHeadRenderer,
-  eyeDepthShift,
-  type WolfHeadRenderer,
-} from "@/components/home/wolf-head-parallax";
+  WOLF_TURN_FRAME_COUNT,
+  WOLF_TURN_NOSE,
+  pickWolfFrame,
+  wolfSpritePosition,
+} from "@/components/home/wolf-turn";
 import type { PublicQuota } from "@/lib/demo-game-client";
 import "./wolf-cover.css";
 
-const COVER_SRC = "/cover/wolf.webp";
-const DEPTH_SRC = "/cover/wolf-depth-rg.png";
+const FRONT_SRC = "/cover/frame_front.webp";
+const SPRITE_SRC = "/cover/sprite.webp";
+const FRAME_INDEXES = Array.from({ length: WOLF_TURN_FRAME_COUNT }, (_, index) => index);
+
 type DeviceOrientationEventConstructor = typeof DeviceOrientationEvent & {
   requestPermission?: () => Promise<"granted" | "denied" | "default">;
 };
@@ -24,210 +25,123 @@ function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
 }
 
-function useWolfHead(
-  artRef: React.RefObject<HTMLDivElement | null>,
-  canvasRef: React.RefObject<HTMLCanvasElement | null>,
-  leftEyeRef: React.RefObject<HTMLDivElement | null>,
-  rightEyeRef: React.RefObject<HTMLDivElement | null>,
-  leftPupilRef: React.RefObject<HTMLDivElement | null>,
-  rightPupilRef: React.RefObject<HTMLDivElement | null>,
-) {
-  const targetRef = useRef({ x: 0, y: 0 });
-  const currentRef = useRef({ x: 0, y: 0 });
-  const pointerRef = useRef({ x: 0, y: 0 });
-  const reducedRef = useRef(false);
+function useWolfTurn(stageRef: React.RefObject<HTMLDivElement | null>) {
   const pausedRef = useRef(false);
-  const kickRef = useRef<() => void>(() => {});
+  const reducedRef = useRef(false);
+  const showRef = useRef<(frame: number) => void>(() => {});
+  const lastPointRef = useRef<{ x: number; y: number } | null>(null);
   const orientationCleanupRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
-    const art = artRef.current;
-    const canvas = canvasRef.current;
+    const stage = stageRef.current;
+    if (!stage) return;
     const media = window.matchMedia("(prefers-reduced-motion: reduce)");
-    let renderer: WolfHeadRenderer | null = null;
-    let frame = 0;
-    let running = false;
     let disposed = false;
-    let booting = false;
-
-    const paint = (x: number, y: number) => {
-      const pupil = `translate3d(calc(-50% + ${x * 120}%), calc(-50% + ${y * 45}%), 0)`;
-      if (leftPupilRef.current) leftPupilRef.current.style.transform = pupil;
-      if (rightPupilRef.current) rightPupilRef.current.style.transform = pupil;
-      if (!renderer) return;
-      renderer.draw(x, y);
-      const eyes = [leftEyeRef.current, rightEyeRef.current];
-      for (let index = 0; index < WOLF_PARALLAX_EYES.length; index += 1) {
-        const eye = eyes[index];
-        const point = WOLF_PARALLAX_EYES[index];
-        if (!eye || !point) continue;
-        const [ex, ey] = point;
-        const [dx, dy] = eyeDepthShift(renderer.depth, ex, ey, x, y);
-        eye.style.left = `${(ex + dx) * 100}%`;
-        eye.style.top = `${(ey + dy) * 100}%`;
-      }
-      if (process.env.NODE_ENV !== "production") {
-        const host = window as Window & { __wolfHeadDraws?: number };
-        host.__wolfHeadDraws = (host.__wolfHeadDraws ?? 0) + 1;
-      }
-    };
-
-    const step = () => {
-      running = false;
-      if (disposed || reducedRef.current || document.hidden) return;
-      const tx = targetRef.current.x;
-      const ty = targetRef.current.y;
-      const cx = currentRef.current.x;
-      const cy = currentRef.current.y;
-      if (Math.abs(cx - tx) < 0.001 && Math.abs(cy - ty) < 0.001) {
-        currentRef.current = { x: tx, y: ty };
-        return;
-      }
-      let nx = cx + (tx - cx) * WOLF_PARALLAX_LERP;
-      let ny = cy + (ty - cy) * WOLF_PARALLAX_LERP;
-      if (Math.abs(tx - nx) < 0.001 && Math.abs(ty - ny) < 0.001) {
-        nx = tx;
-        ny = ty;
-      }
-      currentRef.current = { x: nx, y: ny };
-      paint(nx, ny);
-      if (nx === tx && ny === ty) return;
-      running = true;
-      frame = window.requestAnimationFrame(step);
-    };
-
-    const kick = () => {
-      if (running || reducedRef.current || document.hidden) return;
-      running = true;
-      frame = window.requestAnimationFrame(step);
-    };
-    kickRef.current = kick;
-
-    const restEyes = () => {
-      const eyes = [leftEyeRef.current, rightEyeRef.current];
-      WOLF_PARALLAX_EYES.forEach(([ex, ey], index) => {
-        const eye = eyes[index];
-        if (!eye) return;
-        eye.style.left = `${ex * 100}%`;
-        eye.style.top = `${ey * 100}%`;
-      });
-    };
-
-    let revealed = false;
-    let revealTimer = 0;
-    const reveal = () => {
-      if (revealed || !art || !canvas || reducedRef.current) return;
-      revealed = true;
-      art.dataset.head = "gl";
-      const finish = () => {
-        if (art.dataset.head === "gl") art.dataset.head = "live";
-      };
-      canvas.addEventListener("transitionend", finish, { once: true });
-      revealTimer = window.setTimeout(finish, 500);
-    };
-
-    const showFrame = () => {
-      if (!renderer || !art || reducedRef.current) return false;
-      const rect = art.getBoundingClientRect();
-      if (rect.width < 2 || rect.height < 2) return false;
-      renderer.resize(rect.width, rect.height, window.devicePixelRatio || 1);
-      paint(currentRef.current.x, currentRef.current.y);
-      reveal();
-      return true;
-    };
-
-    const boot = () => {
-      if (disposed || renderer || booting || reducedRef.current || !canvas) return;
-      booting = true;
-      void createWolfHeadRenderer(canvas, COVER_SRC, DEPTH_SRC).then((next) => {
-        booting = false;
-        if (disposed || reducedRef.current) {
-          next.dispose();
-          return;
-        }
-        renderer = next;
-        if (!showFrame()) paint(currentRef.current.x, currentRef.current.y);
-      }).catch((error: unknown) => {
-        booting = false;
-        renderer = null;
-        if (process.env.NODE_ENV !== "production") {
-          console.warn("wolf head parallax fallback", error);
-        }
-        if (!disposed && art) art.dataset.head = "fallback";
-        paint(currentRef.current.x, currentRef.current.y);
-      });
-    };
-
-    const syncReduced = () => {
-      const reduced = media.matches;
-      reducedRef.current = reduced;
-      if (!reduced) {
-        if (renderer) showFrame();
-        else boot();
-        return;
-      }
-      window.cancelAnimationFrame(frame);
-      running = false;
-      targetRef.current = { x: 0, y: 0 };
-      currentRef.current = { x: 0, y: 0 };
-      restEyes();
-      paint(0, 0);
-      if (art) art.dataset.head = "static";
-    };
-
+    let current = -1;
+    let spriteReady = false;
     reducedRef.current = media.matches;
-    if (process.env.NODE_ENV !== "production" && !media.matches) {
-      const look = new URLSearchParams(window.location.search).get("look");
-      if (look) {
-        const [rawX, rawY] = look.split(",").map(Number);
-        if (Number.isFinite(rawX) && Number.isFinite(rawY)) {
-          const x = clamp(rawX, -1, 1);
-          const y = clamp(rawY, -1, 1);
-          targetRef.current = { x, y };
-          currentRef.current = { x, y };
-        }
-      }
-    }
 
-    const lookAt = (clientX: number, clientY: number) => {
-      if (reducedRef.current) return;
-      pointerRef.current = {
-        x: clamp(clientX / window.innerWidth * 2 - 1, -1, 1),
-        y: clamp(clientY / window.innerHeight * 2 - 1, -1, 1),
-      };
-      if (pausedRef.current) return;
-      targetRef.current = pointerRef.current;
-      kick();
+    const nosePoint = () => {
+      const rect = stage.getBoundingClientRect();
+      return [rect.left + rect.width * WOLF_TURN_NOSE.x, rect.top + rect.height * WOLF_TURN_NOSE.y] as const;
     };
+
+    const frameAt = (px: number, py: number) => {
+      const [noseX, noseY] = nosePoint();
+      return pickWolfFrame(px, py, noseX, noseY, window.innerWidth, window.innerHeight);
+    };
+
+    const show = (frame: number) => {
+      if (!spriteReady || frame === current) {
+        stage.dataset.frame = String(spriteReady ? current : 0);
+        return;
+      }
+      const layers = stage.querySelectorAll<HTMLElement>("[data-wolf-frame]");
+      layers.forEach((layer, index) => {
+        layer.style.opacity = index === frame ? "1" : "0";
+      });
+      current = frame;
+      stage.dataset.frame = String(frame);
+    };
+    showRef.current = show;
+
+    const lookAt = (px: number, py: number) => {
+      if (reducedRef.current) return;
+      lastPointRef.current = { x: px, y: py };
+      if (pausedRef.current) return;
+      show(frameAt(px, py));
+    };
+
     const onPointerMove = (event: PointerEvent) => lookAt(event.clientX, event.clientY);
     const onTouchMove = (event: TouchEvent) => {
       const touch = event.touches[0];
       if (!touch) return;
       lookAt(touch.clientX, touch.clientY);
     };
-    const onVisibility = () => {
-      if (!document.hidden) kick();
+    const onPointerLeave = () => {
+      if (reducedRef.current || pausedRef.current) return;
+      lastPointRef.current = null;
+      show(0);
     };
 
-    window.addEventListener("pointermove", onPointerMove, { passive: true });
-    window.addEventListener("touchmove", onTouchMove, { passive: true });
-    document.addEventListener("visibilitychange", onVisibility);
-    media.addEventListener("change", syncReduced);
-    if (art) art.dataset.gaze = "ready";
+    const applyDebugLook = () => {
+      if (process.env.NODE_ENV === "production" || reducedRef.current) return;
+      const look = new URLSearchParams(window.location.search).get("look");
+      if (!look) return;
+      const [x, y] = look.split(",").map(Number);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+      const px = (x + 1) / 2 * window.innerWidth;
+      const py = (y + 1) / 2 * window.innerHeight;
+      lastPointRef.current = { x: px, y: py };
+      show(frameAt(px, py));
+    };
 
-    const observer = new ResizeObserver(() => {
-      showFrame();
-    });
-    if (art) observer.observe(art);
     let cancelIdle = () => {};
+    let revealTimer = 0;
+    const revealSprite = () => {
+      if (disposed || !spriteReady) return;
+      const layers = stage.querySelectorAll<HTMLElement>("[data-wolf-frame]");
+      layers.forEach((layer, index) => {
+        layer.style.backgroundImage = `url("${SPRITE_SRC}")`;
+        layer.style.backgroundPosition = wolfSpritePosition(index);
+      });
+      current = -1;
+      applyDebugLook();
+      if (current < 0) {
+        const last = lastPointRef.current;
+        if (last && !pausedRef.current) show(frameAt(last.x, last.y));
+        else show(0);
+      }
+      revealTimer = window.setTimeout(() => {
+        if (!disposed) stage.dataset.sprite = "live";
+      }, 160);
+    };
+
+    const bootSprite = () => {
+      if (disposed || reducedRef.current || spriteReady) return;
+      const image = new Image();
+      image.onload = () => {
+        if (disposed || reducedRef.current) return;
+        spriteReady = true;
+        revealSprite();
+      };
+      image.onerror = () => {
+        if (!disposed) stage.dataset.sprite = "front";
+      };
+      image.src = SPRITE_SRC;
+    };
+
+    stage.dataset.gaze = "ready";
+    stage.dataset.frame = "0";
     if (media.matches) {
-      restEyes();
-      paint(0, 0);
-      if (art) art.dataset.head = "static";
-    } else if (art) {
-      art.dataset.head = "static";
+      stage.dataset.sprite = "static";
+    } else {
+      stage.dataset.sprite = "front";
+      window.addEventListener("pointermove", onPointerMove, { passive: true });
+      window.addEventListener("touchmove", onTouchMove, { passive: true });
+      window.addEventListener("pointerleave", onPointerLeave);
       const start = () => {
-        if (!disposed && !reducedRef.current) boot();
+        if (!disposed && !reducedRef.current) bootSprite();
       };
       if (typeof window.requestIdleCallback === "function") {
         const idle = window.requestIdleCallback(start, { timeout: 1000 });
@@ -238,23 +152,27 @@ function useWolfHead(
       }
     }
 
+    const onReduce = () => {
+      reducedRef.current = media.matches;
+      if (!media.matches) return;
+      show(0);
+      stage.dataset.sprite = "static";
+    };
+    media.addEventListener("change", onReduce);
+
     return () => {
       disposed = true;
       cancelIdle();
       window.clearTimeout(revealTimer);
-      window.cancelAnimationFrame(frame);
-      kickRef.current = () => {};
-      media.removeEventListener("change", syncReduced);
-      document.removeEventListener("visibilitychange", onVisibility);
+      showRef.current = () => {};
+      media.removeEventListener("change", onReduce);
       window.removeEventListener("pointermove", onPointerMove);
       window.removeEventListener("touchmove", onTouchMove);
+      window.removeEventListener("pointerleave", onPointerLeave);
       orientationCleanupRef.current?.();
       orientationCleanupRef.current = null;
-      observer.disconnect();
-      renderer?.dispose();
-      renderer = null;
     };
-  }, [artRef, canvasRef, leftEyeRef, leftPupilRef, rightEyeRef, rightPupilRef]);
+  }, [stageRef]);
 
   const enableOrientation = useCallback(() => {
     if (reducedRef.current || orientationCleanupRef.current) return;
@@ -264,14 +182,18 @@ function useWolfHead(
     const attach = () => {
       if (orientationCleanupRef.current || reducedRef.current) return;
       const onOrientation = (event: DeviceOrientationEvent) => {
-        if (reducedRef.current || event.gamma == null) return;
-        pointerRef.current = {
-          x: clamp(event.gamma / 30, -1, 1),
-          y: clamp(((event.beta ?? 0) - 45) / 30, -1, 1),
-        };
-        if (pausedRef.current) return;
-        targetRef.current = pointerRef.current;
-        kickRef.current();
+        if (reducedRef.current || pausedRef.current || event.gamma == null) return;
+        const stage = stageRef.current;
+        if (!stage) return;
+        const rect = stage.getBoundingClientRect();
+        const noseX = rect.left + rect.width * WOLF_TURN_NOSE.x;
+        const noseY = rect.top + rect.height * WOLF_TURN_NOSE.y;
+        const reach = Math.min(window.innerWidth, window.innerHeight) * 0.45;
+        const px = noseX + clamp(event.gamma / 30, -1, 1) * reach;
+        const py = noseY + clamp(((event.beta ?? 0) - 45) / 30, -1, 1) * reach;
+        lastPointRef.current = { x: px, y: py };
+        const frame = pickWolfFrame(px, py, noseX, noseY, window.innerWidth, window.innerHeight);
+        showRef.current(frame);
       };
       window.addEventListener("deviceorientation", onOrientation);
       orientationCleanupRef.current = () => {
@@ -291,39 +213,30 @@ function useWolfHead(
 
     const coarse = window.matchMedia("(pointer: coarse)").matches || navigator.maxTouchPoints > 0;
     if (coarse) attach();
-  }, []);
+  }, [stageRef]);
 
   const setGazePaused = useCallback((paused: boolean) => {
     const wasPaused = pausedRef.current;
     pausedRef.current = paused;
-    if (artRef.current) artRef.current.dataset.gazePaused = paused ? "1" : "0";
-    if (paused) {
-      if (!wasPaused) targetRef.current = { ...currentRef.current };
-      return;
+    if (stageRef.current) stageRef.current.dataset.gazePaused = paused ? "1" : "0";
+    if (paused && !wasPaused) showRef.current(0);
+    if (!paused && wasPaused && lastPointRef.current && !reducedRef.current) {
+      const stage = stageRef.current;
+      if (!stage) return;
+      const rect = stage.getBoundingClientRect();
+      const frame = pickWolfFrame(
+        lastPointRef.current.x,
+        lastPointRef.current.y,
+        rect.left + rect.width * WOLF_TURN_NOSE.x,
+        rect.top + rect.height * WOLF_TURN_NOSE.y,
+        window.innerWidth,
+        window.innerHeight,
+      );
+      showRef.current(frame);
     }
-    if (!wasPaused) return;
-    targetRef.current = { ...pointerRef.current };
-    kickRef.current();
-  }, [artRef]);
+  }, [stageRef]);
 
   return { enableOrientation, setGazePaused };
-}
-
-function Eye({
-  side,
-  eyeRef,
-  pupilRef,
-}: {
-  side: "l" | "r";
-  eyeRef: React.RefObject<HTMLDivElement | null>;
-  pupilRef: React.RefObject<HTMLDivElement | null>;
-}) {
-  return (
-    <div ref={eyeRef} className={`wolf-cover__eye wolf-cover__eye--${side}`} data-eye={side} aria-hidden="true">
-      <div ref={pupilRef} className="wolf-cover__pupil" data-pupil={side} />
-      <div className="wolf-cover__glint" />
-    </div>
-  );
 }
 
 function CloseIcon() {
@@ -366,21 +279,9 @@ export function WolfCover({
   onCloseRules: () => void;
 }) {
   const t = useTranslations();
-  const artRef = useRef<HTMLDivElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const leftEyeRef = useRef<HTMLDivElement>(null);
-  const rightEyeRef = useRef<HTMLDivElement>(null);
-  const leftPupilRef = useRef<HTMLDivElement>(null);
-  const rightPupilRef = useRef<HTMLDivElement>(null);
+  const stageRef = useRef<HTMLDivElement>(null);
   const chromeRef = useRef<HTMLDivElement>(null);
-  const { enableOrientation, setGazePaused } = useWolfHead(
-    artRef,
-    canvasRef,
-    leftEyeRef,
-    rightEyeRef,
-    leftPupilRef,
-    rightPupilRef,
-  );
+  const { enableOrientation, setGazePaused } = useWolfTurn(stageRef);
   const quotaSpent = quota !== null && !quota.unlimited && quota.remaining <= 0;
   const showQuota = quota !== null && !quota.unlimited;
 
@@ -425,24 +326,25 @@ export function WolfCover({
 
   return (
     <section className="wolf-cover" aria-label="LAST HUMAN">
-      <link rel="preload" as="image" href={COVER_SRC} type="image/webp" fetchPriority="high" />
-      <div className="wolf-cover__stage">
-        <div className="wolf-cover__art" ref={artRef} data-wolf-art="" data-head="static">
-          <img
-            src={COVER_SRC}
-            alt={t("welcome.cover.imageAlt")}
-            width={1280}
-            height={720}
-            draggable={false}
-            fetchPriority="high"
-            decoding="async"
-          />
-          <canvas ref={canvasRef} className="wolf-cover__canvas" aria-hidden="true" />
-          <Eye side="l" eyeRef={leftEyeRef} pupilRef={leftPupilRef} />
-          <Eye side="r" eyeRef={rightEyeRef} pupilRef={rightPupilRef} />
-        </div>
+      <link rel="preload" as="image" href={FRONT_SRC} type="image/webp" fetchPriority="high" />
+      <div className="wolf-cover__bg" />
+      <div className="wolf-cover__moon" aria-hidden="true" />
+      <div className="wolf-cover__stage" ref={stageRef} data-wolf-art="" data-sprite="front" data-frame="0">
+        <img
+          className="wolf-cover__front"
+          src={FRONT_SRC}
+          alt={t("welcome.cover.imageAlt")}
+          width={640}
+          height={360}
+          draggable={false}
+          fetchPriority="high"
+          decoding="async"
+        />
+        {FRAME_INDEXES.map((index) => (
+          <div key={index} className="wolf-cover__frame" data-wolf-frame={index} />
+        ))}
       </div>
-      <div className="wolf-cover__vignette" />
+      <div className="wolf-cover__fog" />
       <div className="wolf-cover__chrome" ref={chromeRef} data-wolf-chrome="">
         <h1 className="wolf-cover__title">
           LAST HUMAN
