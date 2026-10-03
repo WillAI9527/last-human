@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef } from "react";
 import { useTranslations } from "next-intl";
+import { SixSeatMark } from "@/components/home/SixSeatMark";
 import "./wolf-cover.css";
 
 const COVER_SRC = "/cover/wolf.webp";
@@ -45,6 +46,7 @@ function useWolfGaze(
       apply(0, 0);
     };
     syncReduced();
+    if (artRef.current) artRef.current.dataset.gaze = "ready";
     media.addEventListener("change", syncReduced);
 
     const look = new URLSearchParams(window.location.search).get("look");
@@ -154,19 +156,6 @@ function useWolfGaze(
   return enableOrientation;
 }
 
-function SixSeatMark() {
-  return (
-    <svg className="wolf-cover__mark" viewBox="0 0 512 512" aria-hidden="true">
-      <circle cx="256" cy="88" r="18" fill="#F2EDE4" />
-      <circle cx="401.5" cy="172" r="18" fill="#F2EDE4" />
-      <circle cx="401.5" cy="340" r="18" fill="#F2EDE4" />
-      <circle cx="110.5" cy="172" r="18" fill="#F2EDE4" />
-      <circle cx="110.5" cy="340" r="18" fill="#F2EDE4" />
-      <circle cx="256" cy="424" r="26" fill="#E8BE6A" />
-    </svg>
-  );
-}
-
 function Eye({
   side,
   pupilRef,
@@ -185,9 +174,11 @@ function Eye({
 export function WolfCover({
   sheetOpen,
   onEnter,
+  onDismiss,
 }: {
   sheetOpen: boolean;
   onEnter: () => void;
+  onDismiss: () => void;
 }) {
   const t = useTranslations();
   const artRef = useRef<HTMLDivElement>(null);
@@ -203,8 +194,28 @@ export function WolfCover({
     onEnter();
   };
 
+  const handleCoverClick = (event: React.MouseEvent<HTMLElement>) => {
+    if (!sheetOpen) return;
+    if ((event.target as HTMLElement).closest("button, a, input, textarea")) return;
+    if (dragRef.current) return;
+    onDismiss();
+  };
+
   return (
-    <section className={sheetOpen ? "wolf-cover is-sheet" : "wolf-cover"} aria-label="LAST HUMAN">
+    <section
+      className={sheetOpen ? "wolf-cover is-sheet" : "wolf-cover"}
+      aria-label="LAST HUMAN"
+      onPointerDown={(event) => {
+        dragRef.current = false;
+        originRef.current = { x: event.clientX, y: event.clientY };
+      }}
+      onPointerMove={(event) => {
+        const dx = event.clientX - originRef.current.x;
+        const dy = event.clientY - originRef.current.y;
+        if (dx * dx + dy * dy > 64) dragRef.current = true;
+      }}
+      onClick={handleCoverClick}
+    >
       <link rel="preload" as="image" href={COVER_SRC} type="image/webp" fetchPriority="high" />
       <div className="wolf-cover__stage">
         <div className="wolf-cover__art" ref={artRef} data-wolf-art="">

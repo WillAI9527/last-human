@@ -1,7 +1,7 @@
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
-import { FingerprintSimple, PawPrint, Sparkle, Wrench, GearSix, UserCircle, GithubLogo, EnvelopeSimple, Handshake, DotsThreeOutlineVertical, Users, UsersFour } from "@phosphor-icons/react";
+import { PawPrint, Sparkle, Wrench, GearSix, UserCircle, GithubLogo, EnvelopeSimple, Handshake, DotsThreeOutlineVertical, Users, UsersFour } from "@phosphor-icons/react";
 import { WerewolfIcon } from "@/components/icons/FlatIcons";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -38,6 +38,8 @@ import {
 import { loadTokenPayConnectionWithRetry } from "@/lib/tokenpay-client";
 import { fetchPublicQuota, reservePublicGame, type PublicQuota } from "@/lib/demo-game-client";
 import { WolfCover } from "@/components/home/WolfCover";
+import { SixSeatMark } from "@/components/home/SixSeatMark";
+import { isQuotaSpent, nameFieldEnterAction } from "@/components/home/oath-card";
 
 const GITHUB_REPO_URL = "https://github.com/WillAI9527/last-human";
 
@@ -378,6 +380,9 @@ export function WelcomeScreen({
   const [oathOpen, setOathOpen] = useState(false);
   const [reduceMotion, setReduceMotion] = useState(false);
   const [dailyQuota, setDailyQuota] = useState<PublicQuota | null>(null);
+  const [sealHint, setSealHint] = useState(false);
+  const sheetRef = useRef<HTMLDivElement>(null);
+  const sealHintTimerRef = useRef<number | null>(null);
   const springCampaignRemainingQuota = springCampaign?.remainingQuota ?? 0;
   const springCampaignTotalQuota = springCampaign?.totalQuota ?? 0;
   const springCampaignActiveNow = SPRING_CAMPAIGN_ENABLED
@@ -608,6 +613,38 @@ export function WelcomeScreen({
     return () => window.clearTimeout(id);
   }, [oathOpen, reduceMotion]);
 
+  useEffect(() => {
+    if (!oathOpen) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOathOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [oathOpen]);
+
+  useEffect(() => {
+    if (!oathOpen) return;
+    const sheet = sheetRef.current;
+    const viewport = window.visualViewport;
+    if (!sheet || !viewport) return;
+    const sync = () => {
+      const inset = Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop);
+      sheet.style.setProperty("--wolf-keyboard-inset", `${inset}px`);
+      const input = paperRef.current?.querySelector("input");
+      if (input && document.activeElement === input) {
+        input.scrollIntoView({ block: "center", inline: "nearest" });
+      }
+    };
+    sync();
+    viewport.addEventListener("resize", sync);
+    viewport.addEventListener("scroll", sync);
+    return () => {
+      viewport.removeEventListener("resize", sync);
+      viewport.removeEventListener("scroll", sync);
+      sheet.style.removeProperty("--wolf-keyboard-inset");
+    };
+  }, [oathOpen]);
+
   const roleConfigValid = useMemo(() => {
     if (fixedRoles.length !== playerCount) return false;
     if (fixedRoles.some((r) => !r)) return false;
@@ -653,6 +690,8 @@ export function WelcomeScreen({
   const canConfirm = useMemo(() => {
     return !!humanName.trim() && !isLoading && !isTransitioning && (PUBLIC_DEMO || !creditsLoading);
   }, [humanName, isLoading, isTransitioning, creditsLoading]);
+  const quotaSpent = isQuotaSpent(dailyQuota);
+  const sealDisabled = !canConfirm || quotaSpent;
 
   useEffect(() => {
     const paper = paperRef.current;
@@ -990,7 +1029,11 @@ export function WelcomeScreen({
   return (
     <>
       <div className="wc-contract-screen wc-contract-screen--hero selection:bg-[var(--color-accent)] selection:text-white">
-        <WolfCover sheetOpen={oathOpen} onEnter={() => setOathOpen(true)} />
+        <WolfCover
+          sheetOpen={oathOpen}
+          onEnter={() => setOathOpen(true)}
+          onDismiss={() => setOathOpen(false)}
+        />
         <div className="wc-contract-fog" aria-hidden="true" />
         <div className="wc-contract-vignette" aria-hidden="true" />
 
@@ -1439,6 +1482,7 @@ export function WelcomeScreen({
 
         <motion.div
           id="oath-card"
+          ref={sheetRef}
           initial={false}
           animate={{ y: oathOpen ? 0 : "105%" }}
           transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 280, damping: 32 }}
@@ -1446,8 +1490,27 @@ export function WelcomeScreen({
           style={{ pointerEvents: oathOpen ? "auto" : "none" }}
           aria-hidden={!oathOpen}
           inert={oathOpen ? undefined : true}
+          onClick={(event) => {
+            if (event.target === event.currentTarget) setOathOpen(false);
+          }}
         >
           <div ref={paperRef} className="wc-contract-paper">
+            <button
+              type="button"
+              className="wolf-oath-close"
+              aria-label={t("welcome.closeCard")}
+              onClick={() => setOathOpen(false)}
+            >
+              <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+                <path
+                  d="M3.5 3.5 L12.5 12.5 M12.5 3.5 L3.5 12.5"
+                  fill="none"
+                  stroke="#A9B2BC"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                />
+              </svg>
+            </button>
             <div className="wc-contract-borders" aria-hidden="true" />
 
             {locale === "zh" && FREE_ROUNDS_PROMO_ENABLED && (
@@ -1513,7 +1576,17 @@ export function WelcomeScreen({
               <div className="wc-contract-subtitle">{t("welcome.subtitle")}</div>
               <p className="wolf-rules">{t("welcome.rules")}</p>
               {dailyQuota && !dailyQuota.unlimited && (
-                <p className="wolf-quota">{t("welcome.quotaRemaining", { count: dailyQuota.remaining })}</p>
+                <p className="wolf-quota">
+                  {quotaSpent
+                    ? t.rich("welcome.quotaSpent", {
+                        limit: dailyQuota.limit,
+                        b: (chunks) => <strong>{chunks}</strong>,
+                      })
+                    : t.rich("welcome.quotaRemaining", {
+                        count: dailyQuota.remaining,
+                        b: (chunks) => <strong>{chunks}</strong>,
+                      })}
+                </p>
               )}
               {serverNotice && (
                 <p className="mt-3 text-sm text-[#B3262B]" role="alert">{serverNotice}</p>
@@ -1586,6 +1659,18 @@ export function WelcomeScreen({
                     type="text"
                     value={mounted ? humanName : ""}
                     onChange={(e) => setHumanName(e.target.value)}
+                    onFocus={(event) => {
+                      event.currentTarget.scrollIntoView({ block: "center", inline: "nearest" });
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key !== "Enter" || event.nativeEvent.isComposing) return;
+                      event.preventDefault();
+                      const coarse = window.matchMedia("(pointer: coarse)").matches;
+                      if (nameFieldEnterAction(coarse) !== "hint-seal" || quotaSpent) return;
+                      setSealHint(true);
+                      if (sealHintTimerRef.current !== null) window.clearTimeout(sealHintTimerRef.current);
+                      sealHintTimerRef.current = window.setTimeout(() => setSealHint(false), 720);
+                    }}
                     placeholder={t("welcome.signature.placeholder")}
                     className="wc-signature-input"
                     autoComplete="off"
@@ -1637,11 +1722,14 @@ export function WelcomeScreen({
               <button
                 ref={sealButtonRef}
                 type="button"
-                className="wc-wax-seal"
+                className={`wc-wax-seal${quotaSpent ? " is-spent" : ""}${sealHint ? " is-hint" : ""}`}
                 onClick={handleConfirm}
-                disabled={!canConfirm}
+                disabled={sealDisabled}
+                aria-disabled={sealDisabled}
               >
-                <FingerprintSimple weight="fill" size={44} className="wc-wax-seal-icon" />
+                <span className="wolf-card-mark">
+                  <SixSeatMark muted={quotaSpent} />
+                </span>
               </button>
             </div>
 

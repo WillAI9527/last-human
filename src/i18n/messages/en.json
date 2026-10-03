@@ -118,7 +118,9 @@
     "tutorial": "How to play",
     "subtitle": "You are the only human",
     "rules": "Everyone else is AI. Find the werewolves, or fool them all. Write your name, then press the seal to begin.",
-    "quotaRemaining": "{count} games left today",
+    "quotaRemaining": "<b>{count}</b> games left today",
+    "quotaSpent": "Today's <b>{limit}</b> games are used up. Come back tomorrow.",
+    "closeCard": "Close",
     "cover": {
       "line": "It already has its eyes on you.",
       "enter": "Enter",

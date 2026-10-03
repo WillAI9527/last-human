@@ -215,7 +215,7 @@
   text-align: center;
   font-size: 13px;
   line-height: 1.7;
-  color: rgba(44, 24, 16, 0.78);
+  color: #a9b2bc;
 }
 
 .wolf-quota {
@@ -223,7 +223,97 @@
   text-align: center;
   font-size: 13px;
   letter-spacing: 0.14em;
-  color: #8a1c1c;
+  color: #f2ede4;
+}
+
+.wolf-quota strong {
+  font-weight: 700;
+}
+
+.wolf-oath-close {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 4;
+  width: 48px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: #a9b2bc;
+  touch-action: manipulation;
+}
+
+.wolf-oath-close svg {
+  display: block;
+}
+
+.wolf-oath-sheet {
+  bottom: var(--wolf-keyboard-inset, 0px);
+  max-height: min(60dvh, calc(100% - var(--wolf-keyboard-inset, 0px)));
+}
+
+.wc-wax-seal.is-spent,
+.wc-wax-seal.is-spent:hover,
+.wc-wax-seal.is-spent:active,
+.wc-wax-seal.is-spent:disabled {
+  opacity: 1;
+  filter: none;
+  background-color: #3a3330;
+  background-image: none;
+  border-color: #3a3330;
+  box-shadow: none;
+  transform: none;
+  transition: none;
+  cursor: not-allowed;
+}
+
+.wc-wax-seal.is-spent::before {
+  content: none;
+  animation: none;
+}
+
+.wolf-card-mark {
+  width: 58px;
+  height: 58px;
+  display: grid;
+  place-items: center;
+}
+
+.wolf-card-mark .wolf-cover__mark {
+  width: 58px;
+  height: 58px;
+}
+
+@keyframes wolf-seal-flash {
+  0% {
+    box-shadow: 0 0 0 0 rgba(179, 38, 43, 0);
+    filter: brightness(1);
+  }
+  35% {
+    box-shadow: 0 0 0 8px rgba(179, 38, 43, 0.4);
+    filter: brightness(1.2);
+  }
+  100% {
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+    filter: brightness(1);
+  }
+}
+
+.wc-wax-seal.is-hint {
+  animation: wolf-seal-flash 720ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wc-wax-seal.is-hint {
+    animation: none;
+    outline: 3px solid #f2ede4;
+    outline-offset: 4px;
+  }
 }
 
 @media (max-height: 520px) {
