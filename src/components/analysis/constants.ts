@@ -20,7 +20,7 @@ export const ROLE_NAMES: Record<Role, string> = {
   Guard: "守卫",
   Idiot: "白痴",
   WhiteWolfKing: "白狼王",
-  Villager: "平民",
+  Villager: "村民",
 };
 
 export const ROLE_SHORT: Record<Role, string> = {

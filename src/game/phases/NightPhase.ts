@@ -11,14 +11,13 @@ import {
   buildSystemTextFromParts,
 } from "@/lib/prompt-utils";
 import {
-  addSystemMessage,
   generateGuardAction,
   generateSeerAction,
   generateWitchAction,
   generateWolfAction,
   transitionPhase as rawTransitionPhase,
 } from "@/lib/game-master";
-import { getSystemMessages, getUiText } from "@/lib/game-texts";
+import { getUiText } from "@/lib/game-texts";
 import { DELAY_CONFIG } from "@/lib/game-constants";
 import {
   delay,
@@ -27,6 +26,7 @@ import {
 import { playNarrator } from "@/lib/narrator-audio-player";
 import { getI18n } from "@/i18n/translator";
 import { canWitchPoison, canWitchSave, isWolfNightResolved } from "@/lib/six-player-rules";
+import { addPublicNightBeat, publicNightActionLine } from "@/lib/night-public";
 
 function randomFakeActionDelay(): number {
   const min = DELAY_CONFIG.NIGHT_ROLE_ANIMATION_MIN;
@@ -112,35 +112,44 @@ export class NightPhase extends GamePhase {
     return rawTransitionPhase(state, newPhase);
   }
 
-  private async runGuardAction(state: GameState, runtime: NightPhaseRuntime): Promise<GameState> {
+  /** Shared night beat stays role-free. Only the human who holds the role hears their own prompt. */
+  private announceNight(
+    state: GameState,
+    runtime: NightPhaseRuntime,
+    humanActing: boolean,
+    privatePrompt: string,
+  ): GameState {
     const { t } = getI18n();
-    const speakerSystem = t("speakers.system");
-    const systemMessages = getSystemMessages();
+    const next = addPublicNightBeat(state);
+    runtime.setGameState(next);
+    runtime.setDialogue(t("speakers.system"), humanActing ? privatePrompt : publicNightActionLine(), false);
+    return next;
+  }
+
+  private async runGuardAction(state: GameState, runtime: NightPhaseRuntime): Promise<GameState> {
     const uiText = getUiText();
     const guard = state.players.find((p) => p.role === "Guard" && p.alive);
 
     let currentState = this.transitionPhase(state, "NIGHT_GUARD_ACTION");
-    currentState = addSystemMessage(currentState, systemMessages.guardActionStart);
-    runtime.setGameState(currentState);
-
-    runtime.setIsWaitingForAI(true);
-    runtime.setDialogue(speakerSystem, uiText.guardActing, false);
-    await playNarrator("guardWake");
+    const humanActing = Boolean(guard?.isHuman);
+    currentState = this.announceNight(currentState, runtime, humanActing, uiText.waitingGuard);
 
     if (!guard) {
+      runtime.setIsWaitingForAI(true);
       await delay(randomFakeActionDelay());
       await runtime.waitForUnpause();
       if (!runtime.isTokenValid(runtime.token)) return currentState;
       runtime.setIsWaitingForAI(false);
-      await playNarrator("guardClose");
       return currentState;
     }
 
     if (guard.isHuman) {
       runtime.setIsWaitingForAI(false);
-      runtime.setDialogue(speakerSystem, uiText.waitingGuard, false);
+      await playNarrator("guardWake");
       return currentState;
     }
+
+    runtime.setIsWaitingForAI(true);
 
     const guardTarget = await generateGuardAction(currentState, guard);
     await runtime.waitForUnpause();
@@ -156,50 +165,33 @@ export class NightPhase extends GamePhase {
     runtime.setGameState(currentState);
     runtime.setIsWaitingForAI(false);
 
-    await playNarrator("guardClose");
-
     return currentState;
   }
 
   private async runWolfAction(state: GameState, runtime: NightPhaseRuntime): Promise<GameState> {
-    const { t } = getI18n();
-    const speakerSystem = t("speakers.system");
-    const systemMessages = getSystemMessages();
     const uiText = getUiText();
     let currentState = this.transitionPhase(state, "NIGHT_WOLF_ACTION");
-    currentState = addSystemMessage(currentState, systemMessages.wolfActionStart);
-    runtime.setGameState(currentState);
-
-    const wolves = currentState.players.filter((p) => isWolfRole(p.role) && p.alive);
+    const wolves = state.players.filter((p) => isWolfRole(p.role) && p.alive);
+    const humanWolf = wolves.find((w) => w.isHuman);
+    currentState = this.announceNight(currentState, runtime, Boolean(humanWolf), uiText.waitingWolf);
 
     if (wolves.length === 0) {
       runtime.setIsWaitingForAI(true);
-      runtime.setDialogue(speakerSystem, uiText.wolfActing, false);
-      await playNarrator("wolfWake");
-
       await delay(randomFakeActionDelay());
       await runtime.waitForUnpause();
       if (!runtime.isTokenValid(runtime.token)) return currentState;
-
       runtime.setIsWaitingForAI(false);
-      await playNarrator("wolfClose");
       return currentState;
     }
 
     if (wolves.length > 0) {
-      const humanWolf = wolves.find((w) => w.isHuman);
       if (humanWolf) {
-        runtime.setDialogue(speakerSystem, uiText.waitingWolf, false);
-      } else {
-        runtime.setIsWaitingForAI(true);
-        runtime.setDialogue(speakerSystem, uiText.wolfActing, false);
-      }
-
-      await playNarrator("wolfWake");
-
-      if (humanWolf) {
+        runtime.setIsWaitingForAI(false);
+        await playNarrator("wolfWake");
         return currentState;
       }
+
+      runtime.setIsWaitingForAI(true);
 
       const wolfVotes: Record<string, number> = {};
       try {
@@ -236,42 +228,35 @@ export class NightPhase extends GamePhase {
       }
 
       runtime.setIsWaitingForAI(false);
-
-      await playNarrator("wolfClose");
     }
 
     return currentState;
   }
 
   private async runWitchAction(state: GameState, runtime: NightPhaseRuntime): Promise<GameState> {
-    const { t } = getI18n();
-    const speakerSystem = t("speakers.system");
-    const systemMessages = getSystemMessages();
     const uiText = getUiText();
     const witch = state.players.find((p) => p.role === "Witch" && p.alive);
     const canWitchAct = witch && (!state.roleAbilities.witchHealUsed || !state.roleAbilities.witchPoisonUsed);
     let currentState = this.transitionPhase(state, "NIGHT_WITCH_ACTION");
-    currentState = addSystemMessage(currentState, systemMessages.witchActionStart);
-    runtime.setGameState(currentState);
-
-    runtime.setIsWaitingForAI(true);
-    runtime.setDialogue(speakerSystem, uiText.witchActing, false);
-    await playNarrator("witchWake");
+    const humanActing = Boolean(witch?.isHuman && canWitchAct);
+    currentState = this.announceNight(currentState, runtime, humanActing, uiText.waitingWitch);
 
     if (!witch || !canWitchAct) {
+      runtime.setIsWaitingForAI(true);
       await delay(randomFakeActionDelay());
       await runtime.waitForUnpause();
       if (!runtime.isTokenValid(runtime.token)) return currentState;
       runtime.setIsWaitingForAI(false);
-      await playNarrator("witchClose");
       return currentState;
     }
 
     if (witch.isHuman) {
       runtime.setIsWaitingForAI(false);
-      runtime.setDialogue(speakerSystem, uiText.waitingWitch, false);
+      await playNarrator("witchWake");
       return currentState;
     }
+
+    runtime.setIsWaitingForAI(true);
 
     const witchAction = await generateWitchAction(currentState, witch, currentState.nightActions.wolfTarget);
     await runtime.waitForUnpause();
@@ -294,39 +279,32 @@ export class NightPhase extends GamePhase {
     runtime.setGameState(currentState);
     runtime.setIsWaitingForAI(false);
 
-    await playNarrator("witchClose");
-
     return currentState;
   }
 
   private async runSeerAction(state: GameState, runtime: NightPhaseRuntime): Promise<GameState> {
-    const { t } = getI18n();
-    const speakerSystem = t("speakers.system");
-    const systemMessages = getSystemMessages();
     const uiText = getUiText();
     const seer = state.players.find((p) => p.role === "Seer" && p.alive);
     let currentState = this.transitionPhase(state, "NIGHT_SEER_ACTION");
-    currentState = addSystemMessage(currentState, systemMessages.seerActionStart);
-    runtime.setGameState(currentState);
-
-    runtime.setIsWaitingForAI(true);
-    runtime.setDialogue(speakerSystem, uiText.seerChecking, false);
-    await playNarrator("seerWake");
+    const humanActing = Boolean(seer?.isHuman);
+    currentState = this.announceNight(currentState, runtime, humanActing, uiText.waitingSeer);
 
     if (!seer) {
+      runtime.setIsWaitingForAI(true);
       await delay(randomFakeActionDelay());
       await runtime.waitForUnpause();
       if (!runtime.isTokenValid(runtime.token)) return currentState;
       runtime.setIsWaitingForAI(false);
-      await playNarrator("seerClose");
       return currentState;
     }
 
     if (seer.isHuman) {
       runtime.setIsWaitingForAI(false);
-      runtime.setDialogue(speakerSystem, uiText.waitingSeer, false);
+      await playNarrator("seerWake");
       return currentState;
     }
+
+    runtime.setIsWaitingForAI(true);
 
     const targetSeat = await generateSeerAction(currentState, seer);
     if (!runtime.isTokenValid(runtime.token)) return currentState;
@@ -334,7 +312,6 @@ export class NightPhase extends GamePhase {
     if (targetSeat === undefined) {
       runtime.setGameState(currentState);
       runtime.setIsWaitingForAI(false);
-      await playNarrator("seerClose");
       return currentState;
     }
 
@@ -353,8 +330,6 @@ export class NightPhase extends GamePhase {
     };
     runtime.setGameState(currentState);
     runtime.setIsWaitingForAI(false);
-
-    await playNarrator("seerClose");
 
     return currentState;
   }

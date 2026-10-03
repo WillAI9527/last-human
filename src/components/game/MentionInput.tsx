@@ -75,7 +75,11 @@ function createSuggestionItems(players: Player[]) {
   };
 }
 
-function renderSuggestionList(isGenshinMode: boolean, onOpenChange?: (open: boolean) => void) {
+function renderSuggestionList(
+  isGenshinMode: boolean,
+  onOpenChange?: (open: boolean) => void,
+  onPicked?: () => void,
+) {
   let el: HTMLDivElement | null = null;
   let selectedIndex = 0;
   let lastItems: MentionCandidate[] = [];
@@ -202,6 +206,9 @@ function renderSuggestionList(isGenshinMode: boolean, onOpenChange?: (open: bool
           return true;
         }
         if (props.event.key === "Enter") {
+          props.event.preventDefault();
+          props.event.stopPropagation();
+          onPicked?.();
           lastCommand?.(items[selectedIndex]);
           return true;
         }
@@ -234,6 +241,7 @@ export function MentionInput({
 }: MentionInputProps) {
   const items = useMemo(() => createSuggestionItems(players), [players]);
   const [isSuggestionOpen, setIsSuggestionOpen] = useState(false);
+  const justPickedRef = useRef(false);
 
   const holdTimerRef = useRef<number | null>(null);
   const holdingSlashRef = useRef(false);
@@ -244,6 +252,8 @@ export function MentionInput({
   const suggestionRenderer = useMemo(() => {
     return () => renderSuggestionList(isGenshinMode, (open) => {
       setIsSuggestionOpen(open);
+    }, () => {
+      justPickedRef.current = true;
     });
   }, [isGenshinMode]);
 
@@ -387,8 +397,11 @@ export function MentionInput({
           }
 
           if (e.key === "Enter" && !e.shiftKey) {
-            // Don't send if suggestion popup is open
-            if (isSuggestionOpen) return;
+            if (isSuggestionOpen || justPickedRef.current) {
+              justPickedRef.current = false;
+              e.preventDefault();
+              return;
+            }
             e.preventDefault();
             onSend();
           }

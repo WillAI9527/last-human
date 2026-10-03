@@ -134,14 +134,17 @@ export function PlayerCardCompact({
       case "hunter":
         return "border-[var(--color-warning)] shadow-[0_0_0_2px_var(--color-warning)]";
       case "badge":
-        return "border-[#A9B2BC] shadow-[0_0_0_2px_rgba(169,178,188,0.35)]";
       case "vote":
-        return "border-[#A9B2BC] shadow-[0_0_0_2px_rgba(169,178,188,0.35)]";
+        return "lh-seat-selected";
       default:
         return "border-[#A9B2BC] shadow-[0_0_0_2px_rgba(169,178,188,0.35)]";
     }
   })();
 
+  const voteDimmed = (selectionTone === "vote" || selectionTone === "badge")
+    && isInSelectionPhase
+    && !isSelected
+    && isReady;
   const modelLabel = player.agentProfile?.modelRef?.model;
 
   const isModelAvatar = isGenshinMode && !player.isHuman;
@@ -181,7 +184,7 @@ export function PlayerCardCompact({
               y: 0,
               scale: [1, 1.08, 1.03, 1],
             }
-          : { opacity: 1, y: 0, scale: 1 }
+          : { opacity: voteDimmed ? 0.4 : 1, y: 0, scale: 1 }
       }
       transition={
         revealPop
@@ -203,7 +206,8 @@ export function PlayerCardCompact({
         isSpeaking && !isMe && "wc-player-card--speaking-ai",
         isMe && "wc-player-card--me",
         isWolfTeammate && "border-[var(--color-blood)]/70 bg-[var(--color-wolf-bg)]",
-        isDisabledInSelection && "wc-player-card--disabled opacity-50 grayscale-[0.3] pointer-events-none",
+        isDisabledInSelection && !voteDimmed && "wc-player-card--disabled opacity-50 grayscale-[0.3] pointer-events-none",
+        voteDimmed && "lh-seat-dimmed",
         canClick && isReady && "wc-player-card--selectable cursor-pointer",
         isSelected && "scale-[1.02]",
         isSelected && selectionClass
@@ -295,7 +299,7 @@ export function PlayerCardCompact({
       )}
       {isMe && isReady && !isDead && <SeatCandle night={isNight} />}
       {isMe && isReady && (
-        <span className="lh-you-capsule">你 · {seatNumberLabel(player.seat)}</span>
+        <span className="lh-you-capsule">你</span>
       )}
       {showVoteSeal && isReady && (
         <span className="lh-wax-seal" aria-label="你的票">票</span>
@@ -340,8 +344,8 @@ export function PlayerCardCompact({
       {/* 信息区 */}
       <div className="wc-player-card__info relative z-10">
         {variant === "round" ? (
-          <div className="wc-player-card__name lh-round-name" title={player.displayName}>
-            {isReady ? player.displayName : t("playerCard.joining")}
+          <div className="wc-player-card__name lh-round-name" title={isReady ? playerTitle(player.seat, player.displayName) : player.displayName}>
+            {isReady ? playerTitle(player.seat, player.displayName) : t("playerCard.joining")}
           </div>
         ) : variant === "mobile" ? (
           <div className="wc-player-card__name relative flex items-center gap-1 min-w-0" title={playerTitle(player.seat, player.displayName)}>

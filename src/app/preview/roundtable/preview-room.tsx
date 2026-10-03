@@ -8,6 +8,7 @@ import { receiptForSeatAction, type ActionReceipt } from "@/lib/action-receipt";
 import { GameBackground } from "@/components/game/GameBackground";
 import { RoundTable } from "@/components/game/RoundTable";
 import { DialogArea } from "@/components/game/DialogArea";
+import { PhaseBar } from "@/components/game/PhaseBar";
 import { PlayerDetailModal } from "@/components/game/PlayerDetailModal";
 import { SuspicionReview } from "@/components/analysis/SuspicionReview";
 import type { SuspicionEntry } from "@/lib/suspicion";
@@ -99,15 +100,26 @@ export function PreviewRoom() {
           : "DAY_SPEECH";
     next.currentSpeakerSeat = scene === "keyboard" ? 2 : voteScene ? null : 1;
     next.votes = scene === "vote" && human ? { [human.playerId]: 0 } : {};
-    next.messages = LINES.map((content, index): ChatMessage => ({
-      id: `m-${index}`,
-      playerId: players[index % players.length].playerId,
-      playerName: players[index % players.length].displayName,
-      content,
-      timestamp: index + 1,
-      day: 1,
-      phase: "DAY_SPEECH",
-    }));
+    next.messages = night
+      ? [{
+          id: "night-public",
+          playerId: "system",
+          playerName: "主持人",
+          content: "夜色中有人在行动…",
+          timestamp: 1,
+          day: 1,
+          phase: "NIGHT_WOLF_ACTION",
+          isSystem: true,
+        }]
+      : LINES.map((content, index): ChatMessage => ({
+          id: `m-${index}`,
+          playerId: players[index % players.length].playerId,
+          playerName: players[index % players.length].displayName,
+          content,
+          timestamp: index + 1,
+          day: 1,
+          phase: "DAY_SPEECH",
+        }));
     return next;
   }, [human, night, players, scene, voteScene]);
 
@@ -135,6 +147,7 @@ export function PreviewRoom() {
       data-cast-seat={receipt?.kind === "commit" ? String(selectedSeat ?? "") : ""}
     >
       <GameBackground isNight={night} />
+      <PhaseBar gameState={state} humanPlayer={human} isWaitingForAI={false} />
       <div className={cn("flex-1 min-h-0 flex flex-col md:flex-row", night && "lh-roundtable--night")}>
         <div className={cn("lh-table-pane min-h-0", keyboard && "lh-table-pane--keyboard")}>
           <RoundTable
@@ -164,9 +177,13 @@ export function PreviewRoom() {
             gameState={state}
             humanPlayer={human}
             isNight={night}
-            currentDialogue={keyboard ? null : {
+            currentDialogue={keyboard ? null : night ? {
+              speaker: "系统",
+              text: "夜色中有人在行动…",
+              isStreaming: false,
+            } : {
               speaker: players[1].displayName,
-              text: "我是预言家。昨晚我验了伊尔莎局长，她是狼人。今天先出她。",
+              text: "我是预言家。昨晚我验了伊尔莎局长，她是狼人。今天先出她。我把昨天的票、发言和空档再对一遍，还是觉得她的时间线对不上。",
               isStreaming: false,
             }}
             displayedText=""
@@ -185,6 +202,7 @@ export function PreviewRoom() {
               setReceipt(receiptForSeatAction(state.phase, selectedSeat));
             }}
             onCancelSelection={() => setSelectedSeat(null)}
+            keyboardOpen={keyboard}
           />
         </div>
       </div>

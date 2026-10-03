@@ -15,6 +15,7 @@ import { VoiceRecorder, type VoiceRecorderHandle } from "./VoiceRecorder";
 import { EventLog } from "./EventLog";
 import { buildSimpleAvatarUrl, getModelLogoUrl } from "@/lib/avatar-config";
 import { playerTitle } from "@/lib/player-label";
+import { redactNightRoleLeak } from "@/lib/night-public";
 import { roleCardUrl } from "@/lib/role-card";
 import type { ActionReceipt } from "@/lib/action-receipt";
 import { RoleRevealHistoryCard, type RoleRevealEntry } from "@/components/game/RoleRevealHistoryCard";
@@ -290,6 +291,7 @@ interface DialogAreaProps {
   roomLayout?: "classic" | "round";
   transcriptExpanded?: boolean;
   onTranscriptExpandedChange?: (open: boolean) => void;
+  keyboardOpen?: boolean;
 }
 
 // 等待状态动画组件已移除，与当前简洁风格不符
@@ -312,13 +314,17 @@ function NightActionStatus({ phase, humanRole }: { phase: string; humanRole?: st
       (phase === "NIGHT_SEER_ACTION" && humanRole === "Seer") ||
       (phase === "HUNTER_SHOOT" && humanRole === "Hunter");
     
+    if (!isMyPhase && phase !== "HUNTER_SHOOT") {
+      return { icon: null, text: t("system.publicNightAction"), color: "text-[var(--text-secondary)]" };
+    }
+
     switch (phase) {
       case "NIGHT_WOLF_ACTION":
-        return { icon: WerewolfIcon, text: isMyPhase ? t("dialog.nightAction.wolfAwake") : t("dialog.nightAction.wolfActing"), color: "text-red-500" };
+        return { icon: WerewolfIcon, text: t("dialog.nightAction.wolfAwake"), color: "text-red-500" };
       case "NIGHT_WITCH_ACTION":
-        return { icon: Drop, text: isMyPhase ? t("dialog.nightAction.witchAwake") : t("dialog.nightAction.witchActing"), color: "text-purple-500" };
+        return { icon: Drop, text: t("dialog.nightAction.witchAwake"), color: "text-purple-500" };
       case "NIGHT_SEER_ACTION":
-        return { icon: Eye, text: isMyPhase ? t("dialog.nightAction.seerAwake") : t("dialog.nightAction.seerChecking"), color: "text-blue-500" };
+        return { icon: Eye, text: t("dialog.nightAction.seerAwake"), color: "text-blue-500" };
       case "HUNTER_SHOOT":
         return { icon: Crosshair, text: isMyPhase ? t("dialog.nightAction.hunterAwake") : t("dialog.nightAction.hunterActing"), color: "text-orange-500" };
       default:
@@ -410,6 +416,7 @@ export function DialogArea({
   roomLayout = "classic",
   transcriptExpanded,
   onTranscriptExpandedChange,
+  keyboardOpen = false,
 }: DialogAreaProps) {
   const t = useTranslations();
   const isGenshinMode = !!gameState.isGenshinMode;
@@ -480,9 +487,16 @@ export function DialogArea({
   }, [phase, waitingForNextRound, humanPlayer?.role, gameState.nightActions.seerTarget, currentDialogue?.text]);
 
   const visibleMessages = useMemo(() => {
-    return gameState.messages.filter(
+    const filtered = gameState.messages.filter(
       (m) => !(m.isSystem && isTurnPromptSystemMessage(m.content, t))
     );
+    const collapsed: typeof filtered = [];
+    for (const message of filtered) {
+      const previous = collapsed[collapsed.length - 1];
+      if (message.isSystem && previous?.isSystem && previous.content === message.content) continue;
+      collapsed.push(message);
+    }
+    return collapsed;
   }, [gameState.messages, t]);
   const transcriptOpen = roomLayout !== "round" || (transcriptExpanded ?? transcriptOpenUncontrolled);
   const toggleTranscript = () => {
@@ -490,7 +504,14 @@ export function DialogArea({
     if (transcriptExpanded === undefined) setTranscriptOpenUncontrolled(next);
     onTranscriptExpandedChange?.(next);
   };
-  const shownMessages = roomLayout === "round" && !transcriptOpen ? visibleMessages.slice(-3) : visibleMessages;
+  const shownMessages = roomLayout === "round" && !transcriptOpen
+    ? (keyboardOpen ? visibleMessages.filter((message) => !message.isSystem).slice(-2) : visibleMessages.slice(-3))
+    : visibleMessages;
+
+  useEffect(() => {
+    if (!keyboardOpen || !historyRef.current) return;
+    historyRef.current.scrollTop = historyRef.current.scrollHeight;
+  }, [keyboardOpen, shownMessages.length]);
   const hiddenTranscriptCount = roomLayout === "round" && !transcriptOpen
     ? Math.max(0, visibleMessages.length - shownMessages.length)
     : 0;
@@ -967,7 +988,7 @@ export function DialogArea({
     : (displayedText || currentSpeaker?.text || "");
   // When human has voted in badge election, show "你已经投票给 x 号" instead of "点击头像投票选警徽"
   const humanBadgeVote = humanPlayer ? gameState.badge.votes[humanPlayer.playerId] : undefined;
-  const dialogueText =
+  const rawDialogueText =
     phase === "DAY_BADGE_ELECTION" &&
     humanPlayer &&
     typeof humanBadgeVote === "number" &&
@@ -977,7 +998,13 @@ export function DialogArea({
           return t("dialog.alreadyVotedFor", { seat: humanBadgeVote + 1, name: vp?.displayName || "" });
         })()
       : baseDialogueText;
-  const shouldShowDialogue = waitingForNextRound || dialogueText.trim().length > 0;
+  const dialogueText = redactNightRoleLeak(rawDialogueText);
+  const hostLineAlreadyPosted = Boolean(
+    dialogueText
+    && (dialogueText === t("system.dayBreak") || dialogueText === t("system.peacefulNight"))
+    && visibleMessages.some((message) => message.isSystem && message.content === dialogueText)
+  );
+  const shouldShowDialogue = !hostLineAlreadyPosted && (waitingForNextRound || dialogueText.trim().length > 0);
   const isNightActionPhase = [
     "NIGHT_GUARD_ACTION",
     "NIGHT_WOLF_ACTION",
@@ -1047,12 +1074,13 @@ export function DialogArea({
     && selectedSeat === null
     && !(phase === "NIGHT_WITCH_ACTION" && humanPlayer?.role === "Witch" && !isWaitingForAI);
 
+  const voteBarConfirm = showActionConfirm && (phase === "DAY_VOTE" || phase === "DAY_BADGE_ELECTION");
   const shouldShowDialogPanel = showGameEnd
     || showBadgeSignup
     || showBadgeSignupWaiting
     || showBadgeTransferOption
     || showHunterPassOption
-    || showActionConfirm
+    || (showActionConfirm && !voteBarConfirm)
     || showWitchPanel
     || showWolfSkip
     || showHumanInput
@@ -1060,7 +1088,7 @@ export function DialogArea({
     || showNightWaiting;
 
   return (
-    <div className={cn("wc-dialog-area h-full w-full flex flex-col min-h-0 justify-start", roomLayout === "round" && "lh-dialog-round")}>
+    <div className={cn("wc-dialog-area h-full w-full flex flex-col min-h-0 justify-start", roomLayout === "round" && "lh-dialog-round", voteBarConfirm && "pb-[76px]")}>
       {/* 上方区域：左侧立绘 + 右侧历史记录 */}
       <div className={cn(
         "w-full",
@@ -1090,7 +1118,8 @@ export function DialogArea({
           {/* 右侧：聊天历史记录 */}
           <div className={cn(
             "wc-dialog-history flex-1 min-w-0 relative",
-            roomLayout === "round" && !transcriptOpen && "md:h-[156px] max-md:min-h-[64px] max-md:flex-1",
+            roomLayout === "round" && !transcriptOpen && "lh-transcript-peek",
+            roomLayout === "round" && !transcriptOpen && keyboardOpen && "lh-transcript-peek--keyboard",
             roomLayout === "round" && transcriptOpen && "h-full min-h-0",
             roomLayout !== "round" && "min-h-0"
           )}>
@@ -1123,7 +1152,7 @@ export function DialogArea({
               ref={historyRef}
               className={cn(
                 "absolute inset-0 overflow-y-scroll pb-4 scrollbar-hide transition-opacity duration-200",
-                roomLayout === "round" ? "pt-12" : "pt-10",
+                roomLayout === "round" ? (keyboardOpen ? "pt-8" : "pt-12") : "pt-10",
                 isEventLogOpen && "pointer-events-none opacity-0"
               )}
               style={{
@@ -1181,7 +1210,7 @@ export function DialogArea({
             
             {/* 新消息提示：底部分割线 + 文案 */}
             <AnimatePresence>
-              {unreadCount > 0 && !isAtBottom && !isEventLogOpen && (
+              {unreadCount > 0 && !isAtBottom && !isEventLogOpen && transcriptOpen && (
                 <motion.div
                   initial={{ opacity: 0, y: 10, scale: 0.9 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -1223,7 +1252,7 @@ export function DialogArea({
       {/* 下方：对话框 - 固定在底部 */}
       <div className="wc-dialog-bottom lh-action-dock mt-auto shrink-0 px-4 lg:px-6 pb-4 lg:pb-6 pt-0">
         {/* 投票进度 */}
-        {(gameState.phase === "DAY_VOTE" || gameState.phase === "DAY_BADGE_ELECTION") && (
+        {(gameState.phase === "DAY_VOTE" || gameState.phase === "DAY_BADGE_ELECTION") && selectedSeat === null && (
           <div className="lh-vote-progress mb-3 bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg p-3">
             <div className="text-sm font-semibold text-[var(--text-primary)] mb-2 flex items-center gap-2">
               <span className="w-2 h-2 bg-[var(--color-accent)] rounded-full animate-pulse" />
@@ -1455,6 +1484,7 @@ export function DialogArea({
               {/* 选择确认面板 - 文字形式 */}
               {(() => {
                 if (!showActionConfirm || selectedSeat === null) return null;
+                if (phase === "DAY_VOTE" || phase === "DAY_BADGE_ELECTION") return null;
 
                 const targetPlayer = gameState.players.find(p => p.seat === selectedSeat);
                 const targetName = targetPlayer ? t("ui.seatWithName", { seat: selectedSeat + 1, name: targetPlayer.displayName }) : t("ui.seatOnly", { seat: selectedSeat + 1 });
@@ -1695,7 +1725,7 @@ export function DialogArea({
                         placeholder={gameState.phase === "DAY_LAST_WORDS" ? t("dialog.input.lastWordsPlaceholder") : t("dialog.input.defaultPlaceholder")}
                         isNight={isNight}
                         isGenshinMode={isGenshinMode}
-                        players={gameState.players.filter((p) => p.alive)}
+                        players={gameState.players.filter((p) => p.alive && p.playerId !== humanPlayer?.playerId)}
                       />
                     </div>
 
@@ -1766,7 +1796,7 @@ export function DialogArea({
                     )}
                     
                     {/* 对话内容 - 带玩家标签，逐字输入效果，文字调大；流式时也用 * 渲染斜体 */}
-                    <div className="text-xl leading-relaxed text-[var(--text-primary)] flex-1 pr-1 whitespace-pre-wrap break-words">
+                    <div className="lh-speech-scroll text-xl leading-relaxed text-[var(--text-primary)] flex-1 pr-1 whitespace-pre-wrap break-words">
                       {isTyping ? (
                         renderStreamingMarkdown(
                           waitingForNextRound ? t("dialog.nextRoundHint") : dialogueText,
@@ -1860,6 +1890,31 @@ export function DialogArea({
           )}
         </div>
       </div>
+      {voteBarConfirm && selectedSeat !== null && (() => {
+        const targetPlayer = gameState.players.find((player) => player.seat === selectedSeat);
+        const target = targetPlayer
+          ? playerTitle(selectedSeat, targetPlayer.displayName)
+          : t("ui.seatOnly", { seat: selectedSeat + 1 });
+        return (
+          <div className="lh-vote-bar" data-testid="vote-bar">
+            <button
+              type="button"
+              onClick={onCancelSelection}
+              className="lh-vote-bar__cancel"
+            >
+              {t("dialog.cancel")}
+            </button>
+            <button
+              type="button"
+              onClick={onConfirmAction}
+              data-testid="action-confirm"
+              className="lh-vote-bar__confirm"
+            >
+              {t("dialog.confirmVoteTarget", { target })}
+            </button>
+          </div>
+        );
+      })()}
     </div>
   );
 }
@@ -1952,7 +2007,7 @@ function ChatMessageItem({
       <div className="flex justify-center my-3">
         <div className="text-xs text-center py-2 px-4 rounded-lg border text-[var(--text-secondary)] bg-[var(--glass-bg-weak)] border-[var(--glass-border)]">
           <MentionsMarkdown
-            content={msg.content}
+            content={redactNightRoleLeak(msg.content)}
             players={players}
             isNight={isNight}
             isGenshinMode={isGenshinMode}

@@ -62,7 +62,8 @@ test("夜晚状态条的日夜标记跟阶段走", () => {
   const chip = phaseBarDayChip("NIGHT_START", 1);
   assert.equal(chip.night, true);
   assert.equal(chip.label, "第 1 天 · 夜晚");
-  assert.equal(phaseBarStatus(state({ phase: "NIGHT_START", day: 1 }), false), "夜晚 · 其他玩家正在行动");
+  assert.equal(phaseBarStatus(state({ phase: "NIGHT_START", day: 1 }), false), "夜色中有人在行动…");
+  assert.equal(phaseBarStatus(state({ phase: "NIGHT_WOLF_ACTION", day: 1 }), true), "请按提示行动");
   assert.equal(phaseBarDayChip("DAY_SPEECH", 1).label, "第 1 天 · 白天");
   assert.equal(phaseBarDayChip("DAY_SPEECH", 1).night, false);
 });
@@ -70,7 +71,8 @@ test("夜晚状态条的日夜标记跟阶段走", () => {
 test("夜晚不是本人行动时不写出具体身份阶段", () => {
   for (const phase of ["NIGHT_START", "NIGHT_GUARD_ACTION", "NIGHT_WOLF_ACTION", "NIGHT_WITCH_ACTION", "NIGHT_SEER_ACTION"] as const) {
     const copy = phaseBarStatus(state({ phase }), false);
-    assert.equal(copy, "夜晚 · 其他玩家正在行动");
+    assert.equal(copy, "夜色中有人在行动…");
+    assert.equal(copy.includes("夜晚"), false);
     assert.equal(/预言家|女巫|守卫|狼人/.test(copy), false);
   }
 });

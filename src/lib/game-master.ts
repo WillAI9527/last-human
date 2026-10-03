@@ -342,6 +342,9 @@ export function addSystemMessage(
   state: GameState,
   content: string
 ): GameState {
+  const last = state.messages[state.messages.length - 1];
+  if (last?.isSystem && last.content === content) return state;
+
   const { t } = getI18n();
   const message: ChatMessage = {
     id: uuidv4(),

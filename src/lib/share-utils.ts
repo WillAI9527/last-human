@@ -123,7 +123,7 @@ const ROLE_NAMES: Record<string, string> = {
   Witch: "女巫",
   Hunter: "猎人",
   Guard: "守卫",
-  Villager: "平民",
+  Villager: "村民",
 };
 
 const NIGHT_ACTION_LABELS: Record<string, string> = {

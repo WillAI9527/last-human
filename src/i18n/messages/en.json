@@ -907,6 +907,7 @@
     "dayBreak": "Day breaks. Open your eyes.",
     "dayBreakShort": "Day breaks",
     "voteStartShort": "Voting begins",
+    "publicNightAction": "Someone is acting in the dark…",
     "guardActionStart": "Guard, open your eyes.",
     "wolfActionStart": "Werewolves, open your eyes.",
     "witchActionStart": "Witch, open your eyes.",
@@ -1249,6 +1250,7 @@
     "playAgainHint": "Hope to see you again!",
     "actionConfirmPrompt": "You choose {action} <highlight>{target}</highlight>. Confirm?",
     "actionConfirm": "Confirm {action}",
+    "confirmVoteTarget": "Confirm {target}",
     "gameEnd": {
       "villageWin": "GG! <highlight>Villagers</highlight> win!",
       "wolfWin": "GG! <highlight>Werewolves</highlight> win!"
@@ -1323,7 +1325,7 @@
     "tipsLabel": "Tips",
     "nightIntro": {
       "title": "What happens at night?",
-      "line1": "At night, only <strong>werewolves and special roles</strong> act; villagers and hunters wait for dawn.",
+      "line1": "At night, only <strong>werewolves and special roles</strong> act; everyone else waits for dawn.",
       "line2": "The system prompts each role to open their eyes. When it’s your turn, your role art appears.",
       "line3": "How to act: tap a player avatar, then confirm."
     },

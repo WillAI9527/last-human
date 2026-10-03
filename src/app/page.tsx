@@ -18,6 +18,7 @@ import { isWolfRole } from "@/types/game";
 import { PHASE_CONFIGS, isGameInProgress } from "@/store/game-machine";
 import { getI18n } from "@/i18n/translator";
 import { getSystemMessages, getSystemPatterns } from "@/lib/game-texts";
+import { isNightRoleLeak, publicNightActionLine } from "@/lib/night-public";
 import { useTranslations } from "next-intl";
 import { useAtom } from "jotai";
 import { BADGE_TRANSFER_TORN } from "@/lib/game-master";
@@ -110,10 +111,7 @@ function getRitualCueFromSystemMessage(content: string): { title: string; subtit
   const text = content.trim();
   if (text === systemMessages.gameStart) return { title: t("ritual.gameStart") };
   if (nightFallRegex.test(text)) return { title: text };
-  if (text === systemMessages.guardActionStart) return { title: text };
-  if (text === systemMessages.wolfActionStart) return { title: text };
-  if (text === systemMessages.witchActionStart) return { title: text };
-  if (text === systemMessages.seerActionStart) return { title: text };
+  if (text === publicNightActionLine() || isNightRoleLeak(text)) return { title: publicNightActionLine() };
   if (text === systemMessages.peacefulNight) return { title: systemMessages.peacefulNight };
   if (playerKilledRegex.test(text)) return { title: text };
   if (playerPoisonedRegex.test(text)) return { title: text };
@@ -198,8 +196,18 @@ export default function Home() {
     setActionReceipt({ receipt, phase });
   }, []);
   useEffect(() => {
-    setActionReceipt((current) => (current && current.phase !== gameState.phase ? null : current));
-  }, [gameState.phase]);
+    const humanSeat = gameState.players.find((player) => player.isHuman)?.seat;
+    setActionReceipt((current) => {
+      if (!current || current.phase !== gameState.phase) return null;
+      if (
+        current.receipt.text === receiptForFinishSpeech().text
+        && gameState.currentSpeakerSeat !== humanSeat
+      ) {
+        return null;
+      }
+      return current;
+    });
+  }, [gameState.phase, gameState.currentSpeakerSeat, gameState.players]);
   const visibleActionReceipt = actionReceipt && actionReceipt.phase === gameState.phase ? actionReceipt.receipt : null;
 
   const [visualIsNight, setVisualIsNight] = useState(isNight);
@@ -1581,6 +1589,7 @@ export default function Home() {
                         await handleBadgeSignup(wants);
                       }}
                       actionReceipt={visibleActionReceipt}
+                      keyboardOpen={keyboardOpen}
                       showHumanRoleCard={canShowRole}
                       onRestart={restartGame}
                       onWhiteWolfKingBoom={handleWhiteWolfKingBoom}

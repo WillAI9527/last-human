@@ -1770,6 +1770,74 @@ input[type="submit"]:not(:disabled),
   opacity: 0.5;
 }
 
+.lh-seat-selected {
+  box-shadow: 0 0 0 2px #F2EDE4;
+}
+
+.lh-seat-dimmed {
+  opacity: 0.4;
+}
+
+.lh-speech-scroll {
+  max-height: min(28dvh, 180px);
+  overflow-y: auto;
+}
+
+.lh-transcript-peek {
+  flex: 0 0 auto;
+  height: 128px;
+  min-height: 128px;
+  max-height: 128px;
+}
+
+.lh-transcript-peek--keyboard {
+  height: 128px;
+  min-height: 128px;
+  max-height: 128px;
+}
+
+.lh-vote-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px max(12px, env(safe-area-inset-bottom));
+  background: rgba(15, 13, 12, 0.96);
+  border-top: 1px solid rgba(242, 237, 228, 0.16);
+}
+
+.lh-vote-bar__cancel,
+.lh-vote-bar__confirm {
+  min-height: 48px;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.lh-vote-bar__cancel {
+  flex: 0 0 auto;
+  padding: 0 16px;
+  border: 1px solid #A9B2BC;
+  background: transparent;
+  color: #F2EDE4;
+}
+
+.lh-vote-bar__confirm {
+  flex: 1 1 auto;
+  padding: 0 12px;
+  border: 0;
+  background: #B3262B;
+  color: #F2EDE4;
+}
+
+.lh-dialog-round {
+  position: relative;
+}
+
 .lh-seat-night {
   filter: brightness(0.78) saturate(0.7);
 }
@@ -2018,14 +2086,19 @@ input[type="submit"]:not(:disabled),
   bottom: -1px;
 }
 
+.wc-player-card--round .lh-you-capsule {
+  top: -10px;
+  bottom: auto;
+}
+
 .wc-player-card--round .lh-round-name,
 .wc-player-card--round .wc-player-card__name {
-  max-width: 96px;
+  max-width: 112px;
   white-space: normal;
   overflow: visible;
   text-overflow: unset;
   text-align: center;
-  font-size: 12px;
+  font-size: 11px;
   line-height: 1.25;
   margin: 0;
 }
@@ -2301,6 +2374,11 @@ input[type="submit"]:not(:disabled),
 .wc-player-card--selectable {
   box-shadow: 0 0 0 1px rgba(197, 160, 89, 0.25), 0 8px 20px rgba(197, 160, 89, 0.12);
   animation: wc-selectable-pulse 2s ease-in-out infinite;
+}
+
+.wc-player-card.lh-seat-selected {
+  animation: none;
+  box-shadow: 0 0 0 2px #F2EDE4;
 }
 
 .wc-player-card--selectable:hover {
@@ -4932,6 +5010,7 @@ input[type="submit"]:not(:disabled),
 
 /* ========== Post Game Analysis Page ========== */
 .analysis-page {
+  overflow-x: hidden;
   background-color: #1a1614;
   color: #f0e6d2;
   background-image: 
@@ -5027,8 +5106,8 @@ input[type="submit"]:not(:disabled),
 .lh-phase-bar__status { flex: 1 1 auto; }
 
 .lh-phase-bar__capsule {
-  flex: 0 1 auto;
-  max-width: 46vw;
+  flex: 0 0 auto;
+  max-width: none;
   padding: 4px 10px;
   border-radius: 999px;
   background: #E8BE6A;
@@ -5037,8 +5116,6 @@ input[type="submit"]:not(:disabled),
   font-weight: 700;
   line-height: 1.2;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
   animation: lh-phase-pulse 600ms ease-out 1;
 }
 
@@ -5263,9 +5340,9 @@ input[type="submit"]:not(:disabled),
   }
 
   .lh-table-pane--keyboard {
-    flex: 0 0 104px;
-    height: 104px;
-    max-height: 104px;
+    flex: 0 0 64px;
+    height: 64px;
+    max-height: 64px;
   }
 
   .lh-dialog-round {
