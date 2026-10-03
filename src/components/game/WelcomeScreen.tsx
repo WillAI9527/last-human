@@ -1,7 +1,8 @@
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
-import { FingerprintSimple, PawPrint, Sparkle, Wrench, GearSix, UserCircle, GithubLogo, Star, EnvelopeSimple, Handshake, DotsThreeOutlineVertical, Users, UsersFour } from "@phosphor-icons/react";
+import { FingerprintSimple, PawPrint, Sparkle, Wrench, GearSix, UserCircle, EnvelopeSimple, Handshake, DotsThreeOutlineVertical, Users, UsersFour } from "@phosphor-icons/react";
+import { UpstreamCredit } from "@/components/seo/UpstreamCredit";
 import { WerewolfIcon } from "@/components/icons/FlatIcons";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -372,7 +373,6 @@ export function WelcomeScreen({
   const [difficulty, setDifficulty] = useAtom(difficultyAtom);
   const [playerCount, setPlayerCount] = useAtom(playerCountAtom);
   const [preferredRole, setPreferredRole] = useAtom(preferredRoleAtom);
-  const [githubStars, setGithubStars] = useState<number | null>(null);
   const springCampaignRemainingQuota = springCampaign?.remainingQuota ?? 0;
   const springCampaignTotalQuota = springCampaign?.totalQuota ?? 0;
   const springCampaignActiveNow = SPRING_CAMPAIGN_ENABLED
@@ -574,20 +574,6 @@ export function WelcomeScreen({
   useEffect(() => {
     setFixedRoles(buildDefaultRoles(playerCount));
   }, [playerCount]);
-
-  // Fetch GitHub stars
-  useEffect(() => {
-    fetch('https://api.github.com/repos/oil-oil/wolfcha')
-      .then(res => res.json())
-      .then(data => {
-        if (data.stargazers_count !== undefined) {
-          setGithubStars(data.stargazers_count);
-        }
-      })
-      .catch(() => {
-        // Silently fail, stars will remain null
-      });
-  }, []);
 
   const roleConfigValid = useMemo(() => {
     if (fixedRoles.length !== playerCount) return false;
@@ -1243,17 +1229,6 @@ export function WelcomeScreen({
                   {t("welcome.auth.signIn")}
                 </Button>
               ) : null}
-              <Button asChild variant="outline" className="justify-start">
-                <a
-                  href="https://github.com/oil-oil/wolfcha"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={() => setIsMobileMenuOpen(false)}
-                >
-                  <GithubLogo size={16} />
-                  {t("welcome.github.title")}
-                </a>
-              </Button>
             </div>
           </DialogContent>
         </Dialog>
@@ -1306,22 +1281,6 @@ export function WelcomeScreen({
         <div className="wc-welcome-actions absolute top-5 right-5 z-20 flex items-center gap-2">
           <div className="hidden sm:flex items-center gap-2">
             <LocaleSwitcher className="shrink-0" />
-            <a
-              href="https://github.com/oil-oil/wolfcha"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hidden sm:flex items-center gap-1.5 rounded-md border-2 border-[var(--border-color)] bg-[var(--bg-card)] px-2 py-1 text-[11px] text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-all group"
-              title="View on GitHub"
-            >
-              <GithubLogo size={15} className="group-hover:scale-110 transition-transform" />
-              <span className="hidden lg:inline">GitHub</span>
-              <span className="flex items-center gap-1 text-[var(--color-gold)]">
-                <Star size={12} weight="fill" className="group-hover:scale-110 transition-transform" />
-                <span className="font-serif text-xs font-bold tabular-nums tracking-tight" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.1)' }}>
-                  {githubStars !== null ? githubStars.toLocaleString() : '···'}
-                </span>
-              </span>
-            </a>
             {!PUBLIC_DEMO && (
             <Button
               type="button"
@@ -1644,6 +1603,10 @@ export function WelcomeScreen({
                 <FingerprintSimple weight="fill" size={44} className="wc-wax-seal-icon" />
               </button>
             </div>
+
+            <footer className="mt-6 text-center">
+              <UpstreamCredit className="text-[11px] text-[#6b5a48]/75 underline-offset-2 hover:text-[#3d2e24] hover:underline" />
+            </footer>
 
             <div className="wc-corner-mark" aria-hidden="true">
               <WerewolfIcon size={30} className="text-[var(--color-wolf)] opacity-30" />

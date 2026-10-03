@@ -6,6 +6,7 @@ import { Crown, Scroll } from "lucide-react";
 import type { GameAnalysisData } from "@/types/analysis";
 import { ROLE_NAMES } from "./constants";
 import { buildSimpleAvatarUrl } from "@/lib/avatar-config";
+import { useSiteUrl } from "@/components/seo/SiteUrlProvider";
 
 export type PosterMode = "radar" | "portrait";
 
@@ -16,7 +17,6 @@ interface SharePosterProps {
 }
 
 const SITE_URL = "LAST HUMAN";
-const SITE_FULL_URL = "/";
 
 const ROLE_PORTRAITS: Record<string, string> = {
   Werewolf: "/lihui/wolf.png",
@@ -130,6 +130,7 @@ function RadarChart({ stats, isWolf }: RadarChartProps) {
 
 export const SharePoster = forwardRef<HTMLDivElement, SharePosterProps>(
   function SharePoster({ data, mode = "radar", overrideTag }, ref) {
+    const siteUrl = useSiteUrl();
     const { personalStats, result, duration, playerCount } = data;
     const isVillageWin = result === "village_win";
     const isWinner =
@@ -313,7 +314,7 @@ export const SharePoster = forwardRef<HTMLDivElement, SharePosterProps>(
               <div className="text-[9px] text-white/40 mt-0.5">最后的真人</div>
             </div>
             <div className="bg-white p-1.5 rounded">
-              <QRCodeSVG value={SITE_FULL_URL} size={52} level="M" bgColor="#ffffff" fgColor="#1a1614" />
+              <QRCodeSVG value={siteUrl} size={52} level="M" bgColor="#ffffff" fgColor="#1a1614" />
             </div>
           </div>
         </div>

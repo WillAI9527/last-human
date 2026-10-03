@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { GithubLogo } from "@phosphor-icons/react";
+import { UpstreamCredit } from "@/components/seo/UpstreamCredit";
 
 export function MarketingFooter() {
   const t = useTranslations("seo.footer");
@@ -22,7 +23,7 @@ export function MarketingFooter() {
             </p>
             <div className="flex gap-4">
               <a
-                href="https://github.com/oil-oil/wolfcha"
+                href="https://github.com/WillAI9527/wolfcha"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
@@ -68,7 +69,7 @@ export function MarketingFooter() {
               </li>
               <li>
                 <a 
-                  href="https://github.com/oil-oil/wolfcha/issues" 
+                  href="https://github.com/WillAI9527/wolfcha/issues" 
                   target="_blank"
                   rel="noopener noreferrer"
                   className="hover:text-[var(--color-gold-dark)] transition-colors"
@@ -82,6 +83,9 @@ export function MarketingFooter() {
         
         <div className="mt-12 border-t border-[var(--border-color)] pt-8 text-center text-sm text-[var(--text-muted)]">
           <p>© {new Date().getFullYear()} Wolfcha. Open Source under MIT License.</p>
+          <p className="mt-2">
+            <UpstreamCredit className="underline-offset-2 hover:text-[var(--text-primary)] hover:underline" />
+          </p>
         </div>
       </div>
     </footer>

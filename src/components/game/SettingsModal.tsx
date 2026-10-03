@@ -8,6 +8,7 @@ import type { GameState } from "@/types/game";
 import { aiLogger, type AILogEntry } from "@/lib/ai-logger";
 import { useTranslations } from "next-intl";
 import { useAppLocale } from "@/i18n/useAppLocale";
+import { UpstreamCredit } from "@/components/seo/UpstreamCredit";
 
 interface SoundSettingsSectionProps {
   bgmVolume: number;
@@ -251,6 +252,7 @@ export function SettingsModal({
                 <div className="min-w-0">
                   <div className="text-sm text-[var(--text-primary)] font-medium leading-tight">{t("settings.about.appName")}</div>
                   <div className="text-xs text-[var(--text-muted)] mt-0.5">{t("settings.about.version", { version: appVersion })}</div>
+                  <UpstreamCredit className="mt-1.5 inline-block text-[11px] text-[var(--text-muted)] underline-offset-2 hover:underline" />
                 </div>
               </div>
             </div>

@@ -3,6 +3,7 @@
  */
 
 import type { GameAnalysisData } from "@/types/analysis";
+import { getSiteUrl } from "@/lib/site-url";
 
 export interface ShareOptions {
   title?: string;
@@ -71,7 +72,7 @@ ${data.personalStats.highlightQuote ? `💬 金句：「${data.personalStats.hig
 }
 
 export function generateShareUrl(gameId: string): string {
-  const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
+  const baseUrl = typeof window !== "undefined" ? window.location.origin : getSiteUrl();
   return `${baseUrl}/analysis/${gameId}`;
 }
 
