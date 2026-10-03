@@ -1599,7 +1599,7 @@ export function WelcomeScreen({
                 onClick={handleConfirm}
                 disabled={!canConfirm}
               >
-                <span className="wc-wax-seal-mark" aria-hidden="true" />
+                <img src="/brand/mark-transparent.svg" alt="" className="wc-wax-seal-mark" />
               </button>
             </div>
 
@@ -1607,7 +1607,9 @@ export function WelcomeScreen({
               <UpstreamCredit className="text-[11px] text-[#A9B2BC] underline-offset-2 hover:text-[#F2EDE4] hover:underline" />
             </footer>
 
-            <div className="wc-corner-mark" aria-hidden="true" />
+            <div className="wc-corner-mark" aria-hidden="true">
+              <img src="/brand/mark-transparent.svg" alt="" />
+            </div>
           </div>
         </motion.div>
 
