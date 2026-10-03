@@ -78,3 +78,8 @@ test("夜晚不是本人行动时不写出具体身份阶段", () => {
 test("白天发言条带座位和名字", () => {
   assert.equal(phaseBarStatus(state({ phase: "DAY_SPEECH" }), false), "3号 · 老汉斯 正在发言");
 });
+
+test("等待发言时相位条显示正在思考", () => {
+  assert.equal(phaseBarStatus(state({ phase: "DAY_SPEECH" }), false, true), "3号 · 老汉斯 正在思考…");
+  assert.equal(phaseBarStatus(state({ phase: "DAY_SPEECH" }), true, true), "3号 · 老汉斯 正在发言");
+});

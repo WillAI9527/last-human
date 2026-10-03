@@ -61,7 +61,7 @@ const state: GameState = {
   winner: null,
 };
 
-test("流式限流兜底的返回、onComplete 与日志内容一致", async () => {
+test("4xx 不在同一模型上重试，换模型仍失败时不朗读系统句", async () => {
   const [{ aiLogger }, { generateAISpeechSegmentsStream }] = await Promise.all([
     import("./ai-logger"),
     import("./game-master"),
@@ -69,27 +69,32 @@ test("流式限流兜底的返回、onComplete 与日志内容一致", async () 
   const originalFetch = globalThis.fetch;
   const logs: AILogEntry[] = [];
   const completed: string[][] = [];
+  const emitted: string[] = [];
+  const models: string[] = [];
   const unsubscribe = aiLogger.subscribe((entry) => {
     if (entry.request.player?.playerId === player.playerId) logs.push(entry);
   });
 
-  globalThis.fetch = async (input) => {
+  globalThis.fetch = async (input, init) => {
     const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
     if (url === "/api/demo-config") return Response.json({ active: false, enabled: false });
+    if (!url.includes("/api/chat")) return Response.json({});
+    const body = JSON.parse(String(init?.body));
+    models.push(body.model);
     return new Response("limit_requests", { status: 400 });
   };
 
   try {
-    const result = await generateAISpeechSegmentsStream(state, player, {
+    await assert.rejects(generateAISpeechSegmentsStream(state, player, {
+      onSegmentReceived: (segment) => emitted.push(segment),
       onComplete: (segments) => completed.push(segments),
-    });
-
-    assert.equal(result.length, 1);
-    assert.match(result[0], /请求过于频繁/);
-    assert.deepEqual(completed, [result]);
-    assert.equal(logs.length, 1);
-    assert.equal(logs[0].response.content, result.join("\n"));
-    assert.match(logs[0].error ?? "", /limit_requests/);
+    }));
+    assert.equal(models.length, 2);
+    assert.deepEqual(emitted, []);
+    assert.deepEqual(completed, []);
+    assert.equal(emitted.join("").includes("请求过于频繁"), false);
+    assert.ok(logs.length >= 1);
+    assert.match(logs[0].error ?? "", /limit_requests|400/);
   } finally {
     unsubscribe();
     globalThis.fetch = originalFetch;
@@ -160,8 +165,9 @@ test("取消发言会传到实际请求，取消后的请求不重试、不发�
   globalThis.fetch = async (input, init) => {
     if (String(input) === "/api/demo-config") return Response.json({ active: false, enabled: false });
     calls++;
-    assert.equal(init?.signal, controller.signal);
+    assert.equal(init?.signal?.aborted, false);
     controller.abort();
+    assert.equal(init?.signal?.aborted, true);
     throw new DOMException("cancelled", "AbortError");
   };
   try {
@@ -214,15 +220,18 @@ test("恢复失败不得伪装成功；恢复过程中取消不释放任何恢�
       globalThis.fetch = async (input, init) => {
         if (String(input) === "/api/demo-config") return Response.json({ active: false });
         calls++;
-        if (calls === 1) return new Response('data: {"choices":[{"delta":{"content":"自由分析，不能公开"}}]}\n\ndata: [DONE]\n\n');
-        assert.equal(init?.signal, controller.signal);
-        if (cancel) controller.abort();
+        const body = JSON.parse(String(init?.body));
+        if (body.stream) return new Response('data: {"choices":[{"delta":{"content":"自由分析，不能公开"}}]}\n\ndata: [DONE]\n\n');
+        if (cancel) {
+          controller.abort();
+          assert.equal(init?.signal?.aborted, true);
+        }
         return Response.json({ choices: [{ message: { content: cancel ? '{"segments":["迟到片段"]}' : '{"analysis":"秘密","segments":["不应发布"]}' } }] });
       };
       await assert.rejects(generateAISpeechSegmentsStream(state, player, {
         signal: controller.signal, onSegmentReceived: (s) => emitted.push(s), onComplete: () => completed++,
       }));
-      assert.equal(calls, 2);
+      assert.equal(calls, cancel ? 2 : 4);
       assert.equal(completed, 0);
       assert.deepEqual(emitted, []);
     }
