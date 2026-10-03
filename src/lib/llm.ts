@@ -20,7 +20,7 @@ import {
 import { GAME_SESSION_EXPIRED_CODE } from "@/lib/game-session-policy";
 import { parseLLMJson } from "./llm-json";
 import { generateUUID } from "./utils";
-import { withTimeout } from "@/lib/request-timeout";
+import { GAMEPLAY_CALL_DEADLINE_MS, RequestTimeoutError, withTimeout } from "@/lib/request-timeout";
 import type { PromptScope } from "@/lib/deepseek-prompt-scope";
 import { resolveReasoning, type ReasoningProfile } from "@/lib/reasoning-profile";
 import { getDemoGameToken } from "@/lib/demo-game-client";
@@ -225,6 +225,10 @@ export interface ReasoningOptions {
 
 export interface GenerateOptions {
   signal?: AbortSignal;
+  /** Total time for this call, including retries. Aborts the in-flight fetch. */
+  deadlineMs?: number;
+  /** Attempts including the first. A daily summary uses 2 (one retry). */
+  maxAttempts?: number;
   model: string;
   provider?: Provider;
   promptScope?: PromptScope;
@@ -388,8 +392,54 @@ export function readStreamProtocolError(payload: unknown): string | null {
   return message;
 }
 
-async function sleep(ms: number): Promise<void> {
-  await new Promise((resolve) => setTimeout(resolve, ms));
+function abortReason(signal: AbortSignal): Error {
+  return signal.reason instanceof Error
+    ? signal.reason
+    : new DOMException("The operation was aborted.", "AbortError");
+}
+
+function sleep(ms: number, signal?: AbortSignal): Promise<void> {
+  if (ms <= 0) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(abortReason(signal));
+      return;
+    }
+    const timer = setTimeout(() => {
+      signal?.removeEventListener("abort", onAbort);
+      resolve();
+    }, ms);
+    const onAbort = () => {
+      clearTimeout(timer);
+      reject(abortReason(signal!));
+    };
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
+}
+
+interface AttemptBudget {
+  signal?: AbortSignal;
+  maxAttempts: number;
+  release: () => void;
+}
+
+function openAttemptBudget(options: GenerateOptions): AttemptBudget {
+  const maxAttempts = options.maxAttempts ?? 4;
+  if (options.signal) {
+    return { signal: options.signal, maxAttempts, release: () => {} };
+  }
+  const deadlineMs = options.deadlineMs
+    ?? (options.promptScope === "gameplay" ? GAMEPLAY_CALL_DEADLINE_MS : undefined);
+  if (deadlineMs === undefined) {
+    return { maxAttempts, release: () => {} };
+  }
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(new RequestTimeoutError()), deadlineMs);
+  return {
+    signal: controller.signal,
+    maxAttempts,
+    release: () => clearTimeout(timer),
+  };
 }
 
 async function fetchWithRetry(
@@ -429,9 +479,9 @@ async function fetchWithRetry(
       const backoffMs =
         (retryAfterMs !== null ? Math.min(15000, Math.max(0, retryAfterMs)) : base * 2 ** (attempt - 1)) +
         jitter;
-      await sleep(backoffMs);
+      await sleep(backoffMs, init.signal ?? undefined);
     } catch (err) {
-      init.signal?.throwIfAborted();
+      if (init.signal?.aborted) throw err;
       lastError = err;
       // TokenPay 没有请求幂等键。网络断开时无法确认上游是否已经计费，
       // 因此只允许对明确未执行的 429 重试，不自动重放模糊失败。
@@ -439,7 +489,7 @@ async function fetchWithRetry(
       const base = 400;
       const jitter = Math.floor(Math.random() * 200);
       const backoffMs = base * 2 ** (attempt - 1) + jitter;
-      await sleep(backoffMs);
+      await sleep(backoffMs, init.signal ?? undefined);
     }
   }
 
@@ -711,7 +761,9 @@ function attachGameSessionHeader(headers: Record<string, string>) {
 export async function generateCompletion(
   options: GenerateOptions
 ): Promise<{ content: string; reasoning_details?: unknown; raw: ChatCompletionResponse }> {
-  options.signal?.throwIfAborted();
+  const budget = openAttemptBudget(options);
+  try {
+  budget.signal?.throwIfAborted();
   const maxTokens =
     typeof options.max_tokens === "number" && Number.isFinite(options.max_tokens)
       ? Math.max(16, Math.floor(options.max_tokens))
@@ -745,7 +797,7 @@ export async function generateCompletion(
     "/api/chat",
     {
       method: "POST",
-      signal: options.signal,
+      signal: budget.signal,
       headers: {
         ...headers,
       },
@@ -763,7 +815,7 @@ export async function generateCompletion(
         ...(options.response_format ? { response_format: options.response_format } : {}),
       }),
     },
-    4,
+    budget.maxAttempts,
     effectiveSource,
     logicalRequestId,
   );
@@ -774,7 +826,7 @@ export async function generateCompletion(
   }
 
   const result: ChatCompletionResponse = await response.json();
-  options.signal?.throwIfAborted();
+  budget.signal?.throwIfAborted();
   const choice = result.choices?.[0];
   const assistantMessage = choice?.message;
 
@@ -811,6 +863,9 @@ export async function generateCompletion(
     reasoning_details: assistantMessage.reasoning_details,
     raw: result,
   };
+  } finally {
+    budget.release();
+  }
 }
 
 export async function generateCompletionBatch(
@@ -845,18 +900,31 @@ async function generateCompletionBatchInternal(
   attachGameSessionHeader(headers);
   const logicalRequestId = generateUUID();
 
-  const requestsWithIds = resolvedRequests.map((request) => ({
-    ...request,
-    request_id: generateUUID(),
-  }));
-  const response = await fetchWithRetry(
+  const requestsWithIds = resolvedRequests.map((request) => {
+    const { signal: _signal, deadlineMs: _deadlineMs, maxAttempts: _maxAttempts, ...rest } = request;
+    return { ...rest, request_id: generateUUID() };
+  });
+  const budget = openAttemptBudget({
+    model: requests[0]?.model ?? "",
+    messages: [],
+    promptScope: requests.some((request) => request.promptScope === "gameplay")
+      ? "gameplay"
+      : requests[0]?.promptScope,
+    signal: requests.find((request) => request.signal)?.signal,
+    deadlineMs: requests.find((request) => request.deadlineMs !== undefined)?.deadlineMs,
+    maxAttempts: requests.find((request) => request.maxAttempts !== undefined)?.maxAttempts ?? 3,
+  });
+  let response: Response;
+  try {
+  response = await fetchWithRetry(
     "/api/chat",
     {
       method: "POST",
+      signal: budget.signal,
       headers,
       body: JSON.stringify({ requests: requestsWithIds }),
     },
-    3,
+    budget.maxAttempts,
     effectiveSource,
     logicalRequestId,
   );
@@ -917,11 +985,17 @@ async function generateCompletionBatchInternal(
   }
 
   return parsedResults;
+  } finally {
+    budget.release();
+  }
 }
 
 export async function* generateCompletionStream(
   options: GenerateOptions
 ): AsyncGenerator<string, void, unknown> {
+  const budget = openAttemptBudget(options);
+  try {
+  budget.signal?.throwIfAborted();
   const maxTokens =
     typeof options.max_tokens === "number" && Number.isFinite(options.max_tokens)
       ? Math.max(16, Math.floor(options.max_tokens))
@@ -947,7 +1021,7 @@ export async function* generateCompletionStream(
     "/api/chat",
     {
       method: "POST",
-      signal: options.signal,
+      signal: budget.signal,
       headers: {
         ...headers,
       },
@@ -965,7 +1039,7 @@ export async function* generateCompletionStream(
         ...(options.response_format ? { response_format: options.response_format } : {}),
       }),
     },
-    4,
+    budget.maxAttempts,
     effectiveSource,
     logicalRequestId,
   );
@@ -1050,8 +1124,13 @@ export async function* generateCompletionStream(
     return "";
   };
 
+  const onAbort = () => {
+    void reader.cancel().catch(() => undefined);
+  };
+  budget.signal?.addEventListener("abort", onAbort, { once: true });
   try {
     while (!streamComplete) {
+      budget.signal?.throwIfAborted();
       const { done, value } = await withTimeout(
         reader.read(),
         STREAM_IDLE_TIMEOUT_MS,
@@ -1087,6 +1166,7 @@ export async function* generateCompletionStream(
       throw new Error("模型流式响应在 [DONE] 前意外结束");
     }
   } finally {
+    budget.signal?.removeEventListener("abort", onAbort);
     // 消费方提前退出、对局重置或流超时都必须取消上游读取，避免继续消耗余额。
     await reader.cancel().catch(() => undefined);
   }
@@ -1096,6 +1176,9 @@ export async function* generateCompletionStream(
     inputChars,
     outputChars: totalOutputChars,
   });
+  } finally {
+    budget.release();
+  }
 }
 
 export async function generateJSON<T>(

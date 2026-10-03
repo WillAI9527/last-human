@@ -23,7 +23,7 @@ import { resolveVoiceId, type AppLocale } from "@/lib/voice-constants";
 import { getLocale } from "@/i18n/locale-store";
 import { createSpeechRequest, type SpeechRequest } from "@/lib/speech-request";
 import { generateUUID } from "@/lib/utils";
-import { withTimeout } from "@/lib/request-timeout";
+import { GAMEPLAY_CALL_DEADLINE_MS, withTimeout } from "@/lib/request-timeout";
 import { isGameSessionExpiredMessage } from "@/lib/llm";
 
 const SPEECH_RETRY_BACKOFF_MS = 600;
@@ -165,8 +165,8 @@ export function useDayPhase(
         let firstAudioReady = false;
         if (index === 0 && audioManager.isEnabled()) {
           try {
-            await withTimeout(audioManager.ensureReady(task), 15000);
-            firstAudioReady = true;
+            const ready = await withTimeout(audioManager.ensureReady(task), 15000);
+            firstAudioReady = ready !== false;
           } catch { /* 保留文字，不重发失败的 TTS 请求 */ }
         }
         if (!isValid()) return;
@@ -183,8 +183,9 @@ export function useDayPhase(
           }
           audioChain = audioChain.then(async () => {
             if (!isValid()) return;
-            try { await withTimeout(audioManager.ensureReady(task), 15000); } catch { return; }
-            if (isValid()) audioManager.addToQueue(task);
+            let ready = false;
+            try { ready = (await withTimeout(audioManager.ensureReady(task), 15000)) !== false; } catch { return; }
+            if (isValid() && ready) audioManager.addToQueue(task);
           });
         }
       });
@@ -208,15 +209,20 @@ export function useDayPhase(
         finalizeSpeechQueue({ requestId: id });
         setIsWaitingForAI(false);
         resolve("timeout");
-      }, 60000);
+      }, GAMEPLAY_CALL_DEADLINE_MS);
     });
 
     try {
       const streamPromise = prefetched
         ? Promise.resolve(prefetched.forEach(appendSegment))
-        : generateAISpeechSegmentsStream(state, player, { signal: controller.signal, onSegmentReceived: appendSegment });
+        : generateAISpeechSegmentsStream(state, player, { signal: controller.signal, onSegmentReceived: appendSegment })
+            .then((segments) => segments)
+            .catch((error: unknown) => {
+              if (controller.signal.aborted) return "aborted" as const;
+              throw error;
+            });
       const result = await Promise.race([streamPromise, timeoutPromise]);
-      if (result === "timeout" || !isValid()) return;
+      if (result === "timeout" || result === "aborted" || !isValid()) return;
       await displayChain;
       if (!isValid()) return;
       const nextSeat = getNextSpeechSeat(state);

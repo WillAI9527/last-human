@@ -1,6 +1,7 @@
 import { areNightResultsVisible } from "./night-visibility";
 import { v4 as uuidv4 } from "uuid";
 import { generateCompletion, generateCompletionBatch, generateCompletionStream, mergeOptionsFromModelRef, stripMarkdownCodeFences, stripReasoningArtifacts, type GenerateOptions, type LLMMessage } from "./llm";
+import { DAILY_SUMMARY_DEADLINE_MS, RequestTimeoutError } from "./request-timeout";
 import type { ChatCompletionResponse } from "./llm";
 import { StreamingSpeechParser } from "./streaming-speech-parser";
 import {
@@ -637,13 +638,19 @@ export function formatDailySummaryTranscriptMessage(
 }
 
 export async function generateDailySummary(
-  state: GameState
+  state: GameState,
+  parentSignal?: AbortSignal,
 ): Promise<{ bullets: string[]; voteData?: DailySummaryVoteData }> {
   const { t } = getI18n();
   const startTime = Date.now();
   const summaryModel = getSummaryModel();
   const dayBreakText = t("system.dayBreak");
   const systemSpeaker = t("speakers.system");
+  const controller = new AbortController();
+  const onParentAbort = () => controller.abort(parentSignal?.reason);
+  if (parentSignal?.aborted) onParentAbort();
+  else parentSignal?.addEventListener("abort", onParentAbort, { once: true });
+  const deadline = setTimeout(() => controller.abort(new RequestTimeoutError()), DAILY_SUMMARY_DEADLINE_MS);
 
   const dayStartIndex = (() => {
     for (let i = state.messages.length - 1; i >= 0; i--) {
@@ -671,60 +678,80 @@ export async function generateDailySummary(
   ];
 
   const summaryModelRef = getModelRefForModel(summaryModel);
-  const completion = await generateCompletionAndParse(
-    {
-      model: summaryModel,
-      messages,
-      temperature: GAME_TEMPERATURE.SUMMARY,
-      response_format: structuredResponseFormat(summaryModelRef, "daily_summary", {
-        type: "object",
-        properties: {
-          bullets: {
-            type: "array",
-            items: { type: "string" },
+  try {
+    const completion = await generateCompletionAndParse(
+      {
+        model: summaryModel,
+        messages,
+        temperature: GAME_TEMPERATURE.SUMMARY,
+        signal: controller.signal,
+        deadlineMs: DAILY_SUMMARY_DEADLINE_MS,
+        maxAttempts: 2,
+        response_format: structuredResponseFormat(summaryModelRef, "daily_summary", {
+          type: "object",
+          properties: {
+            bullets: {
+              type: "array",
+              items: { type: "string" },
+            },
           },
-        },
-        required: ["bullets"],
-        additionalProperties: false,
-      }),
-    },
-    (cleaned) => {
-      const obj = parseLLMJson<{ bullets?: unknown; summary?: unknown }>(cleaned);
-      if (!obj || typeof obj !== "object" || Array.isArray(obj)) return parseFail();
-      if (Array.isArray(obj.bullets)) {
-        const bullets = obj.bullets
-          .filter((bullet): bullet is string => typeof bullet === "string")
-          .map((bullet) => bullet.trim())
-          .filter(Boolean);
-        if (bullets.length > 0) {
-          return parseOk({ bullets, voteData });
+          required: ["bullets"],
+          additionalProperties: false,
+        }),
+      },
+      (cleaned) => {
+        const obj = parseLLMJson<{ bullets?: unknown; summary?: unknown }>(cleaned);
+        if (!obj || typeof obj !== "object" || Array.isArray(obj)) return parseFail();
+        if (Array.isArray(obj.bullets)) {
+          const bullets = obj.bullets
+            .filter((bullet): bullet is string => typeof bullet === "string")
+            .map((bullet) => bullet.trim())
+            .filter(Boolean);
+          if (bullets.length > 0) {
+            return parseOk({ bullets, voteData });
+          }
         }
+        if (typeof obj.summary === "string" && obj.summary.trim()) {
+          return parseOk({ bullets: [obj.summary.trim()], voteData });
+        }
+        return parseFail();
       }
-      if (typeof obj.summary === "string" && obj.summary.trim()) {
-        return parseOk({ bullets: [obj.summary.trim()], voteData });
-      }
-      return parseFail();
-    }
-  );
+    );
 
-  await aiLogger.log({
-    type: "daily_summary",
-    request: {
-      model: summaryModel,
-      messages,
-    },
-    response: {
-      content: completion.cleaned,
-      raw: completion.result.content,
-      rawResponse: JSON.stringify(completion.result.raw, null, 2),
-      finishReason: completion.result.raw.choices?.[0]?.finish_reason,
-      parsed: completion.parsed,
-      duration: Date.now() - startTime,
-    },
-  });
+    await aiLogger.log({
+      type: "daily_summary",
+      request: {
+        model: summaryModel,
+        messages,
+      },
+      response: {
+        content: completion.cleaned,
+        raw: completion.result.content,
+        rawResponse: JSON.stringify(completion.result.raw, null, 2),
+        finishReason: completion.result.raw.choices?.[0]?.finish_reason,
+        parsed: completion.parsed,
+        duration: Date.now() - startTime,
+      },
+    });
 
-  if (completion.parsed) return completion.parsed;
-  return { bullets: [], voteData };
+    if (completion.parsed) return completion.parsed;
+    return { bullets: [], voteData };
+  } catch (error) {
+    await aiLogger.log({
+      type: "daily_summary",
+      request: { model: summaryModel, messages },
+      response: {
+        content: "",
+        parsed: { bullets: [] },
+        duration: Date.now() - startTime,
+      },
+      error: String(error),
+    });
+    return { bullets: [], voteData };
+  } finally {
+    clearTimeout(deadline);
+    parentSignal?.removeEventListener("abort", onParentAbort);
+  }
 }
 
 export async function* generateAISpeechStream(

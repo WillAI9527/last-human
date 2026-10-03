@@ -5,6 +5,15 @@ export class RequestTimeoutError extends Error {
   }
 }
 
+/** Whole daily-summary call, including the one allowed retry. */
+export const DAILY_SUMMARY_DEADLINE_MS = 20_000;
+
+/** Speech, vote, and night actions. The budget covers every retry. */
+export const GAMEPLAY_CALL_DEADLINE_MS = 45_000;
+
+/** Voice synthesis must finish or be skipped inside the speech wait. */
+export const TTS_FETCH_BUDGET_MS = 12_000;
+
 export async function withTimeout<T>(
   promise: Promise<T>,
   timeoutMs: number,

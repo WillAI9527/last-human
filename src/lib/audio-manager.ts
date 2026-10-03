@@ -11,6 +11,7 @@ import {
 import { getAuthHeaders } from "@/lib/auth-headers";
 import { getDemoGameToken } from "@/lib/demo-game-client";
 import { gameSessionTracker } from "@/lib/game-session-tracker";
+import { RequestTimeoutError, TTS_FETCH_BUDGET_MS } from "@/lib/request-timeout";
 
 export type TtsProvider = "minimax" | "tokendance";
 
@@ -36,7 +37,7 @@ export class AudioManager {
   private currentAudio: HTMLAudioElement | null = null;
   private state: PlayState = "idle";
   private cache = new Map<string, { blob: Blob; durationMs?: number }>();
-  private inFlight = new Map<string, Promise<void>>();
+  private inFlight = new Map<string, Promise<boolean>>();
   private enabled = false;
   // Set when the server says voice is off (no MiniMax key) or the per-game
   // voice cap is used up, so we stop calling /api/tts for every line.
@@ -102,9 +103,9 @@ export class AudioManager {
     );
   }
 
-  async ensureReady(task: AudioTask): Promise<void> {
-    if (!this.isEnabled()) return;
-    if (this.cache.has(task.id)) return;
+  async ensureReady(task: AudioTask): Promise<boolean> {
+    if (!this.isEnabled()) return false;
+    if (this.cache.has(task.id)) return true;
 
     const existing = this.inFlight.get(task.id);
     if (existing) return existing;
@@ -127,28 +128,37 @@ export class AudioManager {
     await Promise.all(workers);
   }
 
-  private async fetchAndCache(task: AudioTask) {
+  private async fetchAndCache(task: AudioTask): Promise<boolean> {
     const ttsProvider = task.ttsProvider ?? "minimax";
-    const response = await fetch("/api/tts", {
-      method: "POST",
-      headers: await this.buildTtsHeaders(ttsProvider),
-      body: JSON.stringify({ text: task.text, voiceId: task.voiceId, ttsProvider }),
-    });
-    if (!response.ok) {
-      if (response.status === 503 || response.status === 403 || response.status === 429) {
-        this.serverDisabled = true;
-      }
-      const body = await response.text().catch(() => "");
-      throw new Error(`TTS request failed: ${response.status} ${body.slice(0, 600)}`);
-    }
-
-    const blob = await response.blob();
-    const url = URL.createObjectURL(blob);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(new RequestTimeoutError()), TTS_FETCH_BUDGET_MS);
     try {
-      const durationMs = await this.getDurationMs(url);
-      this.cache.set(task.id, { blob, durationMs });
+      const response = await fetch("/api/tts", {
+        method: "POST",
+        signal: controller.signal,
+        headers: await this.buildTtsHeaders(ttsProvider),
+        body: JSON.stringify({ text: task.text, voiceId: task.voiceId, ttsProvider }),
+      });
+      if (!response.ok) {
+        if (response.status === 503 || response.status === 403 || response.status === 429) {
+          this.serverDisabled = true;
+        }
+        return false;
+      }
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      try {
+        const durationMs = await this.getDurationMs(url);
+        this.cache.set(task.id, { blob, durationMs });
+      } finally {
+        URL.revokeObjectURL(url);
+      }
+      return true;
+    } catch {
+      return false;
     } finally {
-      URL.revokeObjectURL(url);
+      clearTimeout(timeoutId);
     }
   }
 
@@ -272,7 +282,14 @@ export class AudioManager {
     this.currentTask = task;
     this.state = "loading";
     try {
-      await this.ensureReady(task);
+      const ready = await this.ensureReady(task);
+      if (this.currentTask !== task) return;
+      if (ready === false) {
+        this.state = "idle";
+        this.currentTask = null;
+        this.processQueue();
+        return;
+      }
       await this.playCachedTask(task);
     } catch (error) {
       console.error("AudioManager error:", error);

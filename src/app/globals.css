@@ -508,15 +508,11 @@ input[type="submit"]:not(:disabled),
   min-height: 590px;
   padding: 34px 30px 28px;
   border-radius: 6px;
-  background-color: #f0e6d2;
-  background-image:
-    radial-gradient(circle at 20% 15%, rgba(139, 69, 19, 0.10), rgba(0, 0, 0, 0) 55%),
-    radial-gradient(circle at 75% 20%, rgba(139, 69, 19, 0.08), rgba(0, 0, 0, 0) 60%),
-    radial-gradient(circle at 50% 85%, rgba(0, 0, 0, 0.06), rgba(0, 0, 0, 0) 60%),
-    repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.015) 0px, rgba(0, 0, 0, 0.015) 1px, rgba(0, 0, 0, 0) 2px, rgba(0, 0, 0, 0) 6px);
-  box-shadow:
-    0 22px 70px rgba(0, 0, 0, 0.55),
-    inset 0 0 60px rgba(139, 69, 19, 0.18);
+  border: 1px solid #E8BE6A;
+  background-color: #14110F;
+  background-image: none;
+  color: #F2EDE4;
+  box-shadow: 0 22px 70px rgba(0, 0, 0, 0.55);
   transform-style: preserve-3d;
   transform:
     rotateY(calc(var(--wc-tilt-x, 0) * 1deg))
@@ -649,7 +645,7 @@ input[type="submit"]:not(:disabled),
 .wc-contract-borders {
   position: absolute;
   inset: 10px;
-  border: 2px solid rgba(44, 24, 16, 0.18);
+  border: 1px solid rgba(232, 190, 106, 0.28);
   pointer-events: none;
 }
 
@@ -657,7 +653,7 @@ input[type="submit"]:not(:disabled),
   content: "";
   position: absolute;
   inset: 5px;
-  border: 1px solid rgba(44, 24, 16, 0.10);
+  border: 1px solid rgba(232, 190, 106, 0.12);
 }
 
 .wc-contract-title {
@@ -665,7 +661,7 @@ input[type="submit"]:not(:disabled),
   font-weight: 800;
   letter-spacing: 0.26em;
   font-size: 34px;
-  color: var(--color-wolf);
+  color: #B3262B;
   opacity: 0.92;
 }
 
@@ -674,7 +670,8 @@ input[type="submit"]:not(:disabled),
   font-size: 11px;
   letter-spacing: 0.32em;
   text-transform: uppercase;
-  opacity: 0.55;
+  color: #A9B2BC;
+  opacity: 1;
 }
 
 .wc-contract-body {
@@ -708,7 +705,8 @@ input[type="submit"]:not(:disabled),
 .wc-contract-oath {
   font-size: 14px;
   line-height: 1.9;
-  opacity: 0.74;
+  color: #F2EDE4;
+  opacity: 1;
 }
 
 .wc-contract-label {
@@ -716,7 +714,8 @@ input[type="submit"]:not(:disabled),
   font-weight: 800;
   letter-spacing: 0.18em;
   text-transform: uppercase;
-  opacity: 0.52;
+  color: #A9B2BC;
+  opacity: 1;
 }
 
 .wc-signature-input {
@@ -724,24 +723,24 @@ input[type="submit"]:not(:disabled),
   height: 62px;
   font-size: 34px;
   text-align: center;
-  color: var(--color-wolf);
+  color: #F2EDE4;
   background: transparent;
   border: none;
-  border-bottom: 2px solid rgba(138, 28, 28, 0.30);
+  border-bottom: 2px solid rgba(232, 190, 106, 0.45);
   outline: none;
   transition: transform 0.25s ease, border-color 0.25s ease;
   font-family: "IM Fell English", var(--font-chinese), ui-serif, Georgia, serif;
 }
 
 .wc-signature-input:focus {
-  border-bottom-color: rgba(138, 28, 28, 0.8);
+  border-bottom-color: #E8BE6A;
   transform: scale(1.03);
 }
 
 .wc-signature-input::placeholder {
   font-size: 14px;
   letter-spacing: 0.06em;
-  color: rgba(138, 28, 28, 0.35);
+  color: #A9B2BC;
 }
 
 .wc-signature-ok {
@@ -756,25 +755,27 @@ input[type="submit"]:not(:disabled),
 .wc-seal-hint {
   font-size: 12px;
   font-style: italic;
-  opacity: 0.60;
+  color: #A9B2BC;
+  opacity: 1;
 }
 
 .wc-wax-seal {
   width: 100px;
   height: 100px;
   border-radius: 9999px;
-  border: 4px solid rgba(138, 28, 28, 0.6);
-  background: radial-gradient(circle at 30% 30%, #b93636, #8a1c1c 55%, #581010);
+  border: none;
+  background: radial-gradient(circle at 35% 30%, #e15a52, #B3262B 46%, #8d1820 78%);
   box-shadow:
-    0 8px 20px rgba(0, 0, 0, 0.35),
-    inset 2px 2px 8px rgba(255, 255, 255, 0.18),
-    inset -2px -2px 10px rgba(0, 0, 0, 0.28);
+    inset 0 0 0 2px rgba(248, 231, 216, 0.32),
+    inset 0 -10px 16px rgba(0, 0, 0, 0.28),
+    0 8px 18px rgba(0, 0, 0, 0.45);
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   position: relative;
-  transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.25s ease, filter 0.25s ease, opacity 0.25s ease;
+  color: #f8e7d8;
+  transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.25s ease, opacity 0.25s ease;
 }
 
 .wc-wax-seal::before {
@@ -787,21 +788,31 @@ input[type="submit"]:not(:disabled),
   pointer-events: none;
 }
 
-.wc-wax-seal:hover {
+.wc-wax-seal:hover:not(:disabled) {
   transform: scale(1.08);
   box-shadow:
-    0 0 34px rgba(185, 54, 54, 0.55),
-    inset 2px 2px 10px rgba(255, 255, 255, 0.24);
+    inset 0 0 0 2px rgba(248, 231, 216, 0.4),
+    0 0 34px rgba(179, 38, 43, 0.55);
 }
 
-.wc-wax-seal:active {
+.wc-wax-seal:active:not(:disabled) {
   transform: scale(0.96);
 }
 
 .wc-wax-seal:disabled {
   cursor: not-allowed;
-  filter: grayscale(1);
-  opacity: 0.65;
+  filter: none;
+  opacity: 0.72;
+}
+
+.wc-wax-seal-mark {
+  width: 58%;
+  height: 58%;
+  background-color: #f8e7d8;
+  -webkit-mask: url("/brand/mark-transparent.svg") center / contain no-repeat;
+  mask: url("/brand/mark-transparent.svg") center / contain no-repeat;
+  filter: drop-shadow(0 1px 0 rgba(80, 10, 14, 0.55));
+  pointer-events: none;
 }
 
 .wc-wax-seal--auth {
@@ -851,8 +862,13 @@ input[type="submit"]:not(:disabled),
 
 .wc-corner-mark {
   position: absolute;
-  bottom: 16px;
-  right: 16px;
+  bottom: 14px;
+  right: 14px;
+  width: 78px;
+  height: 78px;
+  opacity: 0.18;
+  pointer-events: none;
+  background: url("/brand/mark-transparent.svg") center / contain no-repeat;
 }
 
 /* === Difficulty Selector === */

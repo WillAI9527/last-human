@@ -1,9 +1,8 @@
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
-import { FingerprintSimple, PawPrint, Sparkle, Wrench, GearSix, UserCircle, EnvelopeSimple, Handshake, DotsThreeOutlineVertical, Users, UsersFour } from "@phosphor-icons/react";
+import { PawPrint, Sparkle, Wrench, GearSix, UserCircle, EnvelopeSimple, Handshake, DotsThreeOutlineVertical, Users, UsersFour } from "@phosphor-icons/react";
 import { UpstreamCredit } from "@/components/seo/UpstreamCredit";
-import { WerewolfIcon } from "@/components/icons/FlatIcons";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -1600,17 +1599,15 @@ export function WelcomeScreen({
                 onClick={handleConfirm}
                 disabled={!canConfirm}
               >
-                <FingerprintSimple weight="fill" size={44} className="wc-wax-seal-icon" />
+                <span className="wc-wax-seal-mark" aria-hidden="true" />
               </button>
             </div>
 
             <footer className="mt-6 text-center">
-              <UpstreamCredit className="text-[11px] text-[#6b5a48]/75 underline-offset-2 hover:text-[#3d2e24] hover:underline" />
+              <UpstreamCredit className="text-[11px] text-[#A9B2BC] underline-offset-2 hover:text-[#F2EDE4] hover:underline" />
             </footer>
 
-            <div className="wc-corner-mark" aria-hidden="true">
-              <WerewolfIcon size={30} className="text-[var(--color-wolf)] opacity-30" />
-            </div>
+            <div className="wc-corner-mark" aria-hidden="true" />
           </div>
         </motion.div>
 

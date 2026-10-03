@@ -132,7 +132,7 @@
     },
     "transition": {
       "title": "游戏开始",
-      "subtitle": "The Game Begins"
+      "subtitle": "对局开始"
     },
     "roleConfig": {
       "godLabelFull": "预女猎守",
@@ -909,7 +909,7 @@
   "system": {
     "gameStart": "人到齐了，开始吧。",
     "nightFall": "第 {day} 夜，天黑请闭眼",
-    "summarizingDay": "整理今日要点…",
+    "summarizingDay": "正在整理今天的发生的事…",
     "dayBreak": "天亮了，请睁眼",
     "dayBreakShort": "天亮了",
     "voteStartShort": "进入投票环节",
@@ -1581,7 +1581,7 @@
   "gameLogic": {
     "errors": {
       "openRouterUnauthorized": {
-        "title": "OpenRouter 401 Unauthorized",
+        "title": "OpenRouter 授权失败（401）",
         "description": "常见原因：1) 改了 .env.local 但没重启 next dev；2) key 带了引号/空格/换行；3) key 已失效。"
       },
       "requestFailed": "请求失败",
@@ -2180,7 +2180,7 @@
     "dayBreak": "天亮了",
     "voteStart": "进入投票环节",
     "you": "你",
-    "zenmux401": "ZenMux 401 Unauthorized",
+    "zenmux401": "ZenMux 授权失败（401）",
     "requestFailed": "请求失败",
     "errorOccurred": "出错了: {error}",
     "guardNoRepeat": "守卫不能连续两晚守护同一人",

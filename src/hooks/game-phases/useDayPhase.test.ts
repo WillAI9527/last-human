@@ -29,7 +29,7 @@ function harness(tts = false) {
   let serial = 0;
   let organizingTimeout: (() => void) | undefined;
   const scheduleTimeout = (fn: () => void, ms: number) => {
-    if (ms === 60000) organizingTimeout = fn;
+    if (ms === 45000) organizingTimeout = fn;
     return setTimeout(fn, ms);
   };
   const requireMock = (id: string): any => {
@@ -62,7 +62,7 @@ function harness(tts = false) {
     if (id === "@/lib/llm") return { isGameSessionExpiredMessage: () => false };
     if (id === "@/lib/utils") return { generateUUID: () => `request-${++serial}` };
     if (id === "@/lib/speech-request") return speechRequest;
-    if (id === "@/lib/request-timeout") return { withTimeout };
+    if (id === "@/lib/request-timeout") return { withTimeout, GAMEPLAY_CALL_DEADLINE_MS: 45000 };
     throw new Error(`未配置依赖 ${id}`);
   };
   const load = (file: string) => {
@@ -205,4 +205,25 @@ test("发言失败先静默重试一次，再次失败才暂停，错误不作�
     await tick();
     assert.deepEqual([...h.dialogue.getSpeechQueue().segments], ["重试后的公开发言"]);
   } finally { h.dispose(); }
+});
+
+test("发言请求一直不返回时，45 秒内改用兜底台词并中止请求", async (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const h = harness();
+  try {
+    const running = h.day.runAISpeech(h.state, h.first);
+    t.mock.timers.tick(44_000);
+    for (let i = 0; i < 8; i += 1) await Promise.resolve();
+    assert.equal(h.dialogue.getSpeechQueue().isFinalized, false);
+    assert.equal(h.pending[0].options.signal.aborted, false);
+    t.mock.timers.tick(1_000);
+    await running;
+    assert.equal(h.pending[0].options.signal.aborted, true);
+    assert.deepEqual([...h.dialogue.getSpeechQueue().segments], ["dayPhase.timeout"]);
+    assert.equal(h.dialogue.getSpeechQueue().isFinalized, true);
+    assert.equal(h.failures.length, 0);
+  } finally {
+    h.dispose();
+    t.mock.timers.reset();
+  }
 });
