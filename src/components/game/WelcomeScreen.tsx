@@ -2,7 +2,6 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import { PawPrint, Sparkle, Wrench, GearSix, UserCircle, GithubLogo, EnvelopeSimple, Handshake, DotsThreeOutlineVertical, Users, UsersFour } from "@phosphor-icons/react";
-import { WerewolfIcon } from "@/components/icons/FlatIcons";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -38,8 +37,7 @@ import {
 import { loadTokenPayConnectionWithRetry } from "@/lib/tokenpay-client";
 import { fetchPublicQuota, reservePublicGame, type PublicQuota } from "@/lib/demo-game-client";
 import { WolfCover } from "@/components/home/WolfCover";
-import { SixSeatMark } from "@/components/home/SixSeatMark";
-import { isQuotaSpent, nameFieldEnterAction } from "@/components/home/oath-card";
+import { isSealDisabled, nameFieldEnterAction } from "@/components/home/oath-card";
 
 const GITHUB_REPO_URL = "https://github.com/WillAI9527/last-human";
 
@@ -310,11 +308,9 @@ export function WelcomeScreen({
   } = useCredits();
   const [isSetupOpen, setIsSetupOpen] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
-  const paperRef = useRef<HTMLDivElement | null>(null);
   const sealButtonRef = useRef<HTMLButtonElement | null>(null);
   const isStartingRef = useRef(false);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
-  const [serverNotice, setServerNotice] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -322,10 +318,12 @@ export function WelcomeScreen({
       .then((response) => response.json())
       .then((payload: { zenmuxConfigured?: boolean; message?: string | null }) => {
         if (cancelled) return;
-        setServerNotice(payload.zenmuxConfigured ? null : (payload.message || "服务器未配置，暂时无法开局。"));
+        if (!payload.zenmuxConfigured) {
+          toast.error(payload.message || "服务器未配置，暂时无法开局。");
+        }
       })
       .catch(() => {
-        if (!cancelled) setServerNotice("服务器未配置，暂时无法开局。");
+        if (!cancelled) toast.error("服务器未配置，暂时无法开局。");
       });
     return () => {
       cancelled = true;
@@ -377,11 +375,9 @@ export function WelcomeScreen({
   const [difficulty, setDifficulty] = useAtom(difficultyAtom);
   const [playerCount, setPlayerCount] = useAtom(playerCountAtom);
   const [preferredRole, setPreferredRole] = useAtom(preferredRoleAtom);
-  const [oathOpen, setOathOpen] = useState(false);
-  const [reduceMotion, setReduceMotion] = useState(false);
+  const [rulesOpen, setRulesOpen] = useState(false);
   const [dailyQuota, setDailyQuota] = useState<PublicQuota | null>(null);
   const [sealHint, setSealHint] = useState(false);
-  const sheetRef = useRef<HTMLDivElement>(null);
   const sealHintTimerRef = useRef<number | null>(null);
   const springCampaignRemainingQuota = springCampaign?.remainingQuota ?? 0;
   const springCampaignTotalQuota = springCampaign?.totalQuota ?? 0;
@@ -586,15 +582,6 @@ export function WelcomeScreen({
   }, [playerCount]);
 
   useEffect(() => {
-    const media = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const sync = () => setReduceMotion(media.matches);
-    sync();
-    media.addEventListener("change", sync);
-    return () => media.removeEventListener("change", sync);
-  }, []);
-
-  useEffect(() => {
-    if (!oathOpen) return;
     let cancelled = false;
     void fetchPublicQuota().then((quota) => {
       if (!cancelled) setDailyQuota(quota);
@@ -602,48 +589,7 @@ export function WelcomeScreen({
     return () => {
       cancelled = true;
     };
-  }, [oathOpen]);
-
-  useEffect(() => {
-    if (!oathOpen) return;
-    if (window.matchMedia("(pointer: coarse)").matches) return;
-    const id = window.setTimeout(() => {
-      paperRef.current?.querySelector<HTMLInputElement>("input")?.focus();
-    }, reduceMotion ? 0 : 420);
-    return () => window.clearTimeout(id);
-  }, [oathOpen, reduceMotion]);
-
-  useEffect(() => {
-    if (!oathOpen) return;
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOathOpen(false);
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [oathOpen]);
-
-  useEffect(() => {
-    if (!oathOpen) return;
-    const sheet = sheetRef.current;
-    const viewport = window.visualViewport;
-    if (!sheet || !viewport) return;
-    const sync = () => {
-      const inset = Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop);
-      sheet.style.setProperty("--wolf-keyboard-inset", `${inset}px`);
-      const input = paperRef.current?.querySelector("input");
-      if (input && document.activeElement === input) {
-        input.scrollIntoView({ block: "center", inline: "nearest" });
-      }
-    };
-    sync();
-    viewport.addEventListener("resize", sync);
-    viewport.addEventListener("scroll", sync);
-    return () => {
-      viewport.removeEventListener("resize", sync);
-      viewport.removeEventListener("scroll", sync);
-      sheet.style.removeProperty("--wolf-keyboard-inset");
-    };
-  }, [oathOpen]);
+  }, []);
 
   const roleConfigValid = useMemo(() => {
     if (fixedRoles.length !== playerCount) return false;
@@ -687,52 +633,19 @@ export function WelcomeScreen({
     });
   }, [playerCount, t]);
 
-  const canConfirm = useMemo(() => {
-    return !!humanName.trim() && !isLoading && !isTransitioning && (PUBLIC_DEMO || !creditsLoading);
-  }, [humanName, isLoading, isTransitioning, creditsLoading]);
-  const quotaSpent = isQuotaSpent(dailyQuota);
-  const sealDisabled = !canConfirm || quotaSpent;
+  const shownName = mounted ? humanName : "";
+  const sealDisabled = isSealDisabled({
+    name: shownName,
+    quota: dailyQuota,
+    busy: isLoading || isTransitioning || (!PUBLIC_DEMO && creditsLoading),
+  });
 
-  useEffect(() => {
-    const paper = paperRef.current;
-    if (!paper) return;
-
-    if (typeof window === "undefined") return;
-    if ("ontouchstart" in window) return;
-    if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-
-    let rafId: number | null = null;
-    let lastX = 0;
-    let lastY = 0;
-
-    const update = () => {
-      rafId = null;
-      const xAxis = (window.innerWidth / 2 - lastX) / 60;
-      const yAxis = (window.innerHeight / 2 - lastY) / 60;
-      paper.style.setProperty("--wc-tilt-x", `${xAxis}`);
-      paper.style.setProperty("--wc-tilt-y", `${yAxis}`);
-    };
-
-    const onMove = (e: MouseEvent) => {
-      lastX = e.clientX;
-      lastY = e.clientY;
-      if (rafId !== null) return;
-      rafId = window.requestAnimationFrame(update);
-    };
-
-    const onLeave = () => {
-      paper.style.setProperty("--wc-tilt-x", "0");
-      paper.style.setProperty("--wc-tilt-y", "0");
-    };
-
-    window.addEventListener("mousemove", onMove);
-    window.addEventListener("mouseleave", onLeave);
-    return () => {
-      window.removeEventListener("mousemove", onMove);
-      window.removeEventListener("mouseleave", onLeave);
-      if (rafId !== null) window.cancelAnimationFrame(rafId);
-    };
-  }, []);
+  const pulseSeal = () => {
+    if (nameFieldEnterAction() !== "hint-seal" || sealDisabled) return;
+    setSealHint(true);
+    if (sealHintTimerRef.current !== null) window.clearTimeout(sealHintTimerRef.current);
+    sealHintTimerRef.current = window.setTimeout(() => setSealHint(false), 720);
+  };
 
   const createParticles = (element: HTMLElement) => {
     const rect = element.getBoundingClientRect();
@@ -935,7 +848,7 @@ export function WelcomeScreen({
   };
 
   const handleConfirm = async () => {
-    if (!canConfirm) {
+    if (sealDisabled) {
       return;
     }
     if (isStartingRef.current) {
@@ -1030,9 +943,17 @@ export function WelcomeScreen({
     <>
       <div className="wc-contract-screen wc-contract-screen--hero selection:bg-[var(--color-accent)] selection:text-white">
         <WolfCover
-          sheetOpen={oathOpen}
-          onEnter={() => setOathOpen(true)}
-          onDismiss={() => setOathOpen(false)}
+          name={shownName}
+          onNameChange={setHumanName}
+          quota={dailyQuota}
+          sealDisabled={sealDisabled}
+          sealHint={sealHint}
+          sealRef={sealButtonRef}
+          rulesOpen={rulesOpen}
+          onNameEnter={pulseSeal}
+          onSeal={() => { void handleConfirm(); }}
+          onOpenRules={() => setRulesOpen(true)}
+          onCloseRules={() => setRulesOpen(false)}
         />
         <div className="wc-contract-fog" aria-hidden="true" />
         <div className="wc-contract-vignette" aria-hidden="true" />
@@ -1056,6 +977,10 @@ export function WelcomeScreen({
           onSoundEnabledChange={onSoundEnabledChange}
           onAiVoiceEnabledChange={onAiVoiceEnabledChange}
           onAutoAdvanceDialogueEnabledChange={onAutoAdvanceDialogueEnabledChange}
+          onOpenHowToPlay={() => {
+            setIsSetupOpen(false);
+            setRulesOpen(true);
+          }}
         />
         <AuthModal open={isAuthOpen} onOpenChange={setIsAuthOpen} />
         <AccountModal open={isAccountOpen} onOpenChange={setIsAccountOpen} />
@@ -1480,264 +1405,6 @@ export function WelcomeScreen({
           </div>
         </div>
 
-        <motion.div
-          id="oath-card"
-          ref={sheetRef}
-          initial={false}
-          animate={{ y: oathOpen ? 0 : "105%" }}
-          transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 280, damping: 32 }}
-          className="wolf-oath-sheet"
-          style={{ pointerEvents: oathOpen ? "auto" : "none" }}
-          aria-hidden={!oathOpen}
-          inert={oathOpen ? undefined : true}
-          onClick={(event) => {
-            if (event.target === event.currentTarget) setOathOpen(false);
-          }}
-        >
-          <div ref={paperRef} className="wc-contract-paper">
-            <button
-              type="button"
-              className="wolf-oath-close"
-              aria-label={t("welcome.closeCard")}
-              onClick={() => setOathOpen(false)}
-            >
-              <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
-                <path
-                  d="M3.5 3.5 L12.5 12.5 M12.5 3.5 L3.5 12.5"
-                  fill="none"
-                  stroke="#A9B2BC"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                />
-              </svg>
-            </button>
-            <div className="wc-contract-borders" aria-hidden="true" />
-
-            {locale === "zh" && FREE_ROUNDS_PROMO_ENABLED && (
-              <a
-                href="https://my.feishu.cn/share/base/form/shrcnqLuGo3qyh64vFp2JhCN9CF"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="wc-promo-tag-container"
-                aria-label="赠送次数"
-              >
-                <span className="wc-paper-clip" aria-hidden="true" />
-                <span className="wc-promo-ticket">
-                  <span className="wc-shine-effect" aria-hidden="true" />
-                  <span className="wc-promo-title">赠送次数</span>
-                  <span className="wc-promo-subtitle">Free Rounds</span>
-                </span>
-              </a>
-            )}
-
-            {/* Mobile: inline sponsor stamps at top of paper */}
-            {!PUBLIC_DEMO && (
-            <div className="wc-paper-sponsors sm:hidden">
-              <a
-                href="https://bailian.console.aliyun.com/?ref=wolfcha"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="wc-paper-stamp"
-                style={{ "--stamp-rotate": "4deg" } as React.CSSProperties}
-                onClick={() => void trackSponsorClick("bailian")}
-              >
-                <img src="/sponsor/bailian.png" alt="百炼" className="wc-paper-stamp__logo" />
-                <span className="wc-paper-stamp__name">百炼</span>
-              </a>
-              <a
-                href="https://tokendance.space/?ref=wolfcha"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="wc-paper-stamp wc-paper-stamp--tokendance"
-                style={{ "--stamp-rotate": "-3deg" } as React.CSSProperties}
-                onClick={() => void trackSponsorClick("tokendance")}
-              >
-                <img src="/sponsor/tokendance-icon.svg" alt="TokenDance" className="wc-paper-stamp__logo" />
-                <span className="wc-paper-stamp__name">TokenDance</span>
-              </a>
-              {/* Temporarily hidden: Watcha paper stamp
-              <a
-                href="https://watcha.cn/?ref=wolfcha"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="wc-paper-stamp"
-                style={{ "--stamp-rotate": "6deg" } as React.CSSProperties}
-                onClick={() => void trackSponsorClick("watcha")}
-              >
-                <img src="/sponsor/watcha.svg" alt="观猹" className="wc-paper-stamp__logo" />
-                <span className="wc-paper-stamp__name">观猹</span>
-              </a>
-              */}
-            </div>
-            )}
-
-            <div className="mt-2 text-center">
-              <div className="wc-contract-title">LAST HUMAN</div>
-              <div className="wc-contract-subtitle">{t("welcome.subtitle")}</div>
-              <p className="wolf-rules">{t("welcome.rules")}</p>
-              {dailyQuota && !dailyQuota.unlimited && (
-                <p className="wolf-quota">
-                  {quotaSpent
-                    ? t.rich("welcome.quotaSpent", {
-                        limit: dailyQuota.limit,
-                        b: (chunks) => <strong>{chunks}</strong>,
-                      })
-                    : t.rich("welcome.quotaRemaining", {
-                        count: dailyQuota.remaining,
-                        b: (chunks) => <strong>{chunks}</strong>,
-                      })}
-                </p>
-              )}
-              {serverNotice && (
-                <p className="mt-3 text-sm text-[#B3262B]" role="alert">{serverNotice}</p>
-              )}
-            </div>
-
-            <div className="mt-5">
-              {springCampaignActiveNow ? (
-                <div className="relative rotate-[-1deg]">
-                  <div
-                    className="pointer-events-none absolute -top-2 left-6 h-4 w-20 rotate-[-6deg] rounded-sm border border-black/10 bg-white/60 shadow-sm"
-                    aria-hidden="true"
-                  />
-                  <div className="rounded-xl border border-[var(--border-color)] bg-white/60 px-4 py-3 shadow-[0_10px_24px_rgba(0,0,0,0.08)] backdrop-blur-sm">
-                    <div className="flex items-center justify-between gap-3">
-                      <p className="text-sm font-semibold text-[var(--text-primary)]">
-                        {t("welcome.springCampaign.title")}
-                      </p>
-                      <p className="text-xs text-[var(--text-muted)]">
-                        {t("welcome.springCampaign.range")}
-                      </p>
-                    </div>
-                    <p className="mt-1 text-xs leading-snug text-[var(--text-secondary)]">
-                      {user
-                        ? t("welcome.springCampaign.claimedStatus", {
-                          count: springCampaignActiveNow ? effectiveSpringRemainingQuota : SPRING_CAMPAIGN_DAILY_QUOTA,
-                          total: springCampaignActiveNow ? effectiveSpringTotalQuota : SPRING_CAMPAIGN_DAILY_QUOTA,
-                        })
-                        : t("welcome.springCampaign.signInHint")}
-                    </p>
-                  </div>
-                </div>
-              ) : null}
-            </div>
-
-            {/* Temporarily hidden: Watcha official rating badge
-            <div className="mt-5 flex justify-center">
-              <a
-                href="https://watcha.cn/products/wolfcha?tab=review&utm_source=product-badge&utm_content=review"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="wc-watcha-paper-badge"
-                aria-label={t("welcome.watchaRating.ariaLabel")}
-                title={t("welcome.watchaRating.title")}
-              >
-                <img
-                  src="https://watcha.cn/api/v2/products/wolfcha/badge?style=1&dark=false"
-                  alt={t("welcome.watchaRating.title")}
-                  width={360}
-                  loading="lazy"
-                  draggable={false}
-                />
-              </a>
-            </div>
-            */}
-
-            <div className="mt-7 text-center wc-contract-body">
-              <div className="wc-contract-oath">
-                {t("welcome.oath.line1")}
-                <br />
-                {t("welcome.oath.line2")}
-                <br />
-                {t("welcome.oath.line3")}
-              </div>
-
-              <div className="mt-4">
-                <div className="wc-contract-label">{t("welcome.signature.label")}</div>
-                <div className="relative mt-2">
-                  <input
-                    type="text"
-                    value={mounted ? humanName : ""}
-                    onChange={(e) => setHumanName(e.target.value)}
-                    onFocus={(event) => {
-                      event.currentTarget.scrollIntoView({ block: "center", inline: "nearest" });
-                    }}
-                    onKeyDown={(event) => {
-                      if (event.key !== "Enter" || event.nativeEvent.isComposing) return;
-                      event.preventDefault();
-                      const coarse = window.matchMedia("(pointer: coarse)").matches;
-                      if (nameFieldEnterAction(coarse) !== "hint-seal" || quotaSpent) return;
-                      setSealHint(true);
-                      if (sealHintTimerRef.current !== null) window.clearTimeout(sealHintTimerRef.current);
-                      sealHintTimerRef.current = window.setTimeout(() => setSealHint(false), 720);
-                    }}
-                    placeholder={t("welcome.signature.placeholder")}
-                    className="wc-signature-input"
-                    autoComplete="off"
-                    disabled={isLoading || isTransitioning}
-                  />
-                  <AnimatePresence>
-                    {mounted && !!humanName.trim() && (
-                      <motion.div
-                        initial={{ scale: 0.8, opacity: 0 }}
-                        animate={{ scale: 1, opacity: 1 }}
-                        exit={{ scale: 0.8, opacity: 0 }}
-                        className="wc-signature-ok"
-                      >
-                        <Sparkle weight="fill" size={18} />
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
-              </div>
-            </div>
-
-
-            {/* Custom Character Entry */}
-            {user && (
-              <button
-                type="button"
-                onClick={() => setIsCustomCharacterOpen(true)}
-                className="mt-6 mx-auto flex items-center gap-2 px-3 py-1.5 rounded-md border-2 border-dashed border-[var(--border-color)] text-xs text-[var(--text-secondary)] hover:border-[var(--color-accent)] hover:text-[var(--color-accent)] transition-colors"
-              >
-                <UsersFour size={14} />
-                <span>{t("customCharacter.entryButton")}</span>
-                {selectedCharacterIds.size > 0 && (
-                  <span className="px-1.5 py-0.5 rounded-full bg-[var(--color-accent)] text-white text-[10px] font-medium">
-                    {selectedCharacterIds.size}
-                  </span>
-                )}
-                {customCharacters.characters.length > 0 && selectedCharacterIds.size === 0 && (
-                  <span className="px-1.5 py-0.5 rounded-full bg-[var(--text-muted)]/20 text-[var(--text-muted)] text-[10px] font-medium">
-                    {customCharacters.characters.length}
-                  </span>
-                )}
-              </button>
-            )}
-
-            <div className="mt-4 flex flex-col items-center gap-3">
-              <div className="wc-seal-hint">
-                {canConfirm ? t("welcome.sealHint.ready") : t("welcome.sealHint.waiting")}
-              </div>
-              <button
-                ref={sealButtonRef}
-                type="button"
-                className={`wc-wax-seal${quotaSpent ? " is-spent" : ""}${sealHint ? " is-hint" : ""}`}
-                onClick={handleConfirm}
-                disabled={sealDisabled}
-                aria-disabled={sealDisabled}
-              >
-                <span className="wolf-card-mark">
-                  <SixSeatMark muted={quotaSpent} />
-                </span>
-              </button>
-            </div>
-
-            <div className="wc-corner-mark" aria-hidden="true">
-              <WerewolfIcon size={30} className="text-[var(--color-wolf)] opacity-30" />
-            </div>
-          </div>
-        </motion.div>
 
         <AnimatePresence>
           {isTransitioning && (

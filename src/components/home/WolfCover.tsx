@@ -3,10 +3,11 @@
 import { useCallback, useEffect, useRef } from "react";
 import { useTranslations } from "next-intl";
 import { SixSeatMark } from "@/components/home/SixSeatMark";
+import { keyboardInset } from "@/components/home/oath-card";
+import type { PublicQuota } from "@/lib/demo-game-client";
 import "./wolf-cover.css";
 
 const COVER_SRC = "/cover/wolf.webp";
-
 type DeviceOrientationEventConstructor = typeof DeviceOrientationEvent & {
   requestPermission?: () => Promise<"granted" | "denied" | "default">;
 };
@@ -171,51 +172,93 @@ function Eye({
   );
 }
 
+function CloseIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+      <path
+        d="M3.5 3.5 L12.5 12.5 M12.5 3.5 L3.5 12.5"
+        fill="none"
+        stroke="#A9B2BC"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
 export function WolfCover({
-  sheetOpen,
-  onEnter,
-  onDismiss,
+  name,
+  onNameChange,
+  quota,
+  sealDisabled,
+  sealHint,
+  sealRef,
+  rulesOpen,
+  onNameEnter,
+  onSeal,
+  onOpenRules,
+  onCloseRules,
 }: {
-  sheetOpen: boolean;
-  onEnter: () => void;
-  onDismiss: () => void;
+  name: string;
+  onNameChange: (name: string) => void;
+  quota: PublicQuota | null;
+  sealDisabled: boolean;
+  sealHint: boolean;
+  sealRef: React.RefObject<HTMLButtonElement | null>;
+  rulesOpen: boolean;
+  onNameEnter: () => void;
+  onSeal: () => void;
+  onOpenRules: () => void;
+  onCloseRules: () => void;
 }) {
   const t = useTranslations();
   const artRef = useRef<HTMLDivElement>(null);
   const leftPupilRef = useRef<HTMLDivElement>(null);
   const rightPupilRef = useRef<HTMLDivElement>(null);
+  const chromeRef = useRef<HTMLDivElement>(null);
   const enableOrientation = useWolfGaze(artRef, leftPupilRef, rightPupilRef);
-  const dragRef = useRef(false);
-  const originRef = useRef({ x: 0, y: 0 });
+  const quotaSpent = quota !== null && !quota.unlimited && quota.remaining <= 0;
+  const showQuota = quota !== null && !quota.unlimited;
 
-  const handleEnter = () => {
-    if (dragRef.current) return;
+  useEffect(() => {
+    const chrome = chromeRef.current;
+    const viewport = window.visualViewport;
+    if (!chrome || !viewport) return;
+    const sync = () => {
+      const inset = keyboardInset(window.innerHeight, viewport.height, viewport.offsetTop);
+      chrome.style.setProperty("--wolf-keyboard-inset", `${inset}px`);
+      const input = chrome.querySelector("input");
+      if (input && document.activeElement === input) {
+        input.scrollIntoView({ block: "center", inline: "nearest" });
+      }
+    };
+    sync();
+    viewport.addEventListener("resize", sync);
+    viewport.addEventListener("scroll", sync);
+    return () => {
+      viewport.removeEventListener("resize", sync);
+      viewport.removeEventListener("scroll", sync);
+      chrome.style.removeProperty("--wolf-keyboard-inset");
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!rulesOpen) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onCloseRules();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onCloseRules, rulesOpen]);
+
+  const handleSeal = () => {
+    if (sealDisabled) return;
     enableOrientation();
-    onEnter();
-  };
-
-  const handleCoverClick = (event: React.MouseEvent<HTMLElement>) => {
-    if (!sheetOpen) return;
-    if ((event.target as HTMLElement).closest("button, a, input, textarea")) return;
-    if (dragRef.current) return;
-    onDismiss();
+    onSeal();
   };
 
   return (
-    <section
-      className={sheetOpen ? "wolf-cover is-sheet" : "wolf-cover"}
-      aria-label="LAST HUMAN"
-      onPointerDown={(event) => {
-        dragRef.current = false;
-        originRef.current = { x: event.clientX, y: event.clientY };
-      }}
-      onPointerMove={(event) => {
-        const dx = event.clientX - originRef.current.x;
-        const dy = event.clientY - originRef.current.y;
-        if (dx * dx + dy * dy > 64) dragRef.current = true;
-      }}
-      onClick={handleCoverClick}
-    >
+    <section className="wolf-cover" aria-label="LAST HUMAN">
       <link rel="preload" as="image" href={COVER_SRC} type="image/webp" fetchPriority="high" />
       <div className="wolf-cover__stage">
         <div className="wolf-cover__art" ref={artRef} data-wolf-art="">
@@ -233,30 +276,91 @@ export function WolfCover({
         </div>
       </div>
       <div className="wolf-cover__vignette" />
-      <div className="wolf-cover__chrome">
+      <div className="wolf-cover__chrome" ref={chromeRef}>
         <h1 className="wolf-cover__title">
           LAST HUMAN
           <span className="wolf-cover__line">{t("welcome.cover.line")}</span>
+          <span className="wolf-cover__only">{t("welcome.subtitle")}</span>
         </h1>
+        <input
+          className="wolf-cover__sign"
+          value={name}
+          placeholder={t("welcome.signature.placeholder")}
+          aria-label={t("welcome.signature.label")}
+          autoComplete="off"
+          enterKeyHint="done"
+          onChange={(event) => onNameChange(event.target.value)}
+          onFocus={(event) => {
+            event.currentTarget.scrollIntoView({ block: "center", inline: "nearest" });
+          }}
+          onKeyDown={(event) => {
+            if (event.key !== "Enter" || event.nativeEvent.isComposing) return;
+            event.preventDefault();
+            onNameEnter();
+          }}
+        />
+        {showQuota && (
+          <p className="wolf-cover__quota">
+            {quotaSpent
+              ? t.rich("welcome.quotaSpent", {
+                  limit: quota.limit,
+                  b: (chunks) => <strong>{chunks}</strong>,
+                })
+              : t.rich("welcome.quotaRemaining", {
+                  count: quota.remaining,
+                  b: (chunks) => <strong>{chunks}</strong>,
+                })}
+          </p>
+        )}
         <button
+          ref={sealRef}
           type="button"
-          className="wolf-cover__enter"
-          onPointerDown={(event) => {
-            dragRef.current = false;
-            originRef.current = { x: event.clientX, y: event.clientY };
-          }}
-          onPointerMove={(event) => {
-            const dx = event.clientX - originRef.current.x;
-            const dy = event.clientY - originRef.current.y;
-            if (dx * dx + dy * dy > 64) dragRef.current = true;
-          }}
-          onClick={handleEnter}
+          className={`wolf-cover__seal${sealDisabled ? " is-muted" : ""}${sealHint ? " is-hint" : ""}`}
+          disabled={sealDisabled}
+          aria-disabled={sealDisabled}
+          aria-label={t("welcome.cover.sealLabel")}
+          onClick={handleSeal}
         >
-          <span className="wolf-cover__seal" aria-hidden="true">
-            <SixSeatMark />
-          </span>
-          <span className="wolf-cover__enter-label">{t("welcome.cover.enter")}</span>
+          <SixSeatMark muted={sealDisabled} />
         </button>
+        <div className="wolf-cover__seal-label">{t("welcome.cover.sealLabel")}</div>
+        <button type="button" className="wolf-cover__how" onClick={onOpenRules}>
+          {t("welcome.howToPlay.link")}
+        </button>
+      </div>
+
+      <div
+        className={rulesOpen ? "wolf-rules-sheet is-open" : "wolf-rules-sheet"}
+        onClick={(event) => {
+          if (event.target === event.currentTarget) onCloseRules();
+        }}
+        aria-hidden={!rulesOpen}
+        inert={rulesOpen ? undefined : true}
+      >
+        <div
+          className="wolf-rules-panel"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="wolf-rules-title"
+        >
+          <button
+            type="button"
+            className="wolf-rules-close"
+            aria-label={t("welcome.closeCard")}
+            onClick={onCloseRules}
+          >
+            <CloseIcon />
+          </button>
+          <h2 id="wolf-rules-title" className="wolf-rules-title">{t("welcome.howToPlay.title")}</h2>
+          <div className="wolf-rules-body">
+            <p>{t("welcome.howToPlay.p1")}</p>
+            <p>{t("welcome.howToPlay.p2")}</p>
+            <p>{t("welcome.howToPlay.p3")}</p>
+            <p>{t("welcome.howToPlay.p4")}</p>
+            <p>{t("welcome.howToPlay.p5")}</p>
+            <p>{t("welcome.howToPlay.p6")}</p>
+          </div>
+        </div>
       </div>
     </section>
   );
