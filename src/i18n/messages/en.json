@@ -132,8 +132,8 @@
       "title": "How to play",
       "p1": "Six people sit at the table. You are the only human. The other five villagers are played by AI.",
       "p2": "Sides: 2 werewolves, against the Seer, the Witch, and 2 villagers.",
-      "p3": "Night: the werewolves choose one person to kill. The Witch may save that person with the antidote, or poison someone. The Seer checks one person's identity.",
-      "p4": "Day: everyone speaks in turn, then votes to exile one person. If two players tie, each speaks once more and the table votes again. If they still tie, nobody is eliminated.",
+      "p3": "Night: the werewolves choose one person to kill. The Witch may save someone with the antidote or poison someone; only one potion per night, and she can save herself only on night 1. The Seer checks one person's identity.",
+      "p4": "Day: everyone speaks in turn, then votes to exile one person. If there is a tie, the tied players each speak once more and everyone else votes again. If they still tie, nobody is eliminated.",
       "p5": "Winning: if every werewolf is out, the good side wins. If every special role is out, or every villager is out, the werewolves win.",
       "p6": "Your role is assigned at random when the game begins. Listen to them, find who is lying, and don't let them see through you."
     },
