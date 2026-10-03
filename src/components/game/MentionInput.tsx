@@ -274,7 +274,7 @@ export function MentionInput({
     editorProps: {
       attributes: {
         class:
-          "wc-input-field w-full min-h-[44px] max-h-[120px] text-base focus:outline-none transition-all cursor-text",
+          "wc-input-field w-full min-w-0 min-h-[44px] max-h-[120px] text-base focus:outline-none transition-all cursor-text",
       },
     },
     onUpdate: ({ editor }) => {
@@ -307,7 +307,7 @@ export function MentionInput({
   if (!editor) return null;
 
   return (
-    <div className="w-full flex-1 relative">
+    <div className="w-full min-w-0 flex-1 relative">
       {(!value || value.trim().length === 0) && placeholder ? (
         <div
           className={

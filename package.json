@@ -12,6 +12,7 @@
     "audit:character-generation:live": "node --env-file=.env.local --import tsx scripts/live-character-generation-audit.ts",
     "audit:full-game:live": "node --env-file=.env.local --import tsx scripts/live-full-game-audit.ts",
     "lint": "eslint",
+    "test:mobile": "playwright test",
     "test:tokenpay": "NODE_OPTIONS=--conditions=react-server tsx --test server/tokenpay-*.test.ts server/public-demo-chat.test.ts server/legacy-payments.test.ts server/watcha-*.test.ts server/game-session-*.test.ts server/credit-*.test.ts server/chat-observability-contract.test.ts src/lib/chat-request-log.test.ts",
     "migrate:game-sessions-user-id": "node scripts/migrate-game-sessions-user-id.mjs"
   },
@@ -57,6 +58,7 @@
     "uuid": "^13.0.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",

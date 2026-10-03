@@ -11,6 +11,7 @@ import {
   SpeakerSlash,
 } from "@phosphor-icons/react";
 import { useTypewriter } from "@/hooks/useTypewriter";
+import { useVisualViewportShell } from "@/hooks/useVisualViewportShell";
 import { useGameLogic } from "@/hooks/useGameLogic";
 import type { Phase, Player, Role } from "@/types/game";
 import { isWolfRole } from "@/types/game";
@@ -204,7 +205,7 @@ export default function Home() {
   const [visualIsNight, setVisualIsNight] = useState(isNight);
   const visualIsNightRef = useRef(isNight);
   const [isMobile, setIsMobile] = useState(false);
-  const [keyboardOpen, setKeyboardOpen] = useState(false);
+  const keyboardOpen = useVisualViewportShell();
   const [dayNightBlinkPhase, setDayNightBlinkPhase] = useState<null | "closing" | "opening">(null);
   const dayNightBlinkTokenRef = useRef(0);
   const dayNightBlinkTimeoutsRef = useRef<number[]>([]);
@@ -231,19 +232,6 @@ export default function Home() {
     }
     media.addListener(update);
     return () => media.removeListener(update);
-  }, []);
-
-  useEffect(() => {
-    const viewport = window.visualViewport;
-    if (!viewport) return;
-    const sync = () => setKeyboardOpen(window.innerHeight - viewport.height > 140);
-    sync();
-    viewport.addEventListener("resize", sync);
-    viewport.addEventListener("scroll", sync);
-    return () => {
-      viewport.removeEventListener("resize", sync);
-      viewport.removeEventListener("scroll", sync);
-    };
   }, []);
 
   useEffect(() => {
@@ -1240,7 +1228,7 @@ export default function Home() {
   const isWelcomeStage = !gameStarted;
 
   return (
-    <div className={cn("h-screen flex flex-col overflow-hidden bg-transparent", visualIsNight && "lh-room--night")}>
+    <div className={cn("lh-game-shell flex flex-col overflow-hidden bg-transparent", visualIsNight && "lh-room--night")}>
       <TokenPayRecoveryHost />
       <GameBackground isNight={visualIsNight} isBlinking={!!dayNightBlinkPhase} />
 
@@ -1535,10 +1523,7 @@ export default function Home() {
                       className="flex-1 flex flex-col min-h-0 overflow-hidden"
                     >
                 <div className="flex-1 flex flex-col md:flex-row overflow-hidden w-full min-h-0">
-                  <div className={cn(
-                    "min-h-0 md:flex-1",
-                    keyboardOpen ? "h-[104px] shrink-0" : "h-[48vh] min-h-[280px] md:h-auto"
-                  )}>
+                  <div className={cn("lh-table-pane min-h-0", keyboardOpen && "lh-table-pane--keyboard")}>
                     <RoundTable
                       players={allPlayers}
                       gameState={gameState}
@@ -1557,7 +1542,7 @@ export default function Home() {
                     />
                   </div>
 
-                  <div className="flex-1 flex flex-col min-w-0 min-h-0 h-full md:w-[min(440px,38vw)] md:flex-none overflow-hidden">
+                  <div className="lh-dialog-column flex-1 flex flex-col min-w-0 min-h-0 h-full md:w-[min(440px,38vw)] md:flex-none overflow-hidden">
                     <DialogArea
                       roomLayout="round"
                       gameState={gameState}

@@ -2521,7 +2521,8 @@ input[type="submit"]:not(:disabled),
 }
 
 .wc-input-field {
-  flex: 1;
+  flex: 1 1 auto;
+  min-width: 0;
   background: transparent;
   border: none;
   color: inherit;
@@ -5178,4 +5179,150 @@ input[type="submit"]:not(:disabled),
 }
 .lh-dialog-round .wc-input-box .wc-input-placeholder {
   color: rgba(242, 237, 228, 0.42);
+}
+
+/* Visual viewport shell: iOS Safari toolbar and the keyboard change
+   visualViewport, while 100vh stays the large layout viewport. */
+.lh-game-shell {
+  position: fixed;
+  top: var(--lh-viewport-offset, 0px);
+  left: 0;
+  right: 0;
+  width: 100%;
+  height: var(--lh-viewport, 100dvh);
+  max-height: var(--lh-viewport, 100dvh);
+  overflow: hidden;
+}
+
+.lh-dialog-column {
+  position: relative;
+  z-index: 20;
+}
+
+.wc-composer-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.wc-composer-row .wc-input-box {
+  flex: 1 1 8rem;
+  min-width: 0;
+  max-width: 100%;
+  width: auto;
+  height: auto;
+  min-height: 44px;
+  max-height: 132px;
+  align-items: flex-start;
+  padding: 10px 12px;
+  overflow: hidden;
+}
+
+.wc-composer-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-left: auto;
+  max-width: 100%;
+}
+
+.wc-composer-actions > *,
+.wc-composer-actions button {
+  flex-shrink: 0;
+}
+
+.wc-input-box .ProseMirror,
+.wc-composer-row .wc-input-field {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.wc-input-box .ProseMirror {
+  max-height: 108px;
+  overflow-y: auto;
+}
+
+@media (max-width: 768px) {
+  .lh-roundtable {
+    min-height: 0;
+  }
+
+  .lh-table-pane {
+    flex: 1 1 0%;
+    min-height: 0;
+    max-height: min(40dvh, calc(var(--lh-viewport, 100dvh) - 280px));
+    overflow: hidden;
+  }
+
+  .lh-table-pane--keyboard {
+    flex: 0 0 104px;
+    height: 104px;
+    max-height: 104px;
+  }
+
+  .lh-dialog-round {
+    min-height: 0;
+  }
+
+  .lh-action-dock {
+    position: relative;
+    z-index: 30;
+    flex: 0 0 auto;
+    min-height: 0;
+    max-height: calc(100% - 48px);
+    overflow-x: hidden;
+    overflow-y: auto;
+    pointer-events: auto;
+    padding-bottom: max(12px, env(safe-area-inset-bottom));
+  }
+
+  .lh-dialog-round .wc-panel {
+    min-height: 0;
+  }
+
+  .lh-vote-progress {
+    margin-bottom: 8px;
+    padding: 8px 10px;
+  }
+
+  .wc-voting-progress-list {
+    max-height: 72px;
+    overflow-y: auto;
+  }
+
+  .lh-action-confirm {
+    position: sticky;
+    bottom: 0;
+    z-index: 2;
+    background: var(--glass-bg);
+  }
+
+  .lh-action-confirm .wc-action-btn {
+    min-height: 44px;
+    height: 44px;
+  }
+}
+
+@media (min-width: 769px) {
+  .lh-table-pane {
+    flex: 1 1 auto;
+    height: auto;
+    max-height: none;
+    overflow: visible;
+  }
+
+  .lh-table-pane--keyboard {
+    flex: 0 0 104px;
+    height: 104px;
+    max-height: 104px;
+    overflow: hidden;
+  }
 }

@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { cookies, headers } from "next/headers";
 import "./globals.css";
 import { Toaster } from "sonner";
@@ -11,6 +11,13 @@ import { SiteUrlProvider } from "@/components/seo/SiteUrlProvider";
 import { getSiteUrl } from "@/lib/site-url";
 
 const defaultMessages = getMessages(defaultLocale);
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  interactiveWidget: "resizes-content",
+};
 
 export async function generateMetadata(): Promise<Metadata> {
   await headers();

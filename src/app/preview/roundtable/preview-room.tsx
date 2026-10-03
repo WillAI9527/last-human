@@ -4,11 +4,14 @@ import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { type ChatMessage, type ModelRef, type Player, type Role } from "@/types/game";
 import { createInitialGameState } from "@/lib/game-master";
+import { receiptForSeatAction, type ActionReceipt } from "@/lib/action-receipt";
 import { GameBackground } from "@/components/game/GameBackground";
 import { RoundTable } from "@/components/game/RoundTable";
 import { DialogArea } from "@/components/game/DialogArea";
+import { PlayerDetailModal } from "@/components/game/PlayerDetailModal";
 import { SuspicionReview } from "@/components/analysis/SuspicionReview";
 import type { SuspicionEntry } from "@/lib/suspicion";
+import { useVisualViewportShell } from "@/hooks/useVisualViewportShell";
 import { cn } from "@/lib/utils";
 
 const CAST: Array<{ id: string; name: string; role: Role; gender: "male" | "female" }> = [
@@ -40,10 +43,22 @@ export function PreviewRoom() {
   const params = useSearchParams();
   const scene = params.get("scene") ?? "day";
   const [inputText, setInputText] = useState("");
+  const [selectedSeat, setSelectedSeat] = useState<number | null>(null);
+  const [receipt, setReceipt] = useState<ActionReceipt | null>(null);
+  const [detailPlayer, setDetailPlayer] = useState<Player | null>(null);
+  const keyboardOpen = useVisualViewportShell();
   const night = scene === "night";
-  const keyboard = scene === "keyboard";
+  const keyboard = scene === "keyboard" || keyboardOpen;
   const expanded = scene === "transcript";
   const review = scene === "review";
+  const voteScene = scene === "vote" || scene === "badge";
+
+  useEffect(() => {
+    setSelectedSeat(null);
+    setReceipt(null);
+    setDetailPlayer(null);
+    setInputText("");
+  }, [scene]);
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", night || review ? "dark" : "light");
@@ -75,8 +90,14 @@ export function PreviewRoom() {
     const next = createInitialGameState();
     next.players = players;
     next.day = 1;
-    next.phase = scene === "vote" ? "DAY_VOTE" : night ? "NIGHT_WOLF_ACTION" : "DAY_SPEECH";
-    next.currentSpeakerSeat = keyboard ? 2 : scene === "vote" ? null : 1;
+    next.phase = scene === "vote"
+      ? "DAY_VOTE"
+      : scene === "badge"
+        ? "DAY_BADGE_ELECTION"
+        : night
+          ? "NIGHT_WOLF_ACTION"
+          : "DAY_SPEECH";
+    next.currentSpeakerSeat = scene === "keyboard" ? 2 : voteScene ? null : 1;
     next.votes = scene === "vote" && human ? { [human.playerId]: 0 } : {};
     next.messages = LINES.map((content, index): ChatMessage => ({
       id: `m-${index}`,
@@ -88,7 +109,7 @@ export function PreviewRoom() {
       phase: "DAY_SPEECH",
     }));
     return next;
-  }, [human, keyboard, night, players, scene]);
+  }, [human, night, players, scene, voteScene]);
 
   const suspicion: SuspicionEntry[] = [
     { day: 1, round: 0, voterId: "preview-0", voterSeat: 0, voteSeat: 2, reason: "你第一句就在带节奏。", suspects: [{ seat: 2, score: 86 }, { seat: 1, score: 40 }] },
@@ -108,27 +129,35 @@ export function PreviewRoom() {
   }
 
   return (
-    <main className="h-screen overflow-hidden flex flex-col">
+    <main
+      className="lh-game-shell overflow-hidden flex flex-col"
+      data-testid="game-shell"
+      data-cast-seat={receipt?.kind === "commit" ? String(selectedSeat ?? "") : ""}
+    >
       <GameBackground isNight={night} />
       <div className={cn("flex-1 min-h-0 flex flex-col md:flex-row", night && "lh-roundtable--night")}>
-        <div className={cn("min-h-0 md:flex-1", keyboard ? "h-[104px] shrink-0" : "h-[48vh] min-h-[280px] md:h-auto")}>
+        <div className={cn("lh-table-pane min-h-0", keyboard && "lh-table-pane--keyboard")}>
           <RoundTable
             players={players}
             gameState={state}
             humanPlayer={human}
             visualIsNight={night}
             isGenshinMode={false}
-            selectedSeat={null}
-            humanVoteSeat={scene === "vote" ? 0 : null}
-            canClickSeat={() => scene === "vote"}
-            onSeatClick={() => undefined}
-            selectionTone={scene === "vote" ? "vote" : undefined}
-            isSelectionPhase={scene === "vote"}
+            selectedSeat={voteScene ? selectedSeat : null}
+            humanVoteSeat={receipt?.kind === "commit" ? selectedSeat : scene === "vote" ? 0 : null}
+            canClickSeat={() => voteScene}
+            onSeatClick={(player) => {
+              if (!voteScene || receipt) return;
+              setSelectedSeat(player.seat);
+            }}
+            onDetailClick={setDetailPlayer}
+            selectionTone={voteScene ? "vote" : undefined}
+            isSelectionPhase={voteScene && !receipt}
             canShowRole={false}
             collapsed={keyboard}
           />
         </div>
-        <div className="flex-1 min-h-0 md:w-[min(440px,38vw)] md:flex-none flex flex-col">
+        <div className="lh-dialog-column flex-1 min-h-0 md:w-[min(440px,38vw)] md:flex-none flex flex-col overflow-hidden">
           <DialogArea
             roomLayout="round"
             transcriptExpanded={expanded}
@@ -142,13 +171,29 @@ export function PreviewRoom() {
             }}
             displayedText=""
             isTyping={false}
-            isHumanTurn={keyboard}
+            isHumanTurn={scene === "keyboard"}
             inputText={inputText}
             onInputChange={setInputText}
-            selectedSeat={null}
+            onSendMessage={() => {
+              if (!inputText.trim()) return;
+              setInputText("");
+            }}
+            selectedSeat={voteScene ? selectedSeat : null}
+            actionReceipt={receipt}
+            onConfirmAction={() => {
+              if (selectedSeat === null) return;
+              setReceipt(receiptForSeatAction(state.phase, selectedSeat));
+            }}
+            onCancelSelection={() => setSelectedSeat(null)}
           />
         </div>
       </div>
+      <PlayerDetailModal
+        player={detailPlayer}
+        isOpen={detailPlayer !== null}
+        onClose={() => setDetailPlayer(null)}
+        humanPlayer={human}
+      />
     </main>
   );
 }
