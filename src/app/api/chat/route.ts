@@ -39,6 +39,7 @@ import {
 } from "@/lib/reasoning-profile";
 import {
   createChatRequestLog,
+  extractChatTokenUsage,
   logChatRequest,
   NORMAL_ATTEMPT_TIMEOUT_MS,
   normalizeChatCallType,
@@ -199,7 +200,7 @@ async function readProviderJson(
 ): Promise<unknown> {
   try {
     const result = await response.json();
-    logChatRequest(context.log, response.status);
+    logChatRequest(context.log, response.status, extractChatTokenUsage(result));
     await recordAttempt(context, "success", responseUsage(result));
     return result;
   } catch (error) {
@@ -263,9 +264,9 @@ async function trackedStreamResponse(
     await recordAttempt(context, "error", { errorCode: "missing_response_body" });
     return new Response(null, { status: response.status, headers: response.headers });
   }
-  return trackSseAttempt(response, ({ outcome, outputChars, errorCode }) => {
+  return trackSseAttempt(response, ({ outcome, outputChars, errorCode, usage }) => {
     const status = outcome === "cancelled" || errorCode === "aborted" ? "abort" : response.status;
-    logChatRequest(context.log, status);
+    logChatRequest(context.log, status, extractChatTokenUsage({ usage }));
     settle();
     return recordAttempt(context, outcome, { outputChars, errorCode });
   });

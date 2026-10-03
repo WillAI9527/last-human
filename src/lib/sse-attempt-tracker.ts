@@ -4,6 +4,8 @@ export interface SseAttemptSummary {
   outcome: SseAttemptOutcome;
   outputChars: number;
   errorCode?: string;
+  /** Last provider usage object seen in the stream, when one was sent. */
+  usage?: unknown;
 }
 
 type FinishHandler = (summary: SseAttemptSummary) => void | Promise<void>;
@@ -19,6 +21,7 @@ export function trackSseAttempt(response: Response, onFinish: FinishHandler): Re
       outcome: "error",
       outputChars: 0,
       errorCode: "missing_response_body",
+      usage: undefined,
     })).catch(() => undefined);
     return new Response(null, { status: response.status, headers: response.headers });
   }
@@ -27,11 +30,12 @@ export function trackSseAttempt(response: Response, onFinish: FinishHandler): Re
   const decoder = new TextDecoder();
   let buffer = "";
   let outputChars = 0;
+  let usage: unknown;
   let finishPromise: Promise<void> | null = null;
 
   const finish = (outcome: SseAttemptOutcome, errorCode?: string): Promise<void> => {
     if (!finishPromise) {
-      finishPromise = Promise.resolve(onFinish({ outcome, outputChars, errorCode }))
+      finishPromise = Promise.resolve(onFinish({ outcome, outputChars, errorCode, usage }))
         .catch(() => undefined);
     }
     return finishPromise;
@@ -45,7 +49,9 @@ export function trackSseAttempt(response: Response, onFinish: FinishHandler): Re
     try {
       const payload = JSON.parse(data) as {
         choices?: Array<{ delta?: { content?: unknown } }>;
+        usage?: unknown;
       };
+      if (payload.usage && typeof payload.usage === "object") usage = payload.usage;
       const delta = payload.choices?.[0]?.delta?.content;
       if (typeof delta === "string") outputChars += delta.length;
     } catch {

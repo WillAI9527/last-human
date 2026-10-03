@@ -57,12 +57,17 @@ test("每次 /api/chat 完成只打一行，不含提示词或密钥，普通尝
     logSource.indexOf("export function logChatRequest"),
     logSource.indexOf("export type UpstreamAttempt"),
   );
-  for (const forbidden of ["messages", "content", "apiKey", "authorization", "prompt", "displayName"]) {
+  for (const forbidden of ["messages", "content", "apiKey", "authorization", "displayName"]) {
     assert.doesNotMatch(logBlock, new RegExp(forbidden, "i"), `完成日志不应包含 ${forbidden}`);
   }
+  assert.doesNotMatch(logBlock, /\bprompt\b/i, "完成日志不应包含提示词正文");
   assert.match(logBlock, /source: "api\/chat"/);
   assert.match(logBlock, /elapsedMs/);
   assert.match(logBlock, /callType: log\.callType/);
+  assert.match(logBlock, /promptTokens: tokens\.promptTokens/);
+  assert.match(logBlock, /completionTokens: tokens\.completionTokens/);
+  assert.match(logBlock, /reasoningTokens: tokens\.reasoningTokens/);
+  assert.match(logBlock, /status === "abort" \|\| status === "timeout"/);
 });
 
 test("batch 单项异常被隔离，生产 logger 不写 localStorage，旧日志路由已移除", () => {

@@ -33,6 +33,7 @@ test("SSE 收到 [DONE] 才记成功，并保持转发字节不变", async () =>
     outcome: "success",
     outputChars: 2,
     errorCode: undefined,
+    usage: undefined,
   });
 });
 
@@ -49,6 +50,7 @@ test("SSE 在 [DONE] 前 EOF 记为中断而不是成功", async () => {
     outcome: "interrupted",
     outputChars: 2,
     errorCode: "missing_done",
+    usage: undefined,
   });
 });
 
@@ -68,6 +70,7 @@ test("SSE 末尾无换行且 DONE 被拆分时仍准确记为成功", async () =
     outcome: "success",
     outputChars: 2,
     errorCode: undefined,
+    usage: undefined,
   });
 });
 
@@ -113,5 +116,26 @@ test("SSE 消费方取消只结算一次 cancelled", async () => {
     outcome: "cancelled",
     outputChars: 1,
     errorCode: "consumer_cancelled",
+    usage: undefined,
   });
+});
+
+test("SSE 保留最后一条 usage，且转发字节不变", async () => {
+  const usage = {
+    prompt_tokens: 11,
+    completion_tokens: 6,
+    completion_tokens_details: { reasoning_tokens: 4 },
+  };
+  const source = [
+    `data: ${JSON.stringify({ choices: [{ delta: { content: "甲" } }], usage: { prompt_tokens: 1 } })}\n\n`,
+    `data: ${JSON.stringify({ choices: [], usage })}\n\ndata: [DONE]\n\n`,
+  ];
+  let summary: SseAttemptSummary | null = null;
+  const tracked = trackSseAttempt(responseFromChunks(source), (value) => {
+    summary = value;
+  });
+  assert.equal(await tracked.text(), source.join(""));
+  assert.equal(summary?.outcome, "success");
+  assert.equal(summary?.outputChars, 1);
+  assert.deepEqual(summary?.usage, usage);
 });
