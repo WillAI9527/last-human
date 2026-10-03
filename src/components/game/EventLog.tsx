@@ -36,10 +36,10 @@ const toneClassNames: Record<PublicEventTone, string> = {
 };
 
 const iconClassNames: Record<PublicEventTone, string> = {
-  default: "text-[var(--color-gold)]",
-  danger: "text-[var(--color-gold)]",
-  warning: "text-[var(--color-gold)]",
-  success: "text-[var(--color-gold)]",
+  default: "text-[#F2EDE4]",
+  danger: "text-[#F2EDE4]",
+  warning: "text-[#F2EDE4]",
+  success: "text-[#F2EDE4]",
 };
 
 const eventIcons: Record<PublicEventIcon, ComponentType<{ size?: number; className?: string }>> = {
@@ -232,7 +232,7 @@ export function EventLog({ gameState }: EventLogProps) {
       <div className="flex-1">
         {currentSheriff && (
           <div className="mb-3 flex items-center gap-2 rounded-lg border border-[var(--glass-border)] bg-[var(--glass-bg-weak)] px-3 py-2 text-sm text-[var(--text-primary)]">
-            <Shield size={15} className="shrink-0 text-[var(--color-gold)]" />
+            <Shield size={15} className="shrink-0 text-[#F2EDE4]" />
             <span>{t("eventLog.currentSheriff", { player: currentSheriff })}</span>
           </div>
         )}

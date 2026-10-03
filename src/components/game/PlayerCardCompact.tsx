@@ -152,7 +152,7 @@ export function PlayerCardCompact({
   const avatarClassName = cn(
     "w-full h-full transition-transform duration-500",
     isModelAvatar ? "object-contain p-2 bg-[var(--bg-secondary)]" : "object-cover group-hover:scale-110",
-    isSpeaking && "border-[var(--color-gold)]"
+    isSpeaking && isMe && "border-[var(--human-gold)]"
   );
 
   const handleClick = (e: React.MouseEvent) => {
@@ -264,7 +264,7 @@ export function PlayerCardCompact({
             >
               <div className="relative flex items-center justify-center">
                 <motion.div
-                  className="absolute inset-0 rounded-full border border-[var(--color-gold)]/25"
+                  className="absolute inset-0 rounded-full border border-[#A9B2BC]/40"
                   style={{ width: 46, height: 46 }}
                   animate={{ rotate: 360 }}
                   transition={{ duration: 6, repeat: Infinity, ease: "linear" }}
@@ -274,7 +274,7 @@ export function PlayerCardCompact({
                   animate={{ rotate: -360, opacity: [0.4, 0.9, 0.4] }}
                   transition={{ duration: 4.8, repeat: Infinity, ease: "linear" }}
                 />
-                <div className="absolute inset-0 bg-[var(--color-gold)]/20 blur-xl rounded-full animate-pulse" />
+                <div className="absolute inset-0 bg-[#A9B2BC]/20 blur-xl rounded-full animate-pulse" />
                 <Sparkle
                   size={22}
                   weight="fill"
@@ -429,7 +429,7 @@ export function PlayerCardCompact({
               transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
               className="text-[var(--text-muted)] text-xs flex items-center gap-1"
             >
-              <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-gold)]/60" />
+              <span className="w-1.5 h-1.5 rounded-full bg-[#A9B2BC]" />
               {t("playerCard.joining")}
             </motion.div>
           )}

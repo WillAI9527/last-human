@@ -894,7 +894,7 @@ export function DialogArea({
         <div className="relative flex flex-col items-center">
           <div className="relative mb-6">
             <motion.div
-              className="absolute inset-0 rounded-full border border-[var(--color-gold)]/20"
+              className="absolute inset-0 rounded-full border border-[#A9B2BC]/40"
               style={{ width: 180, height: 180 }}
               animate={{ rotate: 360 }}
               transition={{ duration: 18, repeat: Infinity, ease: "linear" }}
@@ -905,7 +905,7 @@ export function DialogArea({
               transition={{ duration: 14, repeat: Infinity, ease: "linear" }}
             />
             <motion.div
-              className="absolute inset-10 rounded-full border border-[var(--color-gold)]/20"
+              className="absolute inset-10 rounded-full border border-[#A9B2BC]/40"
               animate={{ scale: [0.96, 1.04, 0.96], opacity: [0.35, 0.7, 0.35] }}
               transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
             />
@@ -915,8 +915,8 @@ export function DialogArea({
               animate={{ y: [0, -6, 0] }}
               transition={{ duration: 3.2, repeat: Infinity, ease: "easeInOut" }}
             >
-              <div className="absolute inset-0 rounded-full bg-[radial-gradient(circle_at_center,rgba(197,160,89,0.12),rgba(0,0,0,0)_70%)]" />
-              <WerewolfIcon size={56} className="text-[var(--color-gold)]/60 drop-shadow-[0_0_18px_rgba(197,160,89,0.3)]" />
+              <div className="absolute inset-0 rounded-full bg-[radial-gradient(circle_at_center,rgba(169,178,188,0.16),rgba(0,0,0,0)_70%)]" />
+              <WerewolfIcon size={56} className="text-[#F2EDE4]/80" />
             </motion.div>
           </div>
           <motion.div
@@ -925,7 +925,7 @@ export function DialogArea({
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, ease: "easeOut" }}
           >
-            <div className="text-sm font-serif tracking-[0.2em] text-[var(--color-gold)]/80 uppercase">
+            <div className="text-sm font-serif tracking-[0.2em] text-[#F2EDE4]/80 uppercase">
               {t("dialog.emptyState.summoning")}
             </div>
             <div className="text-base font-semibold text-[var(--text-primary)]/85">
@@ -933,7 +933,7 @@ export function DialogArea({
             </div>
             <div className="flex items-center gap-2 text-xs text-[var(--text-muted)]">
               <motion.span
-                className="inline-block w-2 h-2 rounded-full bg-[var(--color-gold)]/60"
+                className="inline-block w-2 h-2 rounded-full bg-[#A9B2BC]"
                 animate={{ scale: [1, 1.4, 1], opacity: [0.4, 0.9, 0.4] }}
                 transition={{ duration: 1.4, repeat: Infinity, ease: "easeInOut" }}
               />
@@ -1110,7 +1110,7 @@ export function DialogArea({
                     ? "border-white/15 bg-black/25 text-white/75 hover:bg-black/35 hover:text-white"
                     : "border-[var(--border-color)] bg-white/75 text-[var(--text-secondary)] hover:border-[var(--color-accent)] hover:text-[var(--color-accent)]",
                   isEventLogOpen && (isNight
-                    ? "border-[var(--color-gold)]/40 text-[var(--color-gold)]"
+                    ? "border-[#A9B2BC] text-[#F2EDE4]"
                     : "border-[var(--color-accent)] text-[var(--color-accent)]")
                 )}
               >

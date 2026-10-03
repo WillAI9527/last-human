@@ -159,7 +159,7 @@
 
   /* 徽章 */
   --badge-bg: rgba(197, 160, 89, 0.18);
-  --badge-text: var(--color-gold);
+  --badge-text: var(--bone-100);
 
   /* 玩家卡片渐变 - 夜晚 */
   --card-gradient-from: rgba(40, 35, 33, 0.80);
@@ -192,7 +192,7 @@
   --surface-border: rgba(255, 255, 255, 0.10);
   --chat-bubble-bg: linear-gradient(180deg, rgba(30, 25, 23, 0.95), rgba(20, 16, 14, 0.98));
   --chat-bubble-border: rgba(197, 160, 89, 0.25);
-  --badge-text: var(--color-gold);
+  --badge-text: var(--bone-100);
   --card-gradient-from: rgba(40, 35, 33, 0.82);
   --card-gradient-to: rgba(30, 25, 23, 0.92);
   --color-wolf-bg: rgba(138, 28, 28, 0.18);
@@ -236,7 +236,7 @@ input[type="submit"]:not(:disabled),
 
 .wc-auth .supabase-auth-ui_ui-button {
   border-radius: 6px;
-  border: 1px solid var(--color-gold);
+  border: 1px solid var(--ash-400);
   box-shadow: 0 6px 14px rgba(197, 160, 89, 0.18);
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
@@ -378,7 +378,7 @@ input[type="submit"]:not(:disabled),
   bottom: 8px !important;
   width: 3px !important;
   border-radius: 999px !important;
-  background: var(--color-gold) !important;
+  background: var(--ash-400) !important;
   opacity: 0.9 !important;
 }
 
@@ -418,7 +418,7 @@ input[type="submit"]:not(:disabled),
 [data-sonner-toast] [data-close-button]:hover {
   background: var(--bg-hover) !important;
   color: var(--text-primary) !important;
-  border-color: var(--color-gold) !important;
+  border-color: var(--ash-400) !important;
 }
 
 /* Toast icon colors */
@@ -1670,7 +1670,7 @@ input[type="submit"]:not(:disabled),
 }
 
 [data-theme="dark"] .wc-phase-badge {
-  color: var(--color-gold);
+  color: var(--bone-100);
 }
 
 /* ========== 玩家卡片样式 (严格对齐 style-unification-preview.html) ========== */
@@ -1697,7 +1697,7 @@ input[type="submit"]:not(:disabled),
 
 .wc-player-card:hover {
   transform: translateX(4px);
-  border-color: var(--color-gold);
+  border-color: var(--ash-400);
   background: linear-gradient(145deg, #fff, #f8f5ed);
   box-shadow: var(--shadow-card-hover);
 }
@@ -1724,8 +1724,13 @@ input[type="submit"]:not(:disabled),
 }
 
 [data-theme="dark"] .wc-player-card--speaking {
-  box-shadow: 0 0 12px rgba(197, 160, 89, 0.1);
+  box-shadow: 0 0 12px rgba(169, 178, 188, 0.22);
   background: transparent;
+}
+
+[data-theme="dark"] .wc-player-card--me.wc-player-card--speaking {
+  border-color: var(--human-gold);
+  box-shadow: 0 0 12px rgba(232, 190, 106, 0.28);
 }
 
 .wc-player-card--speaking .wc-player-card__avatar {
@@ -1742,7 +1747,11 @@ input[type="submit"]:not(:disabled),
 }
 
 [data-theme="dark"] .wc-player-card--speaking .wc-player-card__name {
-  color: var(--color-gold);
+  color: var(--bone-100);
+}
+
+[data-theme="dark"] .wc-player-card--me.wc-player-card--speaking .wc-player-card__name {
+  color: var(--human-gold);
 }
 
 .wc-player-card--dead,
@@ -2239,11 +2248,15 @@ input[type="submit"]:not(:disabled),
 }
 
 .wc-player-card--speaking .wc-player-card__meta {
-  color: var(--color-gold-dark);
+  color: var(--bone-100);
 }
 
 [data-theme="dark"] .wc-player-card--speaking .wc-player-card__meta {
-  color: var(--color-gold);
+  color: var(--bone-100);
+}
+
+[data-theme="dark"] .wc-player-card--me.wc-player-card--speaking .wc-player-card__meta {
+  color: var(--human-gold);
 }
 
 /* 座位徽章 - 严格对齐HTML */
@@ -2599,7 +2612,7 @@ input[type="submit"]:not(:disabled),
   display: inline-block;
   width: 2px;
   height: 1.2em;
-  background-color: var(--color-gold);
+  background-color: var(--bone-100);
   margin-left: 2px;
   animation: wc-typing-cursor 1s infinite;
   vertical-align: text-bottom;
@@ -2636,8 +2649,8 @@ input[type="submit"]:not(:disabled),
   height: 56px;
   border-radius: 50%;
   background: var(--bg-dark);
-  border: 2px solid var(--color-gold);
-  color: var(--color-gold);
+  border: 2px solid var(--ash-400);
+  color: var(--bone-100);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2988,7 +3001,7 @@ input[type="submit"]:not(:disabled),
 
 .wc-notebook-fab:hover {
   transform: scale(1.1) rotate(5deg);
-  box-shadow: 0 0 25px rgba(197, 160, 89, 0.30);
+  box-shadow: 0 0 25px rgba(169, 178, 188, 0.35);
 }
 
 /* Scrollbar - 现代简洁风格 */
@@ -4988,7 +5001,7 @@ input[type="submit"]:not(:disabled),
   height: 44px;
   min-height: 44px;
   padding: 0 12px;
-  border-bottom: 1px solid rgba(232, 190, 106, 0.28);
+  border-bottom: 1px solid rgba(169, 178, 188, 0.45);
   background: rgba(15, 13, 12, 0.72);
   color: #F2EDE4;
   font-family: var(--font-body), "Inter", "Noto Serif SC", system-ui, sans-serif;
