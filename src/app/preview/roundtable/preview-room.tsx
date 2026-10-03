@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { PLAYER_MODELS, type ChatMessage, type Player, type Role } from "@/types/game";
+import { type ChatMessage, type ModelRef, type Player, type Role } from "@/types/game";
 import { createInitialGameState } from "@/lib/game-master";
 import { GameBackground } from "@/components/game/GameBackground";
 import { RoundTable } from "@/components/game/RoundTable";
@@ -18,6 +18,14 @@ const CAST: Array<{ id: string; name: string; role: Role; gender: "male" | "fema
   { id: "f-02", name: "玛尔塔", role: "Witch", gender: "female" },
   { id: "m-01", name: "老汉斯", role: "Villager", gender: "male" },
   { id: "m-05", name: "维克多医生", role: "Werewolf", gender: "male" },
+];
+
+const PREVIEW_MODELS: ModelRef[] = [
+  { provider: "zenmux", model: "deepseek/deepseek-v3.2" },
+  { provider: "zenmux", model: "google/gemini-3.5-flash-lite" },
+  { provider: "zenmux", model: "minimax/minimax-m2.1" },
+  { provider: "tokendance", model: "kimi-k2.5" },
+  { provider: "zenmux", model: "openai/gpt-5.2-chat" },
 ];
 
 const LINES = [
@@ -51,7 +59,7 @@ export function PreviewRoom() {
     alignment: villager.role === "Werewolf" ? "wolf" : "village",
     isHuman: seat === 2,
     agentProfile: seat === 2 ? undefined : {
-      modelRef: PLAYER_MODELS[seat % PLAYER_MODELS.length],
+      modelRef: PREVIEW_MODELS[seat > 2 ? seat - 1 : seat],
       persona: {
         mbti: "INTJ",
         gender: villager.gender,

@@ -1802,24 +1802,29 @@ input[type="submit"]:not(:disabled),
 
 .lh-model-badge {
   position: absolute;
-  right: -2px;
-  bottom: -2px;
-  width: 18px;
-  height: 18px;
+  right: -1px;
+  bottom: -1px;
+  width: 20px;
+  height: 20px;
   border-radius: 999px;
-  border: 1.5px solid #0F0D0C;
-  background: #1A1715;
-  overflow: hidden;
+  border: 1px solid #A9B2BC;
+  background: #1A1714;
   z-index: 12;
   display: flex;
   align-items: center;
   justify-content: center;
+  pointer-events: none;
 }
 
 .lh-model-badge img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
+  width: 14px;
+  height: 14px;
+  object-fit: contain;
+}
+
+/* Black official marks read as bone. hue-rotate restores Kimi's blue accent. */
+.lh-model-badge--light img {
+  filter: invert(1) hue-rotate(180deg);
 }
 
 .lh-you-capsule {
@@ -2002,11 +2007,15 @@ input[type="submit"]:not(:disabled),
   height: 72px;
 }
 
+/* The round wrap is 72px around a 64px avatar. Sit the badge on the avatar rim. */
 .wc-player-card--round .lh-model-badge {
-  width: 14px;
-  height: 14px;
-  right: 2px;
-  bottom: 2px;
+  right: 3px;
+  bottom: 3px;
+}
+
+.wc-player-card--round.wc-player-card--speaking .lh-model-badge {
+  right: -1px;
+  bottom: -1px;
 }
 
 .wc-player-card--round .lh-round-name,
@@ -2741,10 +2750,6 @@ input[type="submit"]:not(:disabled),
   margin-bottom: 8px;
 }
 
-.wc-player-card--mobile .lh-model-badge {
-  width: 14px;
-  height: 14px;
-}
 
 .wc-player-card--mobile .lh-you-capsule {
   height: 14px;

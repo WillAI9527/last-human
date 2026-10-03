@@ -16,6 +16,7 @@ import {
   WhiteWolfKingIcon
 } from "@/components/icons/FlatIcons";
 import { buildSimpleAvatarUrl, getModelLogoUrl } from "@/lib/avatar-config";
+import { ModelBadge } from "@/components/game/ModelBadge";
 import { playerTitle } from "@/lib/player-label";
 import { useTranslations } from "next-intl";
 
@@ -156,6 +157,9 @@ export function PlayerDetailModal({ player, isOpen, onClose, humanPlayer, isGens
                     <div className="absolute inset-0 flex items-center justify-center z-20">
                       <span className="text-white font-bold text-sm bg-black/50 px-2 py-1 rounded">{t("playerDetail.out")}</span>
                     </div>
+                  )}
+                  {!renderPlayer.isHuman && modelLabel && (
+                    <ModelBadge modelRef={renderPlayer.agentProfile?.modelRef} />
                   )}
                 </div>
 

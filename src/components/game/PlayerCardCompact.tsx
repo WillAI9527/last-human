@@ -7,6 +7,7 @@ import type { Player } from "@/types/game";
 import { isWolfRole } from "@/types/game";
 import { cn } from "@/lib/utils";
 import { buildSimpleAvatarUrl, getModelLogoUrl } from "@/lib/avatar-config";
+import { ModelBadge } from "@/components/game/ModelBadge";
 import { playerTitle, seatNumberLabel } from "@/lib/player-label";
 import { useTranslations } from "next-intl";
 
@@ -290,9 +291,7 @@ export function PlayerCardCompact({
         )}
       </motion.div>
       {isReady && !isMe && (
-        <span className="lh-model-badge" title={modelLabel || ""}>
-          <img src={getModelLogoUrl(player.agentProfile?.modelRef)} alt="" />
-        </span>
+        <ModelBadge modelRef={player.agentProfile?.modelRef} />
       )}
       {isMe && isReady && !isDead && <SeatCandle night={isNight} />}
       {isMe && isReady && (
