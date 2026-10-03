@@ -5,9 +5,13 @@ import { useTranslations } from "next-intl";
 import { SixSeatMark } from "@/components/home/SixSeatMark";
 import { keyboardInset } from "@/components/home/oath-card";
 import {
+  IDLE_RETURN_MS,
+  MIN_DWELL_MS,
   WOLF_TURN_FRAME_COUNT,
   WOLF_TURN_NOSE,
-  pickWolfFrame,
+  pickWolfFrameHysteresis,
+  smoothPointer,
+  stepWolfDwell,
   wolfSpritePosition,
 } from "@/components/home/wolf-turn";
 import type { PublicQuota } from "@/lib/demo-game-client";
@@ -28,8 +32,10 @@ function clamp(value: number, min: number, max: number) {
 function useWolfTurn(stageRef: React.RefObject<HTMLDivElement | null>) {
   const pausedRef = useRef(false);
   const reducedRef = useRef(false);
-  const showRef = useRef<(frame: number) => void>(() => {});
+  const requestFrameRef = useRef<(frame: number) => void>(() => {});
+  const lookAtRef = useRef<(px: number, py: number) => void>(() => {});
   const lastPointRef = useRef<{ x: number; y: number } | null>(null);
+  const gyroPointRef = useRef<{ x: number; y: number } | null>(null);
   const orientationCleanupRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
@@ -37,8 +43,14 @@ function useWolfTurn(stageRef: React.RefObject<HTMLDivElement | null>) {
     if (!stage) return;
     const media = window.matchMedia("(prefers-reduced-motion: reduce)");
     let disposed = false;
-    let current = -1;
+    let current = 0;
+    let shownAt = performance.now() - MIN_DWELL_MS;
+    let pending: number | null = null;
+    let painted = false;
     let spriteReady = false;
+    let dwellTimer = 0;
+    let idleTimer = 0;
+    let wasHidden = document.visibilityState === "hidden";
     reducedRef.current = media.matches;
 
     const nosePoint = () => {
@@ -46,57 +58,149 @@ function useWolfTurn(stageRef: React.RefObject<HTMLDivElement | null>) {
       return [rect.left + rect.width * WOLF_TURN_NOSE.x, rect.top + rect.height * WOLF_TURN_NOSE.y] as const;
     };
 
-    const frameAt = (px: number, py: number) => {
-      const [noseX, noseY] = nosePoint();
-      return pickWolfFrame(px, py, noseX, noseY, window.innerWidth, window.innerHeight);
-    };
-
-    const show = (frame: number) => {
-      if (!spriteReady || frame === current) {
-        stage.dataset.frame = String(spriteReady ? current : 0);
-        return;
-      }
+    const paint = (frame: number) => {
       const layers = stage.querySelectorAll<HTMLElement>("[data-wolf-frame]");
       layers.forEach((layer, index) => {
         layer.style.opacity = index === frame ? "1" : "0";
       });
       current = frame;
+      painted = true;
       stage.dataset.frame = String(frame);
     };
-    showRef.current = show;
+
+    const clearDwell = () => {
+      window.clearTimeout(dwellTimer);
+      dwellTimer = 0;
+    };
+
+    const armDwell = () => {
+      clearDwell();
+      if (pending == null) return;
+      const delay = Math.max(0, shownAt + MIN_DWELL_MS - performance.now());
+      dwellTimer = window.setTimeout(() => {
+        dwellTimer = 0;
+        if (pending == null) return;
+        requestFrame(pending);
+      }, delay);
+    };
+
+    const requestFrame = (frame: number, force = false) => {
+      if (reducedRef.current) return;
+      if (!spriteReady) {
+        stage.dataset.frame = "0";
+        return;
+      }
+      if (force) {
+        clearDwell();
+        pending = null;
+        paint(frame);
+        shownAt = performance.now();
+        return;
+      }
+      const now = performance.now();
+      const next = stepWolfDwell({ shown: current, shownAt, pending }, frame, now);
+      const changed = next.shown !== current || !painted;
+      pending = next.pending;
+      shownAt = next.shownAt;
+      if (changed) paint(next.shown);
+      armDwell();
+    };
+    requestFrameRef.current = (frame) => requestFrame(frame);
 
     const lookAt = (px: number, py: number) => {
       if (reducedRef.current) return;
+      window.clearTimeout(idleTimer);
+      idleTimer = 0;
       lastPointRef.current = { x: px, y: py };
       if (pausedRef.current) return;
-      show(frameAt(px, py));
+      const [noseX, noseY] = nosePoint();
+      const frame = pickWolfFrameHysteresis({
+        px,
+        py,
+        noseX,
+        noseY,
+        viewportWidth: window.innerWidth,
+        viewportHeight: window.innerHeight,
+        currentFrame: current,
+      });
+      requestFrame(frame);
+    };
+    lookAtRef.current = lookAt;
+
+    const returnFront = () => {
+      lastPointRef.current = null;
+      gyroPointRef.current = null;
+      requestFrame(0);
     };
 
-    const onPointerMove = (event: PointerEvent) => lookAt(event.clientX, event.clientY);
+    const scheduleIdle = () => {
+      window.clearTimeout(idleTimer);
+      idleTimer = window.setTimeout(() => {
+        idleTimer = 0;
+        if (!disposed && !reducedRef.current) returnFront();
+      }, IDLE_RETURN_MS);
+    };
+
+    const onPointerMove = (event: PointerEvent) => {
+      if (event.pointerType === "touch") return;
+      lookAt(event.clientX, event.clientY);
+    };
+    const onTouchStart = () => {
+      window.clearTimeout(idleTimer);
+      idleTimer = 0;
+    };
     const onTouchMove = (event: TouchEvent) => {
       const touch = event.touches[0];
       if (!touch) return;
       lookAt(touch.clientX, touch.clientY);
     };
-    const onPointerLeave = () => {
-      if (reducedRef.current || pausedRef.current) return;
-      lastPointRef.current = null;
-      show(0);
+    const onTouchEnd = (event: TouchEvent) => {
+      if (event.touches.length > 0) return;
+      scheduleIdle();
+    };
+    const onPointerLeave = (event: PointerEvent) => {
+      if (event.pointerType === "touch" || reducedRef.current) return;
+      window.clearTimeout(idleTimer);
+      idleTimer = 0;
+      returnFront();
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") {
+        wasHidden = true;
+        return;
+      }
+      if (!wasHidden) return;
+      wasHidden = false;
+      if (reducedRef.current) return;
+      window.clearTimeout(idleTimer);
+      idleTimer = 0;
+      returnFront();
     };
 
     const applyDebugLook = () => {
-      if (process.env.NODE_ENV === "production" || reducedRef.current) return;
+      if (process.env.NODE_ENV === "production" || reducedRef.current) return false;
       const look = new URLSearchParams(window.location.search).get("look");
-      if (!look) return;
+      if (!look) return false;
       const [x, y] = look.split(",").map(Number);
-      if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
       const px = (x + 1) / 2 * window.innerWidth;
       const py = (y + 1) / 2 * window.innerHeight;
       lastPointRef.current = { x: px, y: py };
-      show(frameAt(px, py));
+      const [noseX, noseY] = nosePoint();
+      const frame = pickWolfFrameHysteresis({
+        px,
+        py,
+        noseX,
+        noseY,
+        viewportWidth: window.innerWidth,
+        viewportHeight: window.innerHeight,
+        currentFrame: 0,
+      });
+      requestFrame(frame, true);
+      return true;
     };
 
-    let cancelIdle = () => {};
+    let cancelSpriteIdle = () => {};
     let revealTimer = 0;
     const revealSprite = () => {
       if (disposed || !spriteReady) return;
@@ -105,12 +209,15 @@ function useWolfTurn(stageRef: React.RefObject<HTMLDivElement | null>) {
         layer.style.backgroundImage = `url("${SPRITE_SRC}")`;
         layer.style.backgroundPosition = wolfSpritePosition(index);
       });
-      current = -1;
-      applyDebugLook();
-      if (current < 0) {
+      current = 0;
+      shownAt = performance.now() - MIN_DWELL_MS;
+      pending = null;
+      painted = false;
+      clearDwell();
+      if (!applyDebugLook()) {
         const last = lastPointRef.current;
-        if (last && !pausedRef.current) show(frameAt(last.x, last.y));
-        else show(0);
+        if (last && !pausedRef.current) lookAt(last.x, last.y);
+        else requestFrame(0);
       }
       revealTimer = window.setTimeout(() => {
         if (!disposed) stage.dataset.sprite = "live";
@@ -138,37 +245,53 @@ function useWolfTurn(stageRef: React.RefObject<HTMLDivElement | null>) {
     } else {
       stage.dataset.sprite = "front";
       window.addEventListener("pointermove", onPointerMove, { passive: true });
+      window.addEventListener("touchstart", onTouchStart, { passive: true });
       window.addEventListener("touchmove", onTouchMove, { passive: true });
+      window.addEventListener("touchend", onTouchEnd, { passive: true });
+      window.addEventListener("touchcancel", onTouchEnd, { passive: true });
       window.addEventListener("pointerleave", onPointerLeave);
+      document.addEventListener("visibilitychange", onVisibility);
       const start = () => {
         if (!disposed && !reducedRef.current) bootSprite();
       };
       if (typeof window.requestIdleCallback === "function") {
         const idle = window.requestIdleCallback(start, { timeout: 1000 });
-        cancelIdle = () => window.cancelIdleCallback(idle);
+        cancelSpriteIdle = () => window.cancelIdleCallback(idle);
       } else {
         const idle = window.setTimeout(start, 0);
-        cancelIdle = () => window.clearTimeout(idle);
+        cancelSpriteIdle = () => window.clearTimeout(idle);
       }
     }
 
     const onReduce = () => {
       reducedRef.current = media.matches;
       if (!media.matches) return;
-      show(0);
+      clearDwell();
+      window.clearTimeout(idleTimer);
+      idleTimer = 0;
+      pending = null;
+      if (spriteReady) paint(0);
+      else stage.dataset.frame = "0";
       stage.dataset.sprite = "static";
     };
     media.addEventListener("change", onReduce);
 
     return () => {
       disposed = true;
-      cancelIdle();
+      cancelSpriteIdle();
+      clearDwell();
+      window.clearTimeout(idleTimer);
       window.clearTimeout(revealTimer);
-      showRef.current = () => {};
+      requestFrameRef.current = () => {};
+      lookAtRef.current = () => {};
       media.removeEventListener("change", onReduce);
       window.removeEventListener("pointermove", onPointerMove);
+      window.removeEventListener("touchstart", onTouchStart);
       window.removeEventListener("touchmove", onTouchMove);
+      window.removeEventListener("touchend", onTouchEnd);
+      window.removeEventListener("touchcancel", onTouchEnd);
       window.removeEventListener("pointerleave", onPointerLeave);
+      document.removeEventListener("visibilitychange", onVisibility);
       orientationCleanupRef.current?.();
       orientationCleanupRef.current = null;
     };
@@ -182,18 +305,20 @@ function useWolfTurn(stageRef: React.RefObject<HTMLDivElement | null>) {
     const attach = () => {
       if (orientationCleanupRef.current || reducedRef.current) return;
       const onOrientation = (event: DeviceOrientationEvent) => {
-        if (reducedRef.current || pausedRef.current || event.gamma == null) return;
+        if (reducedRef.current || event.gamma == null) return;
         const stage = stageRef.current;
         if (!stage) return;
         const rect = stage.getBoundingClientRect();
         const noseX = rect.left + rect.width * WOLF_TURN_NOSE.x;
         const noseY = rect.top + rect.height * WOLF_TURN_NOSE.y;
         const reach = Math.min(window.innerWidth, window.innerHeight) * 0.45;
-        const px = noseX + clamp(event.gamma / 30, -1, 1) * reach;
-        const py = noseY + clamp(((event.beta ?? 0) - 45) / 30, -1, 1) * reach;
-        lastPointRef.current = { x: px, y: py };
-        const frame = pickWolfFrame(px, py, noseX, noseY, window.innerWidth, window.innerHeight);
-        showRef.current(frame);
+        const raw = {
+          x: noseX + clamp(event.gamma / 30, -1, 1) * reach,
+          y: noseY + clamp(((event.beta ?? 0) - 45) / 30, -1, 1) * reach,
+        };
+        const smoothed = smoothPointer(gyroPointRef.current, raw);
+        gyroPointRef.current = smoothed;
+        lookAtRef.current(smoothed.x, smoothed.y);
       };
       window.addEventListener("deviceorientation", onOrientation);
       orientationCleanupRef.current = () => {
@@ -219,20 +344,9 @@ function useWolfTurn(stageRef: React.RefObject<HTMLDivElement | null>) {
     const wasPaused = pausedRef.current;
     pausedRef.current = paused;
     if (stageRef.current) stageRef.current.dataset.gazePaused = paused ? "1" : "0";
-    if (paused && !wasPaused) showRef.current(0);
+    if (paused && !wasPaused) requestFrameRef.current(0);
     if (!paused && wasPaused && lastPointRef.current && !reducedRef.current) {
-      const stage = stageRef.current;
-      if (!stage) return;
-      const rect = stage.getBoundingClientRect();
-      const frame = pickWolfFrame(
-        lastPointRef.current.x,
-        lastPointRef.current.y,
-        rect.left + rect.width * WOLF_TURN_NOSE.x,
-        rect.top + rect.height * WOLF_TURN_NOSE.y,
-        window.innerWidth,
-        window.innerHeight,
-      );
-      showRef.current(frame);
+      lookAtRef.current(lastPointRef.current.x, lastPointRef.current.y);
     }
   }, [stageRef]);
 
