@@ -79,7 +79,7 @@ export function getOrganizationJsonLd() {
     name: "LAST HUMAN",
     url: getSiteUrl(),
     logo: absoluteUrl("/logo.png"),
-    sameAs: ["https://github.com/WillAI9527/wolfcha"],
+    sameAs: ["https://github.com/WillAI9527/last-human"],
   };
 }
 

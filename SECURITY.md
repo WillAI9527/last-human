@@ -3,7 +3,7 @@
 ## Reporting Security Issues
 
 If you discover a security vulnerability, report it through
-[GitHub private vulnerability reporting](https://github.com/oil-oil/wolfcha/security/advisories/new).
+[GitHub private vulnerability reporting](https://github.com/WillAI9527/last-human/security/advisories/new).
 Please do not open a public issue for an undisclosed vulnerability.
 
 Please include:
