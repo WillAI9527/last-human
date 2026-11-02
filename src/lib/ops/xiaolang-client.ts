@@ -1,5 +1,5 @@
 import type { OpsLocale, WizardRecord } from "./flow";
-import { clipCopy, demoQuestions, makeComparison, makeDemoCopy, makeDemoReport } from "./flow";
+import { demoQuestions, makeComparison, makeDemoCopy, makeDemoReport } from "./flow";
 
 /** Tasks the wizard asks 小狼 to do. Swap this file for the teammate client. */
 export type XiaolangTask = "questions" | "analysis" | "comparison" | "copy";
@@ -26,7 +26,5 @@ export async function runXiaolang(
   }
   if (task === "analysis") return makeDemoReport(record, locale, now);
   if (task === "comparison") return makeComparison(record, locale, now);
-  const next = makeDemoCopy(record, locale, now);
-  if (!next.draft) return next;
-  return { ...next, draft: { ...next.draft, body: clipCopy(next.draft.body) } };
+  return makeDemoCopy(record, locale, now);
 }

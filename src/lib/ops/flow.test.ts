@@ -4,24 +4,33 @@ import { readFileSync } from "node:fs";
 
 import {
   ANSWER_MAX_CHARS,
-  COPY_MAX_CHARS,
   claimsUseFetched,
   clipAnswer,
-  clipCopy,
   commitAccount,
   confirmPublish,
   editDraft,
   emptyWizard,
   markPublishFailed,
+  measureCopy,
   selfApprove,
   setCompetitor,
   upsertAnswer,
 } from "./flow";
 import { runXiaolang } from "./xiaolang-client";
 
-test("answers clip at 500 and copy clips at 2000", () => {
+test("answers clip at 500 and platform copy limits only warn", () => {
   assert.equal(clipAnswer("x".repeat(800)).length, ANSWER_MAX_CHARS);
-  assert.equal(clipCopy("y".repeat(4000)).length, COPY_MAX_CHARS);
+  const xhs = measureCopy("xiaohongshu", { title: "标".repeat(21), body: "正".repeat(1001) });
+  assert.equal(xhs.title?.over, true);
+  assert.equal(xhs.body.over, true);
+  assert.equal(xhs.body.limit, 1000);
+  const xOver = measureCopy("x", { title: "", body: "你".repeat(141) });
+  assert.equal(xOver.body.used, 282);
+  assert.equal(xOver.body.over, true);
+  assert.equal(measureCopy("x", { title: "", body: "a".repeat(280) }).body.over, false);
+  assert.equal(measureCopy("instagram", { body: "a".repeat(2200) }).body.over, false);
+  assert.equal(measureCopy("tiktok", { body: "a".repeat(2201) }).body.over, true);
+  assert.equal(measureCopy("facebook", { body: "a".repeat(2001) }).body.limit, 2000);
 });
 
 test("demo main line never marks a link as fetched and publishes from approved", async () => {
@@ -51,7 +60,8 @@ test("demo main line never marks a link as fetched and publishes from approved",
   record = await runXiaolang(record, "copy", "zh");
   assert.equal(record.draft?.status, "draft");
   record = editDraft(record, { body: "b".repeat(2500) });
-  assert.equal(record.draft?.body.length, 2000);
+  assert.equal(record.draft?.body.length, 2500);
+  assert.equal(measureCopy("xiaohongshu", record.draft ?? { body: "" }).body.over, true);
   assert.throws(() => confirmPublish(record));
   record = selfApprove(record);
   assert.equal(record.draft?.status, "approved");

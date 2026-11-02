@@ -10,8 +10,8 @@ import {
   ANSWER_MAX_CHARS,
   commitAccount,
   confirmPublish,
-  COPY_MAX_CHARS,
   editDraft,
+  measureCopy,
   emptyWizard,
   markPublishFailed,
   questionsReady,
@@ -87,6 +87,7 @@ const zh = {
   tags: "标签，用逗号分隔",
   title: "标题",
   body: "正文",
+  over: "超出平台字数，仍可继续",
   when: "发布时间",
   done: "这条内容已标记为已发布。刷新后仍在。",
   self: "作者自审，没有单独审核角色。",
@@ -150,6 +151,7 @@ const en: typeof zh = {
   tags: "Tags, comma separated",
   title: "Title",
   body: "Body",
+  over: "Over the platform limit. You can still continue.",
   when: "Time",
   done: "Marked published. It stays after refresh.",
   self: "The author reviews this. There is no reviewer role.",
@@ -477,12 +479,21 @@ export function Wizard() {
             <p className={`ops-status ops-status--${record.draft.status}`}>{t.status[record.draft.status]} · {t.self}</p>
             {record.draft.isDemo ? <span className="ops-demo-badge bg-demo-soft text-demo">{t.demo}</span> : null}
             {record.failReason ? <div className="ops-error"><span>{record.failReason}</span></div> : null}
-            <label>{t.title}
-              <input value={record.draft.title ?? ""} disabled={record.draft.status === "published"} onChange={(event) => persist(editDraft(recordRef.current ?? record, { title: event.target.value }))} />
-            </label>
-            <label>{t.body}
-              <textarea rows={8} maxLength={COPY_MAX_CHARS} value={record.draft.body} disabled={record.draft.status === "published"} onChange={(event) => persist(editDraft(recordRef.current ?? record, { body: event.target.value }))} />
-            </label>
+            {(() => {
+              const counts = measureCopy(record.account?.platform ?? "xiaohongshu", record.draft);
+              return (
+                <>
+                  <label>{t.title} {counts.title ? <span className={counts.title.over ? "ops-bad" : "ops-muted"}>{counts.title.used}/{counts.title.limit}</span> : null}
+                    <input value={record.draft.title ?? ""} disabled={record.draft.status === "published"} onChange={(event) => persist(editDraft(recordRef.current ?? record, { title: event.target.value }))} />
+                    {counts.title?.over ? <span className="ops-bad">{t.over}</span> : null}
+                  </label>
+                  <label>{t.body} <span className={counts.body.over ? "ops-bad" : "ops-muted"}>{counts.body.used}/{counts.body.limit}</span>
+                    <textarea rows={8} value={record.draft.body} disabled={record.draft.status === "published"} onChange={(event) => persist(editDraft(recordRef.current ?? record, { body: event.target.value }))} />
+                    {counts.body.over ? <span className="ops-bad">{t.over}</span> : null}
+                  </label>
+                </>
+              );
+            })()}
             <label>{t.tags}
               <input value={record.draft.hashtags.join(", ")} disabled={record.draft.status === "published"} onChange={(event) => persist(editDraft(recordRef.current ?? record, { hashtags: event.target.value.split(",").map((item) => item.trim()).filter(Boolean) }))} />
             </label>

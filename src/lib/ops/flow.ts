@@ -58,14 +58,43 @@ export type OpsLocale = "zh" | "en";
 
 const FIXTURE = "fixture:ops-wizard-v1";
 export const ANSWER_MAX_CHARS = 500;
-export const COPY_MAX_CHARS = 2000;
 
 export function clipAnswer(text: string): string {
   return text.slice(0, ANSWER_MAX_CHARS);
 }
 
-export function clipCopy(text: string): string {
-  return text.slice(0, COPY_MAX_CHARS);
+const CJK = /[\u1100-\u115F\u2E80-\uA4CF\uAC00-\uD7A3\uF900-\uFAFF\uFE10-\uFE19\uFE30-\uFE6F\uFF00-\uFF60\uFFE0-\uFFE6]/;
+
+export function weightedLength(text: string, cjkWeight = 1): number {
+  if (cjkWeight === 1) return Array.from(text).length;
+  let count = 0;
+  for (const char of text) count += CJK.test(char) ? cjkWeight : 1;
+  return count;
+}
+
+export function measureCopy(platform: PlatformId, draft: { title?: string; body: string; hashtags?: string[] }): {
+  title: { used: number; limit: number; over: boolean } | null;
+  body: { used: number; limit: number; over: boolean };
+} {
+  const title = draft.title ?? "";
+  const body = draft.body;
+  if (platform === "xiaohongshu") {
+    const titleUsed = weightedLength(title);
+    const bodyUsed = weightedLength(body);
+    return {
+      title: { used: titleUsed, limit: 20, over: titleUsed > 20 },
+      body: { used: bodyUsed, limit: 1000, over: bodyUsed > 1000 },
+    };
+  }
+  if (platform === "x") {
+    const tags = (draft.hashtags ?? []).map((tag) => (tag.startsWith("#") ? tag : `#${tag}`)).join(" ");
+    const text = [title, body, tags].filter(Boolean).join("\n");
+    const used = weightedLength(text, 2);
+    return { title: null, body: { used, limit: 280, over: used > 280 } };
+  }
+  const limit = platform === "facebook" ? 2000 : 2200;
+  const used = weightedLength(body);
+  return { title: null, body: { used, limit, over: used > limit } };
 }
 
 export function emptyWizard(now = new Date().toISOString()): WizardRecord {
@@ -346,9 +375,9 @@ export function makeDemoCopy(record: WizardRecord, locale: OpsLocale, now = new 
     accountId: record.account.id,
     taskId: record.taskId,
     title: zh ? `${record.account.nickname}：先把一件小事说清楚` : `${record.account.nickname}: say one small thing clearly`,
-    body: clipCopy(zh
+    body: zh
       ? `大家好，我是 ${record.account.nickname}。这条是演示文案，不是模型对主页的读取结果。\n\n这周想先靠近「${goalLabel}」。我看了一眼同类账号 ${record.competitor.handle}，但没有打开他们的主页，所以不会假装知道他们的爆款结构。\n\n如果你也在做同样的事，评论里告诉我你卡在哪一步。`
-      : `Hi, this is ${record.account.nickname}. This draft is demo copy. It is not a reading of anyone's profile.\n\nThis week I want to move toward “${goalLabel}”. I noted ${record.competitor.handle}, but their page was not fetched, so this does not claim to know their hits.\n\nIf you are stuck on the same step, say where.`),
+      : `Hi, this is ${record.account.nickname}. This draft is demo copy. It is not a reading of anyone's profile.\n\nThis week I want to move toward “${goalLabel}”. I noted ${record.competitor.handle}, but their page was not fetched, so this does not claim to know their hits.\n\nIf you are stuck on the same step, say where.`,
     hashtags: zh ? ["演示文案", record.account.platform] : ["demo", record.account.platform],
     imagePrompt: zh ? "一张干净的浅色桌面，上面只有一张便签，写着本周目标。不要出现不存在的数据截图。" : "A clean light desk with one note naming this week's goal. Do not fake a stats screenshot.",
     rationale: [demoClaim(zh ? "文案只用了你填写的昵称、目标和竞品名称。" : "The copy uses only the nickname, goal, and competitor name you entered.")],
@@ -370,7 +399,6 @@ export function editDraft(
     draft: {
       ...record.draft,
       ...patch,
-      ...(patch.body !== undefined ? { body: clipCopy(patch.body) } : {}),
       status,
     },
     updatedAt: now,
