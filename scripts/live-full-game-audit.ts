@@ -264,7 +264,7 @@ async function runFullGame() {
 
   // ---- 仅验证角色生成：切换生成模型后确认结构、去重和耗时 ----
   if (CHARACTER_ROUNDS > 0) {
-    const { getGeneratorModel } = await import("@/lib/api-keys");
+    const { getGeneratorModel } = await import("@/lib/model-source");
     print(`生成模型：${getGeneratorModel()}，每轮 ${PLAYER_COUNT} 人，共 ${CHARACTER_ROUNDS} 轮`);
     let failures = 0;
     for (let round = 1; round <= CHARACTER_ROUNDS; round++) {

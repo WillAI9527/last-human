@@ -54,6 +54,36 @@ export function getTesterToken(): string {
   return memoryTesterToken;
 }
 
+export type PublicQuota = {
+  limit: number;
+  used: number;
+  remaining: number;
+  unlimited: boolean;
+};
+
+export async function fetchPublicQuota(): Promise<PublicQuota | null> {
+  const testerToken = getTesterToken();
+  try {
+    const response = await fetch("/api/games/quota", {
+      method: "GET",
+      credentials: "same-origin",
+      cache: "no-store",
+      headers: testerToken ? { [TESTER_TOKEN_HEADER]: testerToken } : undefined,
+    });
+    if (!response.ok) return null;
+    const payload = await response.json() as Partial<PublicQuota>;
+    if (typeof payload.remaining !== "number" || typeof payload.limit !== "number") return null;
+    return {
+      limit: payload.limit,
+      used: typeof payload.used === "number" ? payload.used : 0,
+      remaining: payload.remaining,
+      unlimited: Boolean(payload.unlimited),
+    };
+  } catch {
+    return null;
+  }
+}
+
 export async function reservePublicGame(): Promise<{ ok: true; remaining: number } | { ok: false; message: string; code: string }> {
   const testerToken = getTesterToken();
   const response = await fetch("/api/games/start", {

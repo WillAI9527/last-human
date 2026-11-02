@@ -6,7 +6,7 @@
     "dev": "next dev --webpack",
     "build": "next build --webpack",
     "start": "next start",
-    "test:single-player-context": "tsx --test src/lib/ai-logger.test.ts src/lib/api-keys.test.ts src/lib/character-generator-tokenpay.test.ts src/lib/character-generator-structured-output.test.ts src/lib/tokenpay-client.test.ts src/lib/game-master.badge-signup.test.ts src/lib/game-master.player-setup.test.ts src/lib/game-master.stream-logging.test.ts src/lib/game-master.structured-output.test.ts src/lib/game-master.vote-history.test.ts src/lib/hunter-badge-flow.test.ts src/lib/speech-order.test.ts src/game/phases/factual-context.test.ts scripts/single-player-context-audit.test.ts src/lib/prompt-utils.test.ts src/hooks/useDialogueManager.test.ts src/lib/streaming-speech-parser.test.ts src/hooks/game-phases/useDayPhase.test.ts src/game/phases/context-regressions.test.ts src/lib/audio-manager.test.ts src/hooks/game-phases/useBadgePhase.test.ts src/store/game-machine.test.ts src/game/phases/vote-resume.test.ts src/lib/reasoning-profile.test.ts src/lib/concurrency.test.ts src/lib/demo-rate-limit.test.ts src/lib/demo-flow-simulation.test.ts src/lib/village-cast-isolation.test.ts src/lib/phase-bar-copy.test.ts src/lib/action-receipt.test.ts src/lib/human-vote-mark.test.ts src/lib/suspicion.test.ts src/lib/six-player-isolation.test.ts src/lib/six-player-rules.test.ts src/lib/six-player-simulation.test.ts",
+    "test:single-player-context": "tsx --test src/lib/ai-logger.test.ts src/lib/api-keys.test.ts src/lib/character-generator-tokenpay.test.ts src/lib/character-generator-structured-output.test.ts src/lib/tokenpay-client.test.ts src/lib/game-master.badge-signup.test.ts src/lib/game-master.player-setup.test.ts src/lib/game-master.stream-logging.test.ts src/lib/game-master.structured-output.test.ts src/lib/game-master.vote-history.test.ts src/lib/hunter-badge-flow.test.ts src/lib/speech-order.test.ts src/game/phases/factual-context.test.ts scripts/single-player-context-audit.test.ts src/lib/prompt-utils.test.ts src/hooks/useDialogueManager.test.ts src/lib/streaming-speech-parser.test.ts src/hooks/game-phases/useDayPhase.test.ts src/game/phases/context-regressions.test.ts src/lib/audio-manager.test.ts src/hooks/game-phases/useBadgePhase.test.ts src/store/game-machine.test.ts src/game/phases/vote-resume.test.ts src/lib/reasoning-profile.test.ts src/lib/concurrency.test.ts src/lib/demo-rate-limit.test.ts src/lib/demo-flow-simulation.test.ts src/lib/village-cast-isolation.test.ts src/lib/phase-bar-copy.test.ts src/lib/action-receipt.test.ts src/lib/human-vote-mark.test.ts src/lib/suspicion.test.ts src/lib/six-player-isolation.test.ts src/lib/six-player-rules.test.ts src/lib/six-player-simulation.test.ts src/components/home/oath-card.test.ts src/components/home/wolf-turn.test.ts",
     "audit:single-player-context": "tsx scripts/single-player-context-audit.ts",
     "audit:single-player-context:live": "node --env-file=.env.local --import tsx scripts/live-single-player-context-audit.ts",
     "audit:character-generation:live": "node --env-file=.env.local --import tsx scripts/live-character-generation-audit.ts",
@@ -39,6 +39,7 @@
     "clsx": "^2.1.1",
     "framer-motion": "^12.24.0",
     "html-to-image": "^1.11.11",
+    "idb": "8.0.3",
     "jotai": "^2.16.1",
     "lucide-react": "^0.562.0",
     "next": "16.1.1",
@@ -54,7 +55,8 @@
     "stripe": "^20.2.0",
     "tailwind-merge": "^3.4.0",
     "undici": "^7.19.1",
-    "uuid": "^13.0.0"
+    "uuid": "^13.0.0",
+    "zod": "3.25.76"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
@@ -64,6 +66,7 @@
     "babel-plugin-react-compiler": "1.0.0",
     "eslint": "^9",
     "eslint-config-next": "16.1.1",
+    "playwright": "1.56.1",
     "tailwindcss": "^4",
     "tsx": "^4.23.1",
     "typescript": "^5"

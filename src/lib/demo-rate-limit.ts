@@ -32,6 +32,9 @@ type LlmResult =
 const gamesByToken = new Map<string, GameRecord>();
 const ttsCounts = new Map<string, number>();
 const dailyCounts = new Map<string, number>();
+const opsLlmCounts = new Map<string, number>();
+export const OPS_LLM_LIMIT = 30;
+const OPS_LLM_COOKIE = "ops_llm";
 let lastSweep = Date.now();
 
 function secret(): string {
@@ -186,10 +189,17 @@ export function isDailyLimitBypassed(request: Request): boolean {
   return tokensMatch(expected, provided);
 }
 
-export async function startDemoGame(request: Request): Promise<QuotaResult> {
-  if (!isZenmuxConfigured()) {
-    return { ok: false, status: 503, code: "server_not_configured", message: MSG_SERVER_NOT_CONFIGURED };
-  }
+type DailyUsage = {
+  count: number;
+  limit: number;
+  bypass: boolean;
+  ipHash: string;
+  day: string;
+  memoryKey: string;
+  sharedKey: string;
+};
+
+async function loadDailyUsage(request: Request): Promise<DailyUsage> {
   sweepMemory();
   const ip = getClientIp(request);
   const ipHash = hashValue(ip);
@@ -198,8 +208,41 @@ export async function startDemoGame(request: Request): Promise<QuotaResult> {
   const sharedKey = `lh:games:${day}:${ipHash}`;
   const shared = await readSharedCount(sharedKey);
   const count = Math.max(dailyCounts.get(memoryKey) ?? 0, readQuotaCookie(request, ipHash, day), shared ?? 0);
-  const limit = getDailyGameLimit();
-  const bypass = isDailyLimitBypassed(request);
+  return {
+    count,
+    limit: getDailyGameLimit(),
+    bypass: isDailyLimitBypassed(request),
+    ipHash,
+    day,
+    memoryKey,
+    sharedKey,
+  };
+}
+
+export async function readDailyQuota(request: Request): Promise<{
+  limit: number;
+  used: number;
+  remaining: number;
+  unlimited: boolean;
+}> {
+  const usage = await loadDailyUsage(request);
+  if (usage.bypass) {
+    return { limit: usage.limit, used: usage.count, remaining: usage.limit, unlimited: true };
+  }
+  return {
+    limit: usage.limit,
+    used: usage.count,
+    remaining: Math.max(0, usage.limit - usage.count),
+    unlimited: false,
+  };
+}
+
+export async function startDemoGame(request: Request): Promise<QuotaResult> {
+  if (!isZenmuxConfigured()) {
+    return { ok: false, status: 503, code: "server_not_configured", message: MSG_SERVER_NOT_CONFIGURED };
+  }
+  const usage = await loadDailyUsage(request);
+  const { count, limit, bypass, ipHash, day, memoryKey, sharedKey } = usage;
   // A tester token skips the shared IP quota and does not consume it.
   // The per-game LLM cap still applies after the game token is issued.
   if (!bypass && count >= limit) {
@@ -330,8 +373,27 @@ export function applyRateLimitCookies(response: Response, cookies: string[]): Re
   return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
 }
 
+/** Hourly cap for the ops LLM routes. Independent of the werewolf game ticket. */
+export async function consumeOpsLlmCall(request: Request): Promise<
+  { ok: true; cookies: string[] } | { ok: false; status: 429; code: "rate_limit"; message: string }
+> {
+  const hour = Math.floor(Date.now() / 3_600_000);
+  const key = `${hashValue(getClientIp(request))}:${hour}`;
+  const parsed = decodeSigned<{ key?: string; count?: number }>(readCookie(request, OPS_LLM_COOKIE));
+  let count = parsed?.key === key && Number.isFinite(parsed.count) ? Math.max(0, Number(parsed.count)) : 0;
+  count = Math.max(count, opsLlmCounts.get(key) ?? 0, (await readSharedCount(`ops:llm:${key}`)) ?? 0);
+  if (count >= OPS_LLM_LIMIT) {
+    return { ok: false, status: 429, code: "rate_limit", message: "操作太频繁，请稍后再试。" };
+  }
+  const next = count + 1;
+  opsLlmCounts.set(key, next);
+  await writeSharedCount(`ops:llm:${key}`, next);
+  return { ok: true, cookies: [cookie(OPS_LLM_COOKIE, encodeSigned({ key, count: next }), 3600)] };
+}
+
 export function resetDemoRateLimitForTests() {
   gamesByToken.clear();
   ttsCounts.clear();
   dailyCounts.clear();
+  opsLlmCounts.clear();
 }

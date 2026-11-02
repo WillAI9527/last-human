@@ -6,6 +6,7 @@ import {
   REVIEW_MODEL,
 } from "@/types/game";
 
+// Client-supplied LLM keys are not stored. Legacy localStorage entries are deleted on load.
 const ZENMUX_API_KEY_STORAGE = "wolfcha_zenmux_api_key";
 const DASHSCOPE_API_KEY_STORAGE = "wolfcha_dashscope_api_key";
 const TOKENDANCE_API_KEY_STORAGE = "wolfcha_tokendance_api_key";
@@ -42,13 +43,39 @@ function canUseStorage(): boolean {
   return typeof window !== "undefined" && typeof window.localStorage !== "undefined";
 }
 
+const CLIENT_SECRET_KEYS = new Set<string>([
+  ZENMUX_API_KEY_STORAGE,
+  DASHSCOPE_API_KEY_STORAGE,
+  TOKENDANCE_API_KEY_STORAGE,
+  MINIMAX_API_KEY_STORAGE,
+  MINIMAX_GROUP_ID_STORAGE,
+  VALIDATED_ZENMUX_KEY_STORAGE,
+  VALIDATED_DASHSCOPE_KEY_STORAGE,
+  VALIDATED_TOKENDANCE_KEY_STORAGE,
+  "wolfcha_tokendance_base_url",
+  "wolfcha_validated_tokendance_base_url",
+]);
+
+export function purgeClientSecrets() {
+  if (!canUseStorage()) return;
+  for (const key of CLIENT_SECRET_KEYS) window.localStorage.removeItem(key);
+}
+
 function readStorage(key: string): string {
+  if (CLIENT_SECRET_KEYS.has(key)) {
+    if (canUseStorage()) window.localStorage.removeItem(key);
+    return "";
+  }
   if (!canUseStorage()) return "";
   const value = window.localStorage.getItem(key);
   return typeof value === "string" ? value.trim() : "";
 }
 
 function writeStorage(key: string, value: string) {
+  if (CLIENT_SECRET_KEYS.has(key)) {
+    if (canUseStorage()) window.localStorage.removeItem(key);
+    return;
+  }
   if (!canUseStorage()) return;
   const trimmed = value.trim();
   if (!trimmed) {
@@ -57,6 +84,8 @@ function writeStorage(key: string, value: string) {
   }
   window.localStorage.setItem(key, trimmed);
 }
+
+purgeClientSecrets();
 
 export function getZenmuxApiKey(): string {
   return readStorage(ZENMUX_API_KEY_STORAGE);

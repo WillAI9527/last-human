@@ -7,7 +7,7 @@ const gameMachineSource = readFileSync("src/store/game-machine.ts", "utf8");
 const chatRouteSource = readFileSync("src/app/api/chat/route.ts", "utf8");
 const ttsRouteSource = readFileSync("src/app/api/tts/route.ts", "utf8");
 const audioManagerSource = readFileSync("src/lib/audio-manager.ts", "utf8");
-const apiKeysSource = readFileSync("src/lib/api-keys.ts", "utf8");
+const apiKeysSource = readFileSync("src/lib/model-source.ts", "utf8");
 const welcomeSource = readFileSync("src/components/game/WelcomeScreen.tsx", "utf8");
 
 test("本地恢复与服务端授权共用同一个有效期", () => {

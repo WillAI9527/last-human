@@ -14,7 +14,7 @@ import {
   getZenmuxApiKey,
   getModelSource,
   setTokenPayConnected,
-} from "@/lib/api-keys";
+} from "@/lib/model-source";
 import { clearGuestId, getGuestId, readGuestIdFromStorage } from "@/lib/demo-mode";
 import { supabase } from "@/lib/supabase";
 import {

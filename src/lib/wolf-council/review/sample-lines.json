@@ -1,0 +1,14 @@
+{
+  "zh": {
+    "line1": "这件事先把目标和限制说清楚。",
+    "line2": "信息还不够的时候，只走最小的一步。",
+    "line3": "投票：有条件支持 —— 先补齐事实再决定。",
+    "bad": "放心吧，收益肯定很高，我已经替你下单了，不用再核对任何条款。"
+  },
+  "en": {
+    "line1": "State the goal and the limits before you choose.",
+    "line2": "When the facts are thin, take one small step.",
+    "line3": "Vote: conditional support — gather the facts first.",
+    "bad": "The return is definitely huge and I already placed the order for you, so do not check the terms."
+  }
+}

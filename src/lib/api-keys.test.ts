@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { resolveModelSource } from "./api-keys";
+import { getZenmuxApiKey, purgeClientSecrets, resolveModelSource, setZenmuxApiKey } from "./model-source";
 
 test("显式选择自定义 Key 时不会被 TokenPay 连接状态覆盖", () => {
   assert.equal(
@@ -37,6 +37,12 @@ test("旧版本保存过 custom 且仍有 Key 时，优先保持 custom 的单�
     }),
     "custom",
   );
+});
+
+test("浏览器里不再保存 API Key", () => {
+  setZenmuxApiKey("sk-secret-should-not-stick");
+  purgeClientSecrets();
+  assert.equal(getZenmuxApiKey(), "");
 });
 
 test("旧版本没有有效 custom 配置时，TokenPay 连接可以成为来源", () => {

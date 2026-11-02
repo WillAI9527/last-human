@@ -20,7 +20,7 @@ import {
 import { GAME_TEMPERATURE } from "./ai-config";
 import { sampleModelRefs, type GeneratedCharacter } from "./character-generator";
 import { aiLogger } from "./ai-logger";
-import { getGeneratorModel, getSummaryModel } from "@/lib/api-keys";
+import { getGeneratorModel, getSummaryModel } from "@/lib/model-source";
 import { PhaseManager } from "@/game/core/PhaseManager";
 import type { PromptResult } from "@/game/core/types";
 import { buildCachedSystemMessageFromParts } from "./prompt-utils";

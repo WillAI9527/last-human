@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { cookies, headers } from "next/headers";
 import "./globals.css";
 import { Toaster } from "sonner";
@@ -9,6 +9,19 @@ import { getMessages } from "@/i18n/messages";
 import { JsonLd, getGameJsonLd, getWebsiteJsonLd, getOrganizationJsonLd } from "@/components/seo/JsonLd";
 
 const defaultMessages = getMessages(defaultLocale);
+
+const shareImage = {
+  url: "/og-image.png",
+  width: 1280,
+  height: 640,
+  alt: "LAST HUMAN · 最后的真人",
+} as const;
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+};
 
 export const metadata: Metadata = {
   title: {
@@ -53,20 +66,13 @@ export const metadata: Metadata = {
     siteName: defaultMessages.app.title,
     locale: localeToHtmlLang[defaultLocale],
     url: "/",
-    images: [
-      {
-        url: "/og-image.png",
-        width: 1200,
-        height: 630,
-        alt: "LAST HUMAN · 最后的真人",
-      },
-    ],
+    images: [shareImage],
   },
   twitter: {
     card: "summary_large_image",
     title: defaultMessages.app.title,
     description: defaultMessages.app.description,
-    images: ["/og-image.png"],
+    images: [shareImage],
   },
   icons: {
     icon: [

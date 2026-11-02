@@ -7,7 +7,7 @@ import {
   hasMinimaxKey,
   hasTokendanceKey,
   resolveAiVoiceAvailability,
-} from "@/lib/api-keys";
+} from "@/lib/model-source";
 import { getAuthHeaders } from "@/lib/auth-headers";
 import { getDemoGameToken } from "@/lib/demo-game-client";
 import { gameSessionTracker } from "@/lib/game-session-tracker";

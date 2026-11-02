@@ -5,7 +5,7 @@ import {
   resolveAiVoiceAvailability,
   resolveModelSource,
   setModelSource,
-} from "@/lib/api-keys";
+} from "@/lib/model-source";
 import { ALL_MODELS, AVAILABLE_MODELS, MODEL_IDS, SUMMARY_MODEL, REVIEW_MODEL } from "@/types/game";
 
 process.env.NEXT_PUBLIC_SUPABASE_URL ||= "https://example.supabase.co";

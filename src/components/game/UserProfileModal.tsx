@@ -52,7 +52,7 @@ import {
   setValidatedDashscopeKey,
   setValidatedTokendanceKey,
   type ModelSource,
-} from "@/lib/api-keys";
+} from "@/lib/model-source";
 import { getModelLogoPath } from "@/lib/model-logo";
 import { REFERRAL_BONUS_ENABLED, SPRING_CAMPAIGN_ENABLED, REDEMPTION_CODE_ENABLED } from "@/lib/welfare-config";
 import { WatchaPayPurchase } from "@/components/game/WatchaPayPurchase";

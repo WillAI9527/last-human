@@ -116,7 +116,27 @@
     },
     "settings": "Settings",
     "tutorial": "How to play",
-    "subtitle": "You are the only human",
+    "subtitle": "You are the only human at the table",
+    "rules": "Everyone else is AI. Find the werewolves, or fool them all. Write your name, then press the seal to begin.",
+    "quotaRemaining": "<b>{count}</b> games left today",
+    "quotaSpent": "Today's <b>{limit}</b> games are used up. Come back tomorrow.",
+    "closeCard": "Close",
+    "cover": {
+      "line": "It already has its eyes on you.",
+      "enter": "Enter",
+      "sealLabel": "Press the seal · Begin",
+      "imageAlt": "A werewolf staring at you"
+    },
+    "howToPlay": {
+      "link": "How to play?",
+      "title": "How to play",
+      "p1": "Six people sit at the table. You are the only human. The other five villagers are played by AI.",
+      "p2": "Sides: 2 werewolves, against the Seer, the Witch, and 2 villagers.",
+      "p3": "Night: the werewolves choose one person to kill. The Witch may save someone with the antidote or poison someone; only one potion per night, and she can save herself only on night 1. The Seer checks one person's identity.",
+      "p4": "Day: everyone speaks in turn, then votes to exile one person. If there is a tie, the tied players each speak once more and everyone else votes again. If they still tie, nobody is eliminated.",
+      "p5": "Winning: if every werewolf is out, the good side wins. If every special role is out, or every villager is out, the werewolves win.",
+      "p6": "Your role is assigned at random when the game begins. Listen to them, find who is lying, and don't let them see through you."
+    },
     "oath": {
       "line1": "I willingly enter this game of deception and truth.",
       "line2": "When darkness falls, I shall conceal my identity;",
@@ -124,7 +144,7 @@
     },
     "signature": {
       "label": "Sign your name",
-      "placeholder": "Signature here..."
+      "placeholder": "Sign here…"
     },
     "sealHint": {
       "ready": "Press the seal to begin",
