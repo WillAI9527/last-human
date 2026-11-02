@@ -106,8 +106,13 @@ test("Chinese screens stay Chinese and English screens stay English", () => {
   }
 });
 
-test("the council screen does not call a model API", () => {
+test("the council screen calls the review route and keeps model-name labels", () => {
   const source = readFileSync("src/components/wolf-council/CouncilRoom.tsx", "utf8");
-  assert.doesNotMatch(source, /fetch\(|\/api\/chat|ZENMUX|API_KEY/);
-  assert.match(source, /Mocked reply|hallCopy/);
+  assert.match(source, /\/api\/council-turn/);
+  assert.doesNotMatch(source, /\/api\/chat|ZENMUX|API_KEY/);
+  assert.match(source, /demoFail/);
+  assert.match(source, /badgePass/);
+  const social = BOARDS.find((board) => board.id === "social");
+  assert.ok(social);
+  assert.deepEqual(boardWolves(social).map((wolf) => wolf.modelLabel), [...ADVISOR_LABELS]);
 });

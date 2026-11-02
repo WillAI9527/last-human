@@ -6,7 +6,8 @@ import { Users } from "@phosphor-icons/react";
 import { useAppLocale } from "@/i18n/useAppLocale";
 import { fill, hallCopy, type HallCopy } from "@/lib/wolf-council/copy";
 import { boardWolves, getBoard, replyNotices, WOLVES, type Board, type Wolf } from "@/lib/wolf-council/data";
-import { adviceLines, seatedIndexes, STANCES, stanceRoll, tally, voteSentence } from "@/lib/wolf-council/logic";
+import { adviceLines, seatedIndexes, STANCES, tally, voteSentence } from "@/lib/wolf-council/logic";
+import { clientSample, type ClientReview } from "@/lib/wolf-council/review/sample-client";
 import { withLocale } from "@/lib/wolf-council/paths";
 import {
   appendHistory,
@@ -19,7 +20,7 @@ import {
 
 type Phase = "setup" | "ask" | "discuss" | "vote" | "decide" | "done";
 type LogEntry =
-  | { type: "sys"; key: "sysMock" | "sysStart" | "sysVote" | "sysDecide"; n?: number }
+  | { type: "sys"; key: "sysMock" | "sysLive" | "sysStart" | "sysVote" | "sysDecide"; n?: number }
   | { type: "user"; text: string }
   | {
       type: "wolf";
@@ -30,6 +31,8 @@ type LogEntry =
       stance: number;
       voteFor: number;
       voteN: number;
+      text?: string;
+      review?: ClientReview;
     };
 
 type ModalState = {
@@ -59,6 +62,9 @@ export function CouncilRoom({ boardId }: { boardId: string }) {
   const [modal, setModal] = useState<ModalState | null>(null);
   const [detail, setDetail] = useState<number | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [demoFail, setDemoFail] = useState(false);
+  const [points, setPoints] = useState<string[]>([]);
+  const alive = useRef(true);
   const memory = useSyncExternalStore(subscribeMemory, loadMemory, emptyMemory);
   const memoryOn = memoryFilled(memory);
   const timers = useRef<number[]>([]);
@@ -68,6 +74,7 @@ export function CouncilRoom({ boardId }: { boardId: string }) {
   useEffect(() => {
     const timerIds = timers.current;
     return () => {
+      alive.current = false;
       timerIds.forEach((id) => window.clearTimeout(id));
       timerIds.length = 0;
     };
@@ -115,73 +122,126 @@ export function CouncilRoom({ boardId }: { boardId: string }) {
       return;
     }
     setPhase("ask");
-    setLog([{ type: "sys", key: "sysMock" }, { type: "sys", key: "sysStart", n: seated.length }]);
+    setLog([{ type: "sys", key: "sysLive" }, { type: "sys", key: "sysStart", n: seated.length }]);
   };
 
   const allSelected = selected.length > 0 && selected.every(Boolean);
   const someSelected = selected.some(Boolean);
 
   const runRound = (text: string) => {
+    void runLive(text);
+  };
+
+  const runLive = async (text: string) => {
     const seats = seatedIndexes(selected);
     const stanceLocal: Array<number | null> = wolves.map(() => null);
     const voteLocal: Array<number | null> = wolves.map(() => null);
+    const pointLocal = wolves.map(() => "");
     setQuestion(text);
     setDecision(null);
     setStances(stanceLocal);
     setVotes(voteLocal);
+    setPoints(pointLocal);
     setLog((prev) => [...prev, { type: "user", text }]);
     setPhase("discuss");
-
-    const speak = (kind: "reply" | "vote", step: number, done: () => void) => {
-      if (step >= seats.length) {
-        setSpeaking(-1);
-        done();
-        return;
-      }
+    let previous = "";
+    for (let step = 0; step < seats.length; step += 1) {
+      if (!alive.current) return;
       const seat = seats[step];
-      const entry: LogEntry = {
+      setSpeaking(seat);
+      setLog((prev) => [...prev, {
         type: "wolf",
         seat,
-        kind,
+        kind: "reply",
         typing: true,
-        prev: kind === "reply" && step > 0 ? seats[step - 1] : -1,
+        prev: step > 0 ? seats[step - 1] : -1,
         stance: 0,
         voteFor: -1,
         voteN: 1,
-      };
-      if (kind === "reply") {
-        entry.stance = stanceRoll(Math.random);
-        stanceLocal[seat] = entry.stance;
-        setStances(stanceLocal.slice());
-      } else {
-        const others = seats.filter((index) => index !== seat);
-        entry.voteFor = others[Math.floor(Math.random() * others.length)] ?? seats[0];
-        entry.voteN = seats.indexOf(entry.voteFor) + 1;
-        voteLocal[seat] = entry.voteFor;
-        setVotes(voteLocal.slice());
+      }]);
+      const controller = new AbortController();
+      const killer = window.setTimeout(() => controller.abort(), 180000);
+      let spoken = "";
+      let review: ClientReview | undefined;
+      try {
+        const response = await fetch("/api/council-turn", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            wolfId: wolves[seat].id,
+            question: text,
+            previousWolfAnswer: previous,
+            mode: "debate",
+            locale,
+            demo: board.id === "social" && demoFail ? "fail" : undefined,
+          }),
+          signal: controller.signal,
+        });
+        const data = await response.json() as Record<string, unknown>;
+        if (response.ok && typeof data.final === "string" && data.final) {
+          spoken = data.final;
+          review = reviewFrom(data, spoken);
+        }
+      } catch {
+        spoken = "";
+      } finally {
+        window.clearTimeout(killer);
       }
+      if (!alive.current) return;
+      if (!spoken || !review) {
+        const fallback = clientSample(wolves[seat].id, locale, board.id === "social" && demoFail);
+        spoken = fallback.final;
+        review = fallback.review;
+      }
+      previous = spoken;
+      const stance = parseStance(spoken);
+      stanceLocal[seat] = stance;
+      pointLocal[seat] = pointFrom(spoken);
+      const others = seats.filter((index) => index !== seat);
+      const voteFor = others[step % Math.max(others.length, 1)] ?? seats[0];
+      voteLocal[seat] = voteFor;
+      setStances(stanceLocal.slice());
+      setPoints(pointLocal.slice());
+      setVotes(voteLocal.slice());
+      setLog((prev) => prev.map((item) => (
+        item.type === "wolf" && item.seat === seat && item.kind === "reply" && item.typing
+          ? { ...item, typing: false, text: spoken, stance, voteFor, voteN: seats.indexOf(voteFor) + 1, review }
+          : item
+      )));
+    }
+    if (!alive.current) return;
+    setSpeaking(-1);
+    setLog((prev) => [...prev, { type: "sys", key: "sysVote" }]);
+    setPhase("vote");
+    const speakVotes = (step: number) => {
+      if (!alive.current) return;
+      if (step >= seats.length) {
+        setSpeaking(-1);
+        setLog((prev) => [...prev, { type: "sys", key: "sysDecide" }]);
+        setPhase("decide");
+        return;
+      }
+      const seat = seats[step];
+      const voteFor = voteLocal[seat] ?? seats[0];
       setSpeaking(seat);
-      setLog((prev) => [...prev, entry]);
+      setLog((prev) => [...prev, {
+        type: "wolf",
+        seat,
+        kind: "vote",
+        typing: true,
+        prev: -1,
+        stance: stanceLocal[seat] ?? 0,
+        voteFor,
+        voteN: seats.indexOf(voteFor) + 1,
+      }]);
       later(() => {
         setLog((prev) => prev.map((item, index) => (
           index === prev.length - 1 && item.type === "wolf" ? { ...item, typing: false } : item
         )));
-        later(() => speak(kind, step + 1, done), 220);
-      }, kind === "vote" ? 520 : 780);
+        later(() => speakVotes(step + 1), 220);
+      }, 520);
     };
-
-    later(() => {
-      speak("reply", 0, () => {
-        setLog((prev) => [...prev, { type: "sys", key: "sysVote" }]);
-        setPhase("vote");
-        later(() => {
-          speak("vote", 0, () => {
-            setLog((prev) => [...prev, { type: "sys", key: "sysDecide" }]);
-            setPhase("decide");
-          });
-        }, 360);
-      });
-    }, 240);
+    later(() => speakVotes(0), 280);
   };
 
   const finish = (kind: CouncilDecision, note: string) => {
@@ -261,7 +321,20 @@ export function CouncilRoom({ boardId }: { boardId: string }) {
             </button>
             <span className="wh-chosen">{fill(copy.chosen, { n: seated.length })}</span>
           </div>
+          {board.id === "social" ? (
+            <label className="wh-demo-toggle">
+              <input type="checkbox" checked={demoFail} onChange={(event) => setDemoFail(event.target.checked)} />
+              <span>{copy.demoToggle}</span>
+            </label>
+          ) : null}
         </>
+      ) : null}
+      {board.id === "social" && demoFail ? <p className="wh-demo-banner">{copy.demoBanner}</p> : null}
+      {board.id === "social" && phase === "ask" ? (
+        <label className="wh-demo-toggle">
+          <input type="checkbox" checked={demoFail} onChange={(event) => setDemoFail(event.target.checked)} />
+          <span>{copy.demoToggle}</span>
+        </label>
       ) : null}
       {phase === "ask" ? (
         <div className="wh-chips">
@@ -299,7 +372,7 @@ export function CouncilRoom({ boardId }: { boardId: string }) {
                 <span>
                   {wolf.modelLabel}
                   {locale === "zh" ? "：" : ": "}
-                  {wolf.mock.point[locale]}
+                  {points[seat] || wolf.mock.point[locale]}
                   {stance != null ? <span className="wh-mock">{STANCES[locale][stance]}</span> : null}
                 </span>
                 <span className="wh-bar" aria-hidden="true"><i style={{ width: `${((result.counts[index] ?? 0) / Math.max(seated.length, 1)) * 100}%` }} /></span>
@@ -321,7 +394,7 @@ export function CouncilRoom({ boardId }: { boardId: string }) {
                   body: copy.modifyBody,
                   ok: copy.modify,
                   input: true,
-                  value: wolves[seated[result.top]]?.mock.point[locale] ?? "",
+                  value: points[seated[result.top]] || wolves[seated[result.top]]?.mock.point[locale] || "",
                   onOk: (value) => finish("modify", value),
                 })}>{copy.modify}</button>
                 <button type="button" className="wh-btn is-red" onClick={() => setModal({
@@ -480,18 +553,113 @@ function Message({
       <div>
         <div className="wh-who">
           {wolf.modelLabel}
-          <span className="wh-mock">{copy.mock}</span>
+          {entry.typing && entry.kind === "reply" ? <span className="wh-mock">{copy.reviewing}</span> : null}
+          {!entry.typing && entry.review?.sample ? <span className="wh-mock">{copy.sample}</span> : null}
+          {!entry.typing && entry.review ? <ReviewMark review={entry.review} copy={copy} locale={locale} /> : null}
+          {!entry.typing && !entry.review && entry.kind === "reply" ? <span className="wh-mock">{copy.mock}</span> : null}
         </div>
         <div className="wh-bub">
           {entry.typing ? "…" : entry.kind === "vote"
             ? <p className="wh-vote">{voteSentence(locale, entry.voteN, wolves[entry.voteFor]?.modelLabel ?? "")}</p>
-            : adviceLines(wolf, locale, previous, entry.stance).map((line, lineIndex) => <p key={lineIndex}>{line}</p>)}
+            : entry.text
+              ? <p className="wh-speech">{entry.text}</p>
+              : adviceLines(wolf, locale, previous, entry.stance).map((line, lineIndex) => <p key={lineIndex}>{line}</p>)}
           {!entry.typing && notices.disclaimer ? <p className="wh-disc">{notices.disclaimer}</p> : null}
           {!entry.typing && notices.crisis ? <p className="wh-crisis">{notices.crisis}</p> : null}
         </div>
       </div>
     </div>
   );
+}
+
+function ReviewMark({ review, copy, locale }: { review: ClientReview; copy: HallCopy; locale: "zh" | "en" }) {
+  const [open, setOpen] = useState(false);
+  const status = reviewStatus(review, copy);
+  const gap = locale === "zh" ? "：" : ": ";
+  return (
+    <>
+      {status ? (
+        <button type="button" className={`wh-rv is-${status.kind}`} onClick={() => setOpen((value) => !value)}>
+          {status.label}
+        </button>
+      ) : null}
+      {open ? (
+        <div className="wh-rv-detail">
+          {review.original && review.original !== review.final ? (
+            <>
+              <b>{copy.draftTitle}</b>
+              <p>{review.original}</p>
+              <b>{copy.fixTitle}</b>
+              <p>{review.final}</p>
+            </>
+          ) : null}
+          {review.checks.length ? (
+            <>
+              <b>{copy.checkTitle}</b>
+              <ul>
+                {review.checks.map((check) => (
+                  <li key={check.id}>
+                    {check.skipped ? "–" : check.pass ? "✓" : "✗"} {check.name}
+                    {check.reason ? `${gap}${check.reason}` : ""}
+                  </li>
+                ))}
+              </ul>
+            </>
+          ) : null}
+        </div>
+      ) : null}
+    </>
+  );
+}
+
+function reviewStatus(review: ClientReview, copy: HallCopy): { kind: "pass" | "fixed" | "fail"; label: string } | null {
+  if (review.originalPassed && review.passed) {
+    return review.sample ? null : { kind: "pass", label: copy.badgePass };
+  }
+  if (review.passed) return { kind: "fixed", label: fill(copy.badgeFixed, { n: Math.max(review.fixedCount, 1) }) };
+  if (!review.sample) return { kind: "fail", label: copy.badgeFail };
+  return null;
+}
+
+function reviewFrom(data: Record<string, unknown>, spoken: string): ClientReview {
+  return {
+    sample: Boolean(data.sample),
+    demo: Boolean(data.demo),
+    originalPassed: Boolean(data.originalPassed),
+    passed: data.passed !== false,
+    fixedCount: typeof data.fixedCount === "number" ? data.fixedCount : 0,
+    original: typeof data.original === "string" ? data.original : spoken,
+    final: spoken,
+    checks: asChecks(data.finalChecks),
+  };
+}
+
+function asChecks(value: unknown): ClientReview["checks"] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((item) => {
+    if (!item || typeof item !== "object") return [];
+    const row = item as Record<string, unknown>;
+    return [{
+      id: String(row.id || ""),
+      name: String(row.name || ""),
+      pass: Boolean(row.pass),
+      skipped: Boolean(row.skipped),
+      reason: String(row.reason || ""),
+    }];
+  });
+}
+
+function parseStance(text: string): number {
+  if (/有条件支持|conditional/i.test(text)) return 2;
+  if (/反对|oppose/i.test(text)) return 1;
+  if (/支持|support/i.test(text)) return 0;
+  return 2;
+}
+
+function pointFrom(text: string): string {
+  const lines = text.split("\n").map((line) => line.trim()).filter(Boolean);
+  const body = lines.filter((line) => !/^(投票|Vote)\s*[:：]/i.test(line));
+  return (body[1] || body[0] || "").replace(/[（(][^）)]*[）)]$/, "").trim();
 }
 
 function ModelMark({ label }: { label: Wolf["modelLabel"] }) {
