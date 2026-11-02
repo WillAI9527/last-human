@@ -9,6 +9,8 @@ export const GAME_COOKIE = "lh_game";
 export const QUOTA_COOKIE = "lh_quota";
 export const LLM_COOKIE = "lh_llm";
 export const TTS_COOKIE = "lh_tts";
+export const COUNCIL_COOKIE = "lh_council";
+export const DEFAULT_COUNCIL_DAILY_TURN_LIMIT = 80;
 export const TESTER_TOKEN_HEADER = "x-tester-token";
 
 export const MSG_SERVER_NOT_CONFIGURED = "服务器未配置，暂时无法开局。";
@@ -32,6 +34,7 @@ type LlmResult =
 const gamesByToken = new Map<string, GameRecord>();
 const ttsCounts = new Map<string, number>();
 const dailyCounts = new Map<string, number>();
+const councilCounts = new Map<string, number>();
 let lastSweep = Date.now();
 
 function secret(): string {
@@ -330,8 +333,47 @@ export function applyRateLimitCookies(response: Response, cookies: string[]): Re
   return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
 }
 
+export function getCouncilDailyTurnLimit(): number {
+  const raw = process.env.COUNCIL_DAILY_TURN_LIMIT?.trim();
+  if (!raw) return DEFAULT_COUNCIL_DAILY_TURN_LIMIT;
+  const parsed = Number(raw);
+  if (!Number.isInteger(parsed) || parsed < 1) return DEFAULT_COUNCIL_DAILY_TURN_LIMIT;
+  return parsed;
+}
+
+function readCouncilCookie(request: Request, ipHash: string, day: string): number {
+  const parsed = decodeSigned<{ ipHash?: string; day?: string; count?: number }>(readCookie(request, COUNCIL_COOKIE));
+  if (!parsed || parsed.ipHash !== ipHash || parsed.day !== day) return 0;
+  return Number.isFinite(parsed.count) ? Math.max(0, Number(parsed.count)) : 0;
+}
+
+/** Per-IP daily cap for Wolf Hall council turns. Separate from the Werewolf game ticket. */
+export async function consumeCouncilTurn(
+  request: Request,
+  limit = getCouncilDailyTurnLimit(),
+): Promise<LlmResult> {
+  sweepMemory();
+  const ipHash = hashValue(getClientIp(request));
+  const day = singaporeDayKey();
+  const memoryKey = `${day}:${ipHash}`;
+  const sharedKey = `lh:council:${day}:${ipHash}`;
+  const shared = await readSharedCount(sharedKey);
+  const count = Math.max(councilCounts.get(memoryKey) ?? 0, readCouncilCookie(request, ipHash, day), shared ?? 0);
+  if (count >= limit) {
+    return { ok: false, status: 429, code: "council_daily_limit", message: "council daily limit" };
+  }
+  const next = count + 1;
+  councilCounts.set(memoryKey, next);
+  await writeSharedCount(sharedKey, next);
+  return {
+    ok: true,
+    cookies: [cookie(COUNCIL_COOKIE, encodeSigned({ ipHash, day, count: next }))],
+  };
+}
+
 export function resetDemoRateLimitForTests() {
   gamesByToken.clear();
   ttsCounts.clear();
   dailyCounts.clear();
+  councilCounts.clear();
 }

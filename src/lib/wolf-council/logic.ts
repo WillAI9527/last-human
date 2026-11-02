@@ -57,6 +57,28 @@ export function stanceRoll(random: () => number): number {
   return [0, 0, 2, 2, 1][Math.floor(random() * 5)] ?? 0;
 }
 
+export function parseStance(text: string, locale: AppLocale): number | null {
+  const last = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean).pop() ?? "";
+  const order = [2, 1, 0];
+  for (const index of order) {
+    const word = STANCES[locale][index];
+    if (word && last.includes(word)) return index;
+  }
+  return null;
+}
+
+export function suggestionLine(text: string, fallback: string): string {
+  const lines = text.split(/\n/).map((line) => line.trim()).filter(Boolean);
+  return lines[1] || lines[0] || fallback;
+}
+
+export function reviewBadge(attempts: number, passed: boolean, checkCount: number): "pass" | "fixed" | "fail" | "none" {
+  if (checkCount <= 0) return "none";
+  if (passed && attempts > 0) return "fixed";
+  if (passed) return "pass";
+  return "fail";
+}
+
 export function visibleDisclaimer(wolf: Wolf, board: Board, locale: AppLocale): { disclaimer: string; crisis: string } {
   return replyNotices(wolf, board, locale);
 }

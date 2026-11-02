@@ -7,6 +7,7 @@ import {
   MSG_LLM_CAP,
   MSG_SERVER_NOT_CONFIGURED,
   TESTER_TOKEN_HEADER,
+  consumeCouncilTurn,
   consumeDemoLlmCall,
   dailyLimitMessage,
   resetDemoRateLimitForTests,
@@ -256,4 +257,15 @@ test("游戏令牌在客户端 IP 变化后仍然有效（移动网络 / CGNAT�
   });
   const rejected = await consumeDemoLlmCall(forged, 1);
   assert.equal(rejected.ok, false);
+});
+
+test("council turns use their own daily cap and do not need a game ticket", async () => {
+  resetDemoRateLimitForTests();
+  const first = await consumeCouncilTurn(requestFrom("203.0.113.77"), 1);
+  assert.equal(first.ok, true);
+  const second = await consumeCouncilTurn(requestFrom("203.0.113.77"), 1);
+  assert.equal(second.ok, false);
+  if (!second.ok) assert.equal(second.code, "council_daily_limit");
+  const other = await consumeCouncilTurn(requestFrom("203.0.113.78"), 1);
+  assert.equal(other.ok, true);
 });
