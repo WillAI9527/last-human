@@ -7,7 +7,7 @@ import { adviceLines, tally, toggleWolf, voteSentence } from "./logic";
 
 const HAN = /[\u4e00-\u9fff]/;
 const LATIN_WORD = /[A-Za-z]{3,}/g;
-const ZH_ALLOW = new Set(["SOS", "LAST", "HUMAN"]);
+const ZH_ALLOW = new Set(["SOS", "LAST", "HUMAN", "DEMO"]);
 
 function walkStrings(value: unknown, visit: (text: string, path: string) => void, path = ""): void {
   if (typeof value === "string") {
@@ -106,8 +106,11 @@ test("Chinese screens stay Chinese and English screens stay English", () => {
   }
 });
 
-test("the council screen does not call a model API", () => {
+test("the council screen calls the council route and keeps the key on the server", () => {
   const source = readFileSync("src/components/wolf-council/CouncilRoom.tsx", "utf8");
-  assert.doesNotMatch(source, /fetch\(|\/api\/chat|ZENMUX|API_KEY/);
-  assert.match(source, /Mocked reply|hallCopy/);
+  assert.match(source, /\/api\/council-turn/);
+  assert.match(source, /adviceLines/);
+  assert.match(source, /demoFail/);
+  assert.match(source, /reviewing/);
+  assert.doesNotMatch(source, /ZENMUX_API_KEY|\/api\/chat/);
 });
