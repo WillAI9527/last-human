@@ -124,7 +124,7 @@
     },
     "signature": {
       "label": "签署你的名字",
-      "placeholder": "在此签名..."
+      "placeholder": "在此签名…"
     },
     "sealHint": {
       "ready": "按下印章以生效",
@@ -185,6 +185,25 @@
         "seat": "{seat}号",
         "overrideLabel": "启用职业配置覆盖"
       }
+    },
+    "quotaRemaining": "今天还剩 <b>{count}</b> 局",
+    "quotaSpent": "今天的 <b>{limit}</b> 局已用完，明天再来",
+    "closeCard": "关闭",
+    "cover": {
+      "line": "它已经盯上你了",
+      "enter": "入局",
+      "sealLabel": "按下火漆印 · 入局",
+      "imageAlt": "盯着你的狼人"
+    },
+    "howToPlay": {
+      "link": "怎么玩？",
+      "title": "怎么玩",
+      "p1": "桌上 6 个人，只有你是真人，另外 5 位村民由 AI 扮演。",
+      "p2": "阵营：2 名狼人，对面是预言家、女巫和 2 名村民。",
+      "p3": "夜晚：狼人选一人击杀；女巫可以用解药救人或用毒药毒人，同一晚只能用一瓶，只有第一晚能救自己；预言家查验一人的身份。",
+      "p4": "白天：轮流发言，然后投票放逐一人。如果平票，平票的人再各说一次，其他人重新投票，仍然平票就无人出局。",
+      "p5": "胜负：狼人全部出局，好人赢；神职全灭或村民全灭，狼人赢。",
+      "p6": "你的身份开局随机分配。听他们说话，找出谁在撒谎，也别被他们看穿。"
     }
   },
   "authErrors": {
@@ -213,14 +232,14 @@
       "appName": "LAST HUMAN · 最后的真人",
       "version": "版本号：v{version}",
       "group": {
-        "title": "加入用户群",
-        "description": "扫码入群，反馈问题与建议",
-        "alt": "LAST HUMAN 用户群",
-        "missing": "未找到群组图片（public/group.png）"
+        "title": "扫码加作者",
+        "description": "添加 will，反馈问题与建议",
+        "alt": "will 的微信二维码",
+        "missing": "未找到作者二维码（public/author-qr.jpg）"
       },
       "back": "返回设置",
       "cardTitle": "关于我们",
-      "cardDescription": "Logo、版本号、入群二维码",
+      "cardDescription": "Logo、版本号、作者二维码",
       "view": "查看"
     },
     "audio": {

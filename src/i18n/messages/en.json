@@ -124,7 +124,7 @@
     },
     "signature": {
       "label": "Sign your name",
-      "placeholder": "Signature here..."
+      "placeholder": "Sign here…"
     },
     "sealHint": {
       "ready": "Press the seal to begin",
@@ -185,6 +185,25 @@
         "seat": "Seat {seat}",
         "overrideLabel": "Enable role override"
       }
+    },
+    "quotaRemaining": "<b>{count}</b> games left today",
+    "quotaSpent": "Today's <b>{limit}</b> games are used up. Come back tomorrow.",
+    "closeCard": "Close",
+    "cover": {
+      "line": "It already has its eyes on you.",
+      "enter": "Enter",
+      "sealLabel": "Press the seal · Begin",
+      "imageAlt": "A werewolf staring at you"
+    },
+    "howToPlay": {
+      "link": "How to play?",
+      "title": "How to play",
+      "p1": "Six people sit at the table. You are the only human. The other five villagers are played by AI.",
+      "p2": "Sides: 2 werewolves, against the Seer, the Witch, and 2 villagers.",
+      "p3": "Night: the werewolves choose one person to kill. The Witch may save someone with the antidote or poison someone; only one potion per night, and she can save herself only on night 1. The Seer checks one person's identity.",
+      "p4": "Day: everyone speaks in turn, then votes to exile one person. If there is a tie, the tied players each speak once more and everyone else votes again. If they still tie, nobody is eliminated.",
+      "p5": "Winning: if every werewolf is out, the good side wins. If every special role is out, or every villager is out, the werewolves win.",
+      "p6": "Your role is assigned at random when the game begins. Listen to them, find who is lying, and don't let them see through you."
     }
   },
   "authErrors": {
@@ -213,14 +232,14 @@
       "appName": "LAST HUMAN",
       "version": "Version: v{version}",
       "group": {
-        "title": "Join the community",
-        "description": "Scan to join and share feedback",
-        "alt": "LAST HUMAN community group",
-        "missing": "Group image not found (public/group.png)"
+        "title": "Add the author",
+        "description": "Scan to add Will and share feedback.",
+        "alt": "Will's WeChat QR code",
+        "missing": "Author QR image not found (public/author-qr.jpg)"
       },
       "back": "Back to settings",
       "cardTitle": "About",
-      "cardDescription": "Logo, version, and community QR",
+      "cardDescription": "Logo, version, and author QR",
       "view": "View"
     },
     "audio": {
@@ -398,8 +417,7 @@
         "tag": "Challenge"
       }
     }
-  }
-  ,
+  },
   "gameSetup": {
     "title": "Game setup",
     "description": "Adjust difficulty and player count before starting",
@@ -414,11 +432,31 @@
       "hardDesc": "Deep confrontation, more complex reasoning"
     },
     "playerCount": {
-      "8": { "title": "8 players", "description": "3 wolves, 3 gods, 2 villagers", "roles": "Gods: Seer, Witch, Hunter" },
-      "9": { "title": "9 players", "description": "3 wolves, 3 gods, 3 villagers", "roles": "Gods: Seer, Witch, Hunter" },
-      "10": { "title": "10 players", "description": "2 wolves + WWK, 4 gods, 3 villagers", "roles": "Gods: Seer, Witch, Hunter, Guard" },
-      "11": { "title": "11 players", "description": "3 wolves + WWK, 5 gods, 2 villagers", "roles": "Gods: Seer, Witch, Hunter, Guard, Idiot" },
-      "12": { "title": "12 players", "description": "3 wolves + WWK, 5 gods, 3 villagers", "roles": "Gods: Seer, Witch, Hunter, Guard, Idiot" }
+      "8": {
+        "title": "8 players",
+        "description": "3 wolves, 3 gods, 2 villagers",
+        "roles": "Gods: Seer, Witch, Hunter"
+      },
+      "9": {
+        "title": "9 players",
+        "description": "3 wolves, 3 gods, 3 villagers",
+        "roles": "Gods: Seer, Witch, Hunter"
+      },
+      "10": {
+        "title": "10 players",
+        "description": "2 wolves + WWK, 4 gods, 3 villagers",
+        "roles": "Gods: Seer, Witch, Hunter, Guard"
+      },
+      "11": {
+        "title": "11 players",
+        "description": "3 wolves + WWK, 5 gods, 2 villagers",
+        "roles": "Gods: Seer, Witch, Hunter, Guard, Idiot"
+      },
+      "12": {
+        "title": "12 players",
+        "description": "3 wolves + WWK, 5 gods, 3 villagers",
+        "roles": "Gods: Seer, Witch, Hunter, Guard, Idiot"
+      }
     },
     "genshinMode": {
       "title": "Model original mode",
@@ -444,8 +482,7 @@
         "idiot": "Survives a vote-out by revealing role, but loses voting rights"
       }
     }
-  }
-  ,
+  },
   "authModal": {
     "title": "Sign in or sign up",
     "description": "Sign in to access credits and share rewards.",
@@ -523,8 +560,7 @@
         "description": "Please check your inbox"
       }
     }
-  }
-  ,
+  },
   "resetPassword": {
     "title": "Reset password",
     "description": "Enter your new password. It must be at least 6 characters.",
@@ -556,8 +592,7 @@
         "description": "An unknown error occurred"
       }
     }
-  }
-  ,
+  },
   "accountModal": {
     "title": "Change password",
     "description": "Update your account password. It must be at least 6 characters.",
@@ -586,8 +621,7 @@
         "description": "An unknown error occurred"
       }
     }
-  }
-  ,
+  },
   "userProfile": {
     "title": "Account",
     "description": "View account details and actions",
@@ -614,8 +648,7 @@
         "description": "Clipboard is unavailable or permission denied"
       }
     }
-  }
-  ,
+  },
   "sharePanel": {
     "title": "Share link",
     "description": "Share this link with friends.",
@@ -629,8 +662,7 @@
       "copySuccess": "Share link copied",
       "copyFail": "Copy failed. Please copy manually."
     }
-  }
-  ,
+  },
   "bottomAction": {
     "cancel": "Cancel",
     "confirmVote": "Confirm vote: Seat {seat}",
@@ -653,15 +685,13 @@
       "whiteWolfKingBoom": "Self-destruct & take #{seat}",
       "whiteWolfKingBoomBtn": "Self-destruct"
     }
-  }
-  ,
+  },
   "mentions": {
     "playerLabel": "Seat {seat} {name}",
     "seatLabel": "Seat {seat}",
     "mention": "@Seat {seat}",
     "noMatch": "No matching players"
-  }
-  ,
+  },
   "common": {
     "you": "You",
     "listSeparator": ", ",
@@ -679,21 +709,18 @@
     "badgeHolder": "Sheriff",
     "badgeCandidate": "Candidate",
     "joining": "Joining..."
-  }
-  ,
+  },
   "voteResult": {
     "seatLabel": "Seat {seat}",
     "voteCount": "{count} votes"
-  }
-  ,
+  },
   "votingProgress": {
     "votedCount": "{voted}/{total} voted",
     "totalVotes": "Total {count}",
     "waiting": "Waiting for votes...",
     "waitingLabel": "Waiting:",
     "youSuffix": " (you)"
-  }
-  ,
+  },
   "persona": {
     "strategy": {
       "aggressive": "Aggressive",
@@ -709,8 +736,7 @@
     "background": "Background",
     "voiceStyle": "Voice style",
     "selfRole": "This is your role"
-  }
-  ,
+  },
   "tutorialModal": {
     "title": "Beginner Guide: How to Play Werewolf",
     "intro": "This is a faction game of hidden roles, reasoning, and table talk. Follow the system prompts and act or speak when it's your turn.",
@@ -768,8 +794,7 @@
     "actions": {
       "close": "Got it"
     }
-  }
-  ,
+  },
   "roleReveal": {
     "cardTitle": "Role card",
     "cardHint": "View privately",
@@ -1122,8 +1147,7 @@
         "task": "【Witch Skill】\nYou have one antidote (save) and one poison (kill), each once per game.\n\n【Important Rules】\n- Antidote can save the wolf's victim ({selfSaveRule})\n- Poison can kill any player (usually confirmed wolves)\n- One potion max per night\n- If guard and witch both save the same target (milk poison), they still die\n\n【Potion Status】\nAntidote: {healStatus} | Poison: {poisonStatus}\n\n【Tonight】\n{tonightInfo}\n\n【Task】\nDecide whether to use a potion.\n{saveLine}\n{poisonLine}\n- You may use no potion\n\nPoison targets: {poisonTargets}\n\n【Format】\nReturn a strict JSON object only. No code blocks, no explanations, no extra text.\nSave example: {saveJsonFormat}\nPoison example: {poisonJsonFormat}\nPass example: {passJsonFormat}",
         "user": "{context}\n\nWhat will you do? Return a strict JSON object."
       }
-    }
-    ,
+    },
     "badge": {
       "option": "Seat {seat} ({name})",
       "signup": {
@@ -1173,32 +1197,85 @@
     "tiePk": "Execution tied. Enter PK speeches."
   },
   "phase": {
-    "lobby": { "description": "Ready to start" },
-    "setup": { "description": "Generating roles..." },
-    "nightStart": { "description": "Night falls" },
-    "nightGuard": { "description": "Guard in action", "human": "Tap a player card to choose who to protect" },
-    "nightWolf": { "description": "Werewolves in action", "human": "Tap a player card to choose a kill target" },
-    "nightWitch": { "description": "Witch in action", "human": "Use a potion?" },
-    "nightSeer": { "description": "Seer in action", "human": "Tap a player card to choose who to check" },
-    "nightResolve": { "description": "Day breaks" },
-    "dayStart": { "description": "Day begins" },
-    "badgeSignup": { "description": "Sheriff signup", "human": "Run for sheriff?" },
-    "badgeSpeech": { "description": "Sheriff speeches" },
+    "lobby": {
+      "description": "Ready to start"
+    },
+    "setup": {
+      "description": "Generating roles..."
+    },
+    "nightStart": {
+      "description": "Night falls"
+    },
+    "nightGuard": {
+      "description": "Guard in action",
+      "human": "Tap a player card to choose who to protect"
+    },
+    "nightWolf": {
+      "description": "Werewolves in action",
+      "human": "Tap a player card to choose a kill target"
+    },
+    "nightWitch": {
+      "description": "Witch in action",
+      "human": "Use a potion?"
+    },
+    "nightSeer": {
+      "description": "Seer in action",
+      "human": "Tap a player card to choose who to check"
+    },
+    "nightResolve": {
+      "description": "Day breaks"
+    },
+    "dayStart": {
+      "description": "Day begins"
+    },
+    "badgeSignup": {
+      "description": "Sheriff signup",
+      "human": "Run for sheriff?"
+    },
+    "badgeSpeech": {
+      "description": "Sheriff speeches"
+    },
     "badgeElection": {
       "description": "Sheriff election",
       "human": "Tap a player card to vote for sheriff",
       "noVote": "You're a candidate; no vote needed"
     },
-    "pkSpeech": { "description": "PK speeches" },
-    "daySpeech": { "description": "Discussion phase" },
+    "pkSpeech": {
+      "description": "PK speeches"
+    },
+    "daySpeech": {
+      "description": "Discussion phase"
+    },
     "speechYourTurn": "Your turn to speak",
-    "lastWords": { "description": "Last words" },
-    "dayVote": { "description": "Vote phase", "human": "Tap a player card to vote", "noVotePk": "You are in the PK; no vote needed", "noVoteIdiot": "Idiot revealed — no voting rights" },
-    "dayResolve": { "description": "Execution resolution" },
-    "badgeTransfer": { "description": "Sheriff badge transfer", "human": "Tap a player card to choose a transfer target" },
-    "hunterShoot": { "description": "Hunter shot", "human": "Tap a player card to choose your shot target" },
-    "whiteWolfKingBoom": { "description": "White Wolf King self-destruct", "human": "Tap a player card to choose self-destruct target" },
-    "gameEnd": { "description": "Game over", "villageWin": "Villagers win", "wolfWin": "Werewolves win" }
+    "lastWords": {
+      "description": "Last words"
+    },
+    "dayVote": {
+      "description": "Vote phase",
+      "human": "Tap a player card to vote",
+      "noVotePk": "You are in the PK; no vote needed",
+      "noVoteIdiot": "Idiot revealed — no voting rights"
+    },
+    "dayResolve": {
+      "description": "Execution resolution"
+    },
+    "badgeTransfer": {
+      "description": "Sheriff badge transfer",
+      "human": "Tap a player card to choose a transfer target"
+    },
+    "hunterShoot": {
+      "description": "Hunter shot",
+      "human": "Tap a player card to choose your shot target"
+    },
+    "whiteWolfKingBoom": {
+      "description": "White Wolf King self-destruct",
+      "human": "Tap a player card to choose self-destruct target"
+    },
+    "gameEnd": {
+      "description": "Game over",
+      "villageWin": "Villagers win",
+      "wolfWin": "Werewolves win"
+    }
   },
   "page": {
     "voteHelp": "How to vote?",
@@ -1354,7 +1431,10 @@
           "By day, disguise as good and mislead others"
         ],
         "action": "Tap a good player to choose a kill target",
-        "tips": ["Coordinate with teammates", "Sound good, but not perfect"]
+        "tips": [
+          "Coordinate with teammates",
+          "Sound good, but not perfect"
+        ]
       },
       "Seer": {
         "desc": "You can check a player’s true alignment.",
@@ -1363,7 +1443,10 @@
           "Share results in the day to guide votes"
         ],
         "action": "Tap a player to check",
-        "tips": ["Build trust before revealing", "Let others believe you're the seer"]
+        "tips": [
+          "Build trust before revealing",
+          "Let others believe you're the seer"
+        ]
       },
       "Witch": {
         "desc": "You have one antidote and one poison.",
@@ -1372,7 +1455,10 @@
           "Poison: eliminate any player (once)"
         ],
         "action": "Choose save, poison, or pass",
-        "tips": ["Potions are precious", "Wait when info is limited"]
+        "tips": [
+          "Potions are precious",
+          "Wait when info is limited"
+        ]
       },
       "Hunter": {
         "desc": "When you are eliminated, you may shoot one player.",
@@ -1381,7 +1467,10 @@
           "If you die or are banished, you can shoot one player"
         ],
         "action": "Tap a player to shoot",
-        "tips": ["Don’t reveal too early", "Decide carefully before you fall"]
+        "tips": [
+          "Don’t reveal too early",
+          "Decide carefully before you fall"
+        ]
       },
       "Guard": {
         "desc": "You can protect a player from a wolf kill.",
@@ -1390,7 +1479,10 @@
           "You cannot protect the same player two nights in a row"
         ],
         "action": "Tap a player to protect",
-        "tips": ["Guard key moments, not just key people", "Don’t reveal who you guarded"]
+        "tips": [
+          "Guard key moments, not just key people",
+          "Don’t reveal who you guarded"
+        ]
       },
       "Villager": {
         "desc": "You have no special power, but your judgment matters.",
@@ -1399,7 +1491,10 @@
           "Listen carefully, find logic gaps, and vote suspicious players"
         ],
         "action": "Tap a player to vote during voting phase",
-        "tips": ["Speak with evidence", "Think and listen more"]
+        "tips": [
+          "Speak with evidence",
+          "Think and listen more"
+        ]
       },
       "Idiot": {
         "desc": "Immune to exile once — flip your card and survive.",
@@ -1409,7 +1504,10 @@
           "After reveal, lose voting rights but can still speak"
         ],
         "action": "Tap a player to vote (before reveal)",
-        "tips": ["Speak boldly", "After reveal, influence through speech"]
+        "tips": [
+          "Speak boldly",
+          "After reveal, influence through speech"
+        ]
       },
       "WhiteWolfKing": {
         "desc": "King of wolves — self-destruct to take someone down.",
@@ -1419,7 +1517,10 @@
           "After self-destruct, skip to night immediately"
         ],
         "action": "Tap a player to kill at night; use self-destruct button during day",
-        "tips": ["Timing is everything", "Prioritize taking key roles"]
+        "tips": [
+          "Timing is everything",
+          "Prioritize taking key roles"
+        ]
       }
     }
   },

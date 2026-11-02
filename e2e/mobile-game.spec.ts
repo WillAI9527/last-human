@@ -1,7 +1,9 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { mkdir } from "node:fs/promises";
+import path from "node:path";
 
-const SHOTS = "/opt/cursor/artifacts/screenshots";
+const SHOTS = process.env.PLAYWRIGHT_SCREENSHOT_DIR
+  ?? path.join(process.cwd(), "test-results", "mobile-screenshots");
 
 async function expectTappable(locator: Locator) {
   await expect(locator).toBeVisible();

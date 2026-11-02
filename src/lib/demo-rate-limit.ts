@@ -186,10 +186,17 @@ export function isDailyLimitBypassed(request: Request): boolean {
   return tokensMatch(expected, provided);
 }
 
-export async function startDemoGame(request: Request): Promise<QuotaResult> {
-  if (!isZenmuxConfigured()) {
-    return { ok: false, status: 503, code: "server_not_configured", message: MSG_SERVER_NOT_CONFIGURED };
-  }
+type DailyUsage = {
+  count: number;
+  limit: number;
+  bypass: boolean;
+  ipHash: string;
+  day: string;
+  memoryKey: string;
+  sharedKey: string;
+};
+
+async function loadDailyUsage(request: Request): Promise<DailyUsage> {
   sweepMemory();
   const ip = getClientIp(request);
   const ipHash = hashValue(ip);
@@ -198,31 +205,63 @@ export async function startDemoGame(request: Request): Promise<QuotaResult> {
   const sharedKey = `lh:games:${day}:${ipHash}`;
   const shared = await readSharedCount(sharedKey);
   const count = Math.max(dailyCounts.get(memoryKey) ?? 0, readQuotaCookie(request, ipHash, day), shared ?? 0);
-  const limit = getDailyGameLimit();
-  const bypass = isDailyLimitBypassed(request);
+  return {
+    count,
+    limit: getDailyGameLimit(),
+    bypass: isDailyLimitBypassed(request),
+    ipHash,
+    day,
+    memoryKey,
+    sharedKey,
+  };
+}
+
+export async function readDailyQuota(request: Request): Promise<{
+  limit: number;
+  used: number;
+  remaining: number;
+  unlimited: boolean;
+}> {
+  const usage = await loadDailyUsage(request);
+  if (usage.bypass) {
+    return { limit: usage.limit, used: usage.count, remaining: usage.limit, unlimited: true };
+  }
+  return {
+    limit: usage.limit,
+    used: usage.count,
+    remaining: Math.max(0, usage.limit - usage.count),
+    unlimited: false,
+  };
+}
+
+export async function startDemoGame(request: Request): Promise<QuotaResult> {
+  if (!isZenmuxConfigured()) {
+    return { ok: false, status: 503, code: "server_not_configured", message: MSG_SERVER_NOT_CONFIGURED };
+  }
+  const usage = await loadDailyUsage(request);
   // A tester token skips the shared IP quota and does not consume it.
   // The per-game LLM cap still applies after the game token is issued.
-  if (!bypass && count >= limit) {
-    return { ok: false, status: 429, code: "daily_limit", message: dailyLimitMessage(limit) };
+  if (!usage.bypass && usage.count >= usage.limit) {
+    return { ok: false, status: 429, code: "daily_limit", message: dailyLimitMessage(usage.limit) };
   }
-  const next = bypass ? count : count + 1;
-  if (!bypass) {
-    dailyCounts.set(memoryKey, next);
-    await writeSharedCount(sharedKey, next);
+  const next = usage.bypass ? usage.count : usage.count + 1;
+  if (!usage.bypass) {
+    dailyCounts.set(usage.memoryKey, next);
+    await writeSharedCount(usage.sharedKey, next);
   }
 
   const exp = Date.now() + GAME_TTL_SECONDS * 1000;
-  const gameToken = encodeSigned({ ipHash, exp });
-  gamesByToken.set(gameToken, { ipHash, calls: 0, exp });
-  await upstash(["SET", `lh:game:${gameToken}`, JSON.stringify({ ipHash, calls: 0, exp }), "EX", String(GAME_TTL_SECONDS)]);
+  const gameToken = encodeSigned({ ipHash: usage.ipHash, exp });
+  gamesByToken.set(gameToken, { ipHash: usage.ipHash, calls: 0, exp });
+  await upstash(["SET", `lh:game:${gameToken}`, JSON.stringify({ ipHash: usage.ipHash, calls: 0, exp }), "EX", String(GAME_TTL_SECONDS)]);
 
   return {
     ok: true,
     gameToken,
-    remaining: bypass ? limit : limit - next,
+    remaining: usage.bypass ? usage.limit : usage.limit - next,
     cookies: [
       cookie(GAME_COOKIE, gameToken),
-      cookie(QUOTA_COOKIE, encodeSigned({ ipHash, day, count: next })),
+      cookie(QUOTA_COOKIE, encodeSigned({ ipHash: usage.ipHash, day: usage.day, count: next })),
       cookie(LLM_COOKIE, encodeSigned({ gameId: gameToken, count: 0, exp })),
       cookie(TTS_COOKIE, encodeSigned({ gameId: gameToken, count: 0, exp })),
     ],

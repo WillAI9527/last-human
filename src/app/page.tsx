@@ -70,6 +70,8 @@ const DAY_NIGHT_BLINK = {
 };
 const dayBgm = "/bgm/day.mp3";
 const nightBgm = "/bgm/night.mp3";
+const GAME_BGM_VOLUME_SCALE = 0.45;
+const NARRATOR_VOLUME = 0.92;
 
 const WC_EYE_FEATHER_VAR = "--wc-eye-feather";
 const WC_LID_VAR = "--wc-lid";
@@ -342,7 +344,7 @@ export default function Home() {
     isNightRef.current = isNight;
   }, [isNight]);
   useEffect(() => {
-    bgmVolumeRef.current = bgmVolume;
+    bgmVolumeRef.current = bgmVolume * GAME_BGM_VOLUME_SCALE;
   }, [bgmVolume]);
   useEffect(() => {
     isSoundEnabledRef.current = isSoundEnabled;
@@ -465,7 +467,7 @@ export default function Home() {
     const audio = bgmAudioRef.current;
     if (!audio) return;
 
-    const desiredVolume = isSoundEnabled ? bgmVolume : 0;
+    const desiredVolume = isSoundEnabled ? bgmVolume * GAME_BGM_VOLUME_SCALE : 0;
 
     if (!showTable || !isSoundEnabled) {
       // Fade out when hiding table or muting
@@ -534,9 +536,9 @@ export default function Home() {
 
   useEffect(() => {
     const narratorPlayer = getNarratorPlayer();
-    narratorPlayer.setVolume(bgmVolume);
-    narratorPlayer.setEnabled(isSoundEnabled && bgmVolume > 0);
-  }, [bgmVolume, isSoundEnabled]);
+    narratorPlayer.setVolume(NARRATOR_VOLUME);
+    narratorPlayer.setEnabled(isSoundEnabled);
+  }, [isSoundEnabled]);
 
   // UI 状态
   const [selectedSeat, setSelectedSeat] = useState<number | null>(null);
