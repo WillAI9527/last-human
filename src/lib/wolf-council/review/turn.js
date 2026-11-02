@@ -147,7 +147,7 @@ async function runTurn(input) {
   const loc = localeOf(input.locale);
   const demo = input.demo === 'fail' || input.demo === true ? 'fail' : undefined;
   const key = (process.env.ZENMUX_API_KEY || '').trim();
-  if (!key)     return sampleTurn({ ...input, locale: loc, demo, boardId: input.boardId });
+  if (!key) return sampleTurn({ ...input, locale: loc, demo, boardId: input.boardId });
   try {
     const out = await councilTurn({
       wolfId: input.wolfId,
