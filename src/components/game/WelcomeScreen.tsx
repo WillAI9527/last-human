@@ -6,6 +6,7 @@ import { WerewolfIcon } from "@/components/icons/FlatIcons";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useAtom } from "jotai";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
@@ -276,6 +277,7 @@ export function WelcomeScreen({
   onAutoAdvanceDialogueEnabledChange,
 }: WelcomeScreenProps) {
   const t = useTranslations();
+  const router = useRouter();
   const { locale } = useAppLocale();
   const discordInviteUrl = "https://discord.gg/ETkdZWgy";
   const sponsorEmail = "zhihuang.oiloil@gmail.com";
@@ -308,6 +310,8 @@ export function WelcomeScreen({
   const paperRef = useRef<HTMLDivElement | null>(null);
   const sealButtonRef = useRef<HTMLButtonElement | null>(null);
   const isStartingRef = useRef(false);
+  const werewolfLaunchRef = useRef(false);
+  const startWerewolfRef = useRef<() => Promise<void>>(async () => {});
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [serverNotice, setServerNotice] = useState<string | null>(null);
 
@@ -890,7 +894,7 @@ export function WelcomeScreen({
     }
   };
 
-  const handleConfirm = async () => {
+  const startWerewolfGame = async () => {
     if (!canConfirm) {
       return;
     }
@@ -935,6 +939,24 @@ export function WelcomeScreen({
 
     await startGameWithCreditGuard(PUBLIC_DEMO || demoModeActive);
   };
+
+  startWerewolfRef.current = startWerewolfGame;
+
+  const handleConfirm = () => {
+    if (!canConfirm || isStartingRef.current) return;
+    router.push(locale === "zh" ? "/zh/hall" : "/hall");
+  };
+
+  useEffect(() => {
+    if (!mounted) return;
+    const url = new URL(window.location.href);
+    if (url.searchParams.get("start") !== "werewolf") return;
+    if (werewolfLaunchRef.current || !canConfirm) return;
+    werewolfLaunchRef.current = true;
+    url.searchParams.delete("start");
+    window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+    void startWerewolfRef.current();
+  }, [canConfirm, mounted]);
 
   const handleOpenPayAsYouGo = () => {
     setUserProfileDefaultTab("payAsYouGo");
