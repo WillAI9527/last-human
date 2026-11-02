@@ -15,7 +15,7 @@ import {
   hasTokendanceKey,
   hasZenmuxKey,
   isCustomKeyEnabled,
-} from "@/lib/api-keys";
+} from "@/lib/model-source";
 import { VOICE_PRESETS } from "./voice-constants";
 import { characterFromVillager, drawVillagers } from "./village-cast";
 

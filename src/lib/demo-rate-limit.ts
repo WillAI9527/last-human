@@ -32,6 +32,9 @@ type LlmResult =
 const gamesByToken = new Map<string, GameRecord>();
 const ttsCounts = new Map<string, number>();
 const dailyCounts = new Map<string, number>();
+const opsLlmCounts = new Map<string, number>();
+export const OPS_LLM_LIMIT = 30;
+const OPS_LLM_COOKIE = "ops_llm";
 let lastSweep = Date.now();
 
 function secret(): string {
@@ -370,8 +373,27 @@ export function applyRateLimitCookies(response: Response, cookies: string[]): Re
   return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
 }
 
+/** Hourly cap for the ops LLM routes. Independent of the werewolf game ticket. */
+export async function consumeOpsLlmCall(request: Request): Promise<
+  { ok: true; cookies: string[] } | { ok: false; status: 429; code: "rate_limit"; message: string }
+> {
+  const hour = Math.floor(Date.now() / 3_600_000);
+  const key = `${hashValue(getClientIp(request))}:${hour}`;
+  const parsed = decodeSigned<{ key?: string; count?: number }>(readCookie(request, OPS_LLM_COOKIE));
+  let count = parsed?.key === key && Number.isFinite(parsed.count) ? Math.max(0, Number(parsed.count)) : 0;
+  count = Math.max(count, opsLlmCounts.get(key) ?? 0, (await readSharedCount(`ops:llm:${key}`)) ?? 0);
+  if (count >= OPS_LLM_LIMIT) {
+    return { ok: false, status: 429, code: "rate_limit", message: "操作太频繁，请稍后再试。" };
+  }
+  const next = count + 1;
+  opsLlmCounts.set(key, next);
+  await writeSharedCount(`ops:llm:${key}`, next);
+  return { ok: true, cookies: [cookie(OPS_LLM_COOKIE, encodeSigned({ key, count: next }), 3600)] };
+}
+
 export function resetDemoRateLimitForTests() {
   gamesByToken.clear();
   ttsCounts.clear();
   dailyCounts.clear();
+  opsLlmCounts.clear();
 }

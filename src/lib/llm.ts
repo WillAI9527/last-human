@@ -1,13 +1,9 @@
 import {
-  getDashscopeApiKey,
-  getTokendanceApiKey,
-  getTokendanceBaseUrl,
-  getZenmuxApiKey,
   getModelSource,
   isCustomKeyEnabled,
   setTokenPayConnected,
   type ModelSource,
-} from "@/lib/api-keys";
+} from "@/lib/model-source";
 import { ALL_MODELS, AVAILABLE_MODELS, PROJECT_MODELS, type ModelRef } from "@/types/game";
 import { gameStatsTracker } from "@/hooks/useGameStats";
 import { gameSessionTracker } from "@/lib/game-session-tracker";
@@ -63,25 +59,13 @@ function resolveModelForBuiltin(model: string): string {
 }
 
 export function resolveApiKeySource(model: string): ApiKeySource {
-  const source = getModelSource();
-  if (source === "project") return "project";
-  if (source === "tokenpay") return "user";
-
-  const provider = getProviderForModel(model);
-  if (provider === "dashscope") {
-    return getDashscopeApiKey() ? "user" : "project";
-  }
-  if (provider === "tokendance") {
-    return getTokendanceApiKey() && getTokendanceBaseUrl()
-      ? "user"
-      : "project";
-  }
-  return getZenmuxApiKey() ? "user" : "project";
+  // Browser storage never supplies an API key. TokenPay is an account mode, not a stored secret.
+  void model;
+  return getModelSource() === "tokenpay" ? "user" : "project";
 }
 
 function resolveEffectiveModelSource(modelSource: ModelSource): ModelSource {
-  // Public demo has only the server ZenMux key. Ignore leftover TokenPay
-  // or custom-key settings from an older localStorage.
+  // Public demo has only the server key. Custom browser keys are not read.
   if (!process.env.NEXT_PUBLIC_SUPABASE_URL) return "project";
   const customEnabled = modelSource === "custom" && isCustomKeyEnabled();
   if (customEnabled) return modelSource;
@@ -112,21 +96,8 @@ export function resolveRequestModelForSource(
 }
 
 function buildModelSourceHeaders(source: ModelSource): Record<string, string> {
-  if (source === "project") return {};
   if (source === "tokenpay") return { "X-TokenPay-Mode": "true" };
-
-  const zenmuxApiKey = getZenmuxApiKey();
-  const dashscopeApiKey = getDashscopeApiKey();
-  const tokendanceApiKey = getTokendanceApiKey();
-  const tokendanceBaseUrl = getTokendanceBaseUrl();
-  return {
-    ...(zenmuxApiKey ? { "X-Zenmux-Api-Key": zenmuxApiKey } : {}),
-    ...(dashscopeApiKey ? { "X-Dashscope-Api-Key": dashscopeApiKey } : {}),
-    ...(tokendanceApiKey ? { "X-Tokendance-Api-Key": tokendanceApiKey } : {}),
-    ...(tokendanceApiKey && tokendanceBaseUrl
-      ? { "X-Tokendance-Base-Url": tokendanceBaseUrl }
-      : {}),
-  };
+  return {};
 }
 
 export interface ChatCompletionResponse {

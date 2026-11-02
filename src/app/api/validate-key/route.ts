@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { DASHSCOPE_VALIDATION_MODEL, TOKENDANCE_VALIDATION_MODEL, ZENMUX_VALIDATION_MODEL } from "@/types/game";
-import { TOKENDANCE_BASE_URL } from "@/lib/api-keys";
+import { TOKENDANCE_BASE_URL } from "@/lib/model-source";
 import { getTokenPayAppUrl } from "@/lib/tokenpay";
 
 const ZENMUX_API_URL = "https://zenmux.ai/api/v1/chat/completions";

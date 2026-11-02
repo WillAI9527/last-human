@@ -5,7 +5,7 @@
 
 import type { GameState, Player, Role, Alignment, Phase } from "@/types/game";
 import { isWolfRole } from "@/types/game";
-import { getSummaryModel } from "@/lib/api-keys";
+import { getSummaryModel } from "@/lib/model-source";
 import type {
   GameAnalysisData,
   TimelineEntry,

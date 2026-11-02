@@ -17,7 +17,7 @@ import {
   getGameAnalysisSourceFingerprint,
 } from "@/lib/game-analysis";
 import { gameStatsTracker } from "@/hooks/useGameStats";
-import { getReviewModel } from "@/lib/api-keys";
+import { getReviewModel } from "@/lib/model-source";
 
 export function useGameAnalysis() {
   const gameState = useAtomValue(gameStateAtom);

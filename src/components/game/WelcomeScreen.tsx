@@ -34,7 +34,7 @@ import {
   setModelSource,
   syncTokenPayConnectionState,
   type ModelSource,
-} from "@/lib/api-keys";
+} from "@/lib/model-source";
 import { loadTokenPayConnectionWithRetry } from "@/lib/tokenpay-client";
 import { fetchPublicQuota, reservePublicGame, type PublicQuota } from "@/lib/demo-game-client";
 import { WolfCover } from "@/components/home/WolfCover";

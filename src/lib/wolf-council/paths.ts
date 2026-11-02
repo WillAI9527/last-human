@@ -7,5 +7,5 @@ export function withLocale(locale: AppLocale, path: string): string {
 }
 
 export function werewolfStartPath(locale: AppLocale): string {
-  return withLocale(locale, "/?start=werewolf");
+  return withLocale(locale, "/play?start=werewolf");
 }

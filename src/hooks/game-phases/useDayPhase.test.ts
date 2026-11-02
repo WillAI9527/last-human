@@ -50,7 +50,7 @@ function harness(tts = false) {
     };
     if (id === "@/lib/speech-order") return { getNextSpeechSeat: () => null };
     if (id === "@/lib/game-constants") return { PHASE_CATEGORIES: { SPEECH_PHASES: ["DAY_SPEECH", "DAY_LAST_WORDS", "DAY_PK_SPEECH"] } };
-    if (id === "@/lib/api-keys") return { getModelSource: () => "project" };
+    if (id === "@/lib/model-source") return { getModelSource: () => "project" };
     if (id === "@/lib/audio-manager") return { makeAudioTaskId: () => "audio", audioManager: {
       isEnabled: () => tts, addToQueue: (task: any) => audio.push(task.text),
       ensureReady: (task: any) => { if (!readiness.has(task.text)) readiness.set(task.text, deferred()); return readiness.get(task.text)!.promise; },

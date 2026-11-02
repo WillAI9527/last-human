@@ -22,7 +22,7 @@ import { useTranslations } from "next-intl";
 
 import { ALL_MODELS, PLAYER_MODELS, PROJECT_MODELS, isWolfRole, type GameState, type Player, type Phase, type Role, type DevPreset, type ModelRef, type StartGameOptions } from "@/types/game";
 import { gameStateAtom, isValidTransition, clearPersistedGameState, isRestorableGameState } from "@/store/game-machine";
-import { getGeneratorModel, getModelSource } from "@/lib/api-keys";
+import { getGeneratorModel, getModelSource } from "@/lib/model-source";
 import {
   createInitialGameState,
   setupPlayers,
