@@ -1,7 +1,7 @@
 .wc-contract-screen--hero {
   height: 100%;
   min-height: 100%;
-  background: #0f0d0c;
+  background: #050708;
 }
 
 .wc-contract-screen--hero > .wc-welcome-actions {
@@ -13,7 +13,7 @@
   inset: 0;
   z-index: 2;
   overflow: hidden;
-  background: #0f0d0c;
+  background: #050708;
   color: #f2ede4;
   user-select: none;
   -webkit-user-select: none;
@@ -22,37 +22,62 @@
 .wolf-cover__bg {
   position: absolute;
   inset: 0;
+  z-index: 0;
   pointer-events: none;
-  background: radial-gradient(ellipse at 50% 40%, #2a1414 0, #160d0c 45%, #0f0d0c 80%);
+  overflow: hidden;
+  background:
+    linear-gradient(180deg, rgba(0, 0, 0, 0.24), rgba(0, 0, 0, 0.12) 44%, rgba(0, 0, 0, 0.5)),
+    radial-gradient(ellipse at 50% 35%, rgba(5, 7, 8, 0) 0, rgba(5, 7, 8, 0.24) 50%, rgba(5, 7, 8, 0.78) 100%),
+    url("/cover/background.png") center / cover no-repeat;
+  transform: scale(1.02);
 }
 
-.wolf-cover__moon {
+.wolf-cover__bg-video {
   position: absolute;
-  right: 14vw;
-  top: 9vh;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.92;
+  filter: brightness(0.74) saturate(0.9) contrast(1.08);
+}
+
+.wolf-cover__bg::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(180deg, rgba(0, 0, 0, 0.26), rgba(0, 0, 0, 0.12) 44%, rgba(0, 0, 0, 0.54)),
+    radial-gradient(ellipse at 50% 35%, rgba(5, 7, 8, 0) 0, rgba(5, 7, 8, 0.28) 50%, rgba(5, 7, 8, 0.82) 100%);
+}
+
+.wolf-cover__mist {
+  position: absolute;
+  inset: 0;
   z-index: 1;
-  width: 9vmin;
-  height: 9vmin;
-  border-radius: 50%;
   pointer-events: none;
-  box-shadow: inset -1.4vmin 0.6vmin 0 0 #b3262b;
-  filter: drop-shadow(0 0 2vmin rgba(179, 38, 43, 0.6));
-  transform: rotate(-20deg);
+  background:
+    radial-gradient(ellipse at 50% 50%, rgba(9, 13, 16, 0) 0, rgba(9, 13, 16, 0.36) 56%, rgba(0, 0, 0, 0.78) 100%),
+    linear-gradient(90deg, rgba(0, 0, 0, 0.62), rgba(0, 0, 0, 0) 24%, rgba(0, 0, 0, 0) 76%, rgba(0, 0, 0, 0.62));
 }
 
 .wolf-cover__stage {
   position: absolute;
   left: 50%;
-  bottom: 0;
-  z-index: 2;
-  width: min(100%, calc(100vh * 16 / 9 * 0.92));
-  aspect-ratio: 16 / 9;
+  top: clamp(30px, 6vh, 72px);
+  z-index: 3;
+  width: min(58vw, 760px);
+  aspect-ratio: 900 / 760;
   transform: translateX(-50%);
   pointer-events: none;
+  filter:
+    drop-shadow(0 18px 34px rgba(0, 0, 0, 0.72))
+    drop-shadow(0 0 28px rgba(190, 220, 255, 0.16));
 }
 
 .wolf-cover__front,
-.wolf-cover__frame {
+.wolf-cover__canvas,
+.wolf-cover__eye-glow {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -63,18 +88,60 @@
 
 .wolf-cover__front {
   display: block;
-  object-fit: fill;
+  object-fit: contain;
 }
 
-.wolf-cover__frame {
-  background-repeat: no-repeat;
-  background-size: 300% 300%;
+.wolf-cover__canvas {
   opacity: 0;
-  transition: opacity 0.14s linear;
+  contain: paint;
+  transform: translateZ(0);
 }
 
 .wolf-cover__stage[data-sprite="live"] .wolf-cover__front {
   opacity: 0;
+}
+
+.wolf-cover__stage[data-sprite="live"] .wolf-cover__canvas {
+  opacity: 1;
+}
+
+.wolf-cover__eye-glow {
+  opacity: 0;
+  contain: paint;
+  transform: translateZ(0);
+  transition: opacity 0.16s ease;
+}
+
+.wolf-cover__eye-glow::before,
+.wolf-cover__eye-glow::after {
+  content: "";
+  position: absolute;
+  top: 41.5%;
+  width: 4.4%;
+  height: 2.4%;
+  border-radius: 999px;
+  background:
+    radial-gradient(ellipse at 50% 50%, rgba(255, 245, 226, 0.96) 0 9%, rgba(255, 66, 45, 0.98) 20%, rgba(178, 8, 18, 0.78) 43%, transparent 72%);
+  filter:
+    blur(0.2px)
+    drop-shadow(0 0 8px rgba(255, 25, 20, 0.96))
+    drop-shadow(0 0 22px rgba(183, 0, 12, 0.74));
+  mix-blend-mode: screen;
+  transform: translate(-50%, -50%) rotate(14deg);
+}
+
+.wolf-cover__eye-glow::before {
+  left: 43.5%;
+}
+
+.wolf-cover__eye-glow::after {
+  left: 56%;
+  transform: translate(-50%, -50%) rotate(-14deg);
+}
+
+.wolf-cover__stage[data-ritual="seal"] .wolf-cover__eye-glow {
+  opacity: 1;
+  animation: wolf-eye-ignite 1100ms ease-out both;
 }
 
 .wolf-cover__fog {
@@ -82,40 +149,37 @@
   left: 0;
   right: 0;
   bottom: 0;
-  z-index: 3;
-  height: 38vh;
+  z-index: 4;
+  height: 34vh;
   pointer-events: none;
-  background: linear-gradient(transparent, #0f0d0c 85%);
+  background: linear-gradient(transparent, rgba(5, 7, 8, 0.82) 72%, #050708);
 }
 
-@media (orientation: portrait) {
-  .wolf-cover__stage {
-    width: auto;
-    height: 66vh;
-    bottom: 16vh;
-  }
+.wolf-cover__language {
+  position: absolute;
+  top: calc(20px + env(safe-area-inset-top, 0px));
+  left: 20px;
+  z-index: 6;
+}
 
-  .wolf-cover__moon {
-    right: 8vw;
-    top: 6vh;
-    width: 14vmin;
-    height: 14vmin;
-  }
+.wc-contract-screen--hero .wc-welcome-actions,
+.wc-contract-screen--hero .wc-sponsor-cards {
+  display: none !important;
 }
 
 .wolf-cover__chrome {
   position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 4;
+  left: 50%;
+  bottom: 12px;
+  z-index: 5;
+  width: min(92vw, 680px);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
-  padding: 0 20px calc(16px + env(safe-area-inset-bottom, 0px));
+  gap: 11px;
+  padding: 0 20px calc(18px + env(safe-area-inset-bottom, 0px));
   pointer-events: none;
-  transform: translateY(calc(-1 * var(--wolf-keyboard-inset, 0px)));
+  transform: translate(-50%, calc(-1 * var(--wolf-keyboard-inset, 0px)));
 }
 
 .wolf-cover__title {
@@ -123,43 +187,49 @@
   text-align: center;
   font-family: "Cormorant Garamond", "Noto Serif SC", ui-serif, Georgia, serif;
   font-weight: 600;
-  font-size: clamp(28px, 5vw, 56px);
-  line-height: 1.1;
-  letter-spacing: 0.35em;
+  font-size: clamp(38px, 5.2vw, 64px);
+  line-height: 0.96;
+  letter-spacing: 0.12em;
   color: #f2ede4;
-  text-indent: 0.35em;
-  text-shadow: 0 0 18px #000;
+  text-indent: 0.12em;
+  white-space: nowrap;
+  text-shadow:
+    0 2px 0 rgba(0, 0, 0, 0.85),
+    0 0 26px rgba(0, 0, 0, 0.92);
 }
 
 .wolf-cover__line {
   display: block;
-  margin-top: 0.65em;
-  font-family: "Noto Serif SC", ui-serif, Georgia, serif;
-  font-size: clamp(16px, 2.4vw, 20px);
+  margin-top: 0.26em;
+  padding-top: 0.22em;
+  border-top: 1px solid rgba(242, 237, 228, 0.86);
+  border-bottom: 1px solid rgba(242, 237, 228, 0.42);
+  font-family: "Cormorant Garamond", "Noto Serif SC", ui-serif, Georgia, serif;
+  font-size: clamp(27px, 3.8vw, 50px);
   font-weight: 600;
-  letter-spacing: 0.42em;
-  text-indent: 0.42em;
-  color: #a9b2bc;
+  letter-spacing: 0.08em;
+  text-indent: 0.08em;
+  color: #f2ede4;
 }
 
 .wolf-cover__only {
   display: block;
-  margin-top: 0.55em;
+  margin-top: 0.7em;
   font-family: "Noto Serif SC", ui-serif, Georgia, serif;
-  font-size: 13px;
+  font-size: clamp(13px, 1.7vw, 17px);
   font-weight: 600;
-  letter-spacing: 0.18em;
-  text-indent: 0.18em;
-  color: #a9b2bc;
+  letter-spacing: 0.16em;
+  text-indent: 0.16em;
+  color: rgba(242, 237, 228, 0.82);
 }
 
 .wolf-cover__sign {
   pointer-events: auto;
-  width: min(280px, 72vw);
-  margin: 0;
-  padding: 6px 0;
+  width: min(300px, 70vw);
+  margin: 2px 0 0;
+  padding: 7px 0 6px;
   border: 0;
-  border-bottom: 1px solid #a9b2bc;
+  border-bottom: 1px solid rgba(242, 237, 228, 0.9);
   border-radius: 0;
   appearance: none;
   -webkit-appearance: none;
@@ -168,28 +238,29 @@
   text-align: center;
   font-family: "Noto Serif SC", ui-serif, Georgia, serif;
   font-weight: 600;
-  font-size: 22px;
-  letter-spacing: 0.15em;
+  font-size: 20px;
+  letter-spacing: 0.08em;
   outline: none;
   caret-color: #f2ede4;
+  text-shadow: 0 2px 8px #000;
 }
 
 .wolf-cover__sign::placeholder {
-  color: #7f8c99;
-  letter-spacing: 0.15em;
+  color: rgba(242, 237, 228, 0.72);
 }
 
 .wolf-cover__sign:focus {
-  border-bottom-color: #f2ede4;
+  border-bottom-color: #ffffff;
 }
 
 .wolf-cover__quota {
   margin: 0;
-  color: #a9b2bc;
+  color: rgba(242, 237, 228, 0.72);
   font-family: "Noto Serif SC", ui-serif, Georgia, serif;
   font-size: 13px;
-  letter-spacing: 0.2em;
+  letter-spacing: 0.16em;
   text-align: center;
+  text-shadow: 0 2px 8px #000;
 }
 
 .wolf-cover__quota strong {
@@ -198,9 +269,10 @@
 }
 
 .wolf-cover__seal {
+  position: relative;
   pointer-events: auto;
-  width: 72px;
-  height: 72px;
+  width: 86px;
+  height: 86px;
   margin: 0;
   padding: 0;
   border: 0;
@@ -208,13 +280,34 @@
   display: grid;
   place-items: center;
   cursor: pointer;
-  background:
-    radial-gradient(circle at 32% 28%, rgba(255, 255, 255, 0.28), transparent 38%),
-    radial-gradient(circle at 50% 58%, #b3262b 0%, #b3262b 42%, #7d151b 100%);
-  box-shadow:
-    0 10px 22px rgba(0, 0, 0, 0.45),
-    inset 2px 2px 6px rgba(255, 255, 255, 0.24),
-    inset -3px -4px 8px rgba(0, 0, 0, 0.38);
+  background: transparent;
+  transform: translateZ(0);
+  transition: transform 0.18s ease, filter 0.18s ease;
+}
+
+.wolf-cover__seal-image {
+  position: absolute;
+  inset: -14%;
+  width: 128%;
+  height: 128%;
+  max-width: none;
+  object-fit: contain;
+  pointer-events: none;
+  filter: drop-shadow(0 8px 12px rgba(0, 0, 0, 0.55));
+}
+
+.wolf-cover__seal:focus-visible {
+  outline: 2px solid #f2ede4;
+  outline-offset: 6px;
+}
+
+.wolf-cover__seal:hover:not(:disabled) {
+  transform: translateY(-1px) scale(1.02);
+  filter: brightness(1.06);
+}
+
+.wolf-cover__seal:active:not(:disabled) {
+  transform: translateY(1px) scale(0.98);
 }
 
 .wolf-cover__seal.is-muted,
@@ -223,43 +316,41 @@
 .wolf-cover__seal:disabled,
 .wolf-cover__seal:disabled:hover {
   opacity: 1;
-  filter: none;
-  background-color: #3a3330;
-  background-image: none;
-  box-shadow: none;
+  filter: grayscale(0.7) brightness(0.58);
+  background:
+    radial-gradient(circle at 50% 52%, #403838 0%, #2a2423 58%, #171312 100%);
+  box-shadow:
+    0 8px 18px rgba(0, 0, 0, 0.48),
+    inset 2px 2px 7px rgba(255, 255, 255, 0.12),
+    inset -4px -4px 10px rgba(0, 0, 0, 0.5);
   transform: none;
   transition: none;
   cursor: not-allowed;
 }
 
-.wolf-cover__seal-label {
+.wolf-cover__seal-text {
   color: #f2ede4;
-  font-family: "Noto Serif SC", ui-serif, Georgia, serif;
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: 0.3em;
-  text-indent: 0.3em;
+  font-family: "Cormorant Garamond", "Noto Serif SC", ui-serif, Georgia, serif;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
   text-shadow: 0 2px 8px #000;
 }
 
 .wolf-cover__how {
   pointer-events: auto;
   margin: 0;
-  padding: 6px 12px 2px;
+  padding: 6px 14px 3px;
   border: 0;
+  border-bottom: 1px solid rgba(242, 237, 228, 0.72);
   background: transparent;
-  color: #7f8c99;
+  color: rgba(242, 237, 228, 0.84);
   font-family: "Noto Serif SC", ui-serif, Georgia, serif;
-  font-size: 13px;
+  font-size: 14px;
   letter-spacing: 0.08em;
   cursor: pointer;
-}
-
-.wolf-cover__mark,
-.wolf-cover__seal .wolf-cover__mark {
-  width: 46px;
-  height: 46px;
-  display: block;
+  text-shadow: 0 2px 8px #000;
 }
 
 .wolf-rules-sheet {
@@ -273,6 +364,7 @@
 
 .wolf-rules-sheet.is-open {
   pointer-events: auto;
+  background: rgba(0, 0, 0, 0.28);
 }
 
 .wolf-rules-panel {
@@ -281,7 +373,7 @@
   height: 50dvh;
   overflow: auto;
   background: #14110f;
-  border-top: 1px solid #a9b2bc;
+  border-top: 1px solid rgba(242, 237, 228, 0.28);
   transform: translateY(100%);
   padding: 18px 28px calc(24px + env(safe-area-inset-bottom, 0px));
   -webkit-overflow-scrolling: touch;
@@ -338,21 +430,42 @@
 @keyframes wolf-seal-flash {
   0% {
     box-shadow:
-      0 10px 22px rgba(0, 0, 0, 0.45),
-      inset 2px 2px 6px rgba(255, 255, 255, 0.24),
-      inset -3px -4px 8px rgba(0, 0, 0, 0.38);
+      0 12px 28px rgba(0, 0, 0, 0.62),
+      0 0 0 2px rgba(242, 237, 228, 0.18),
+      inset 2px 3px 8px rgba(255, 255, 255, 0.28),
+      inset -4px -5px 12px rgba(0, 0, 0, 0.48);
     filter: brightness(1);
   }
   35% {
-    box-shadow: 0 0 0 8px rgba(179, 38, 43, 0.45);
+    box-shadow: 0 0 0 10px rgba(179, 38, 43, 0.42);
     filter: brightness(1.25);
   }
   100% {
     box-shadow:
-      0 10px 22px rgba(0, 0, 0, 0.45),
-      inset 2px 2px 6px rgba(255, 255, 255, 0.24),
-      inset -3px -4px 8px rgba(0, 0, 0, 0.38);
+      0 12px 28px rgba(0, 0, 0, 0.62),
+      0 0 0 2px rgba(242, 237, 228, 0.18),
+      inset 2px 3px 8px rgba(255, 255, 255, 0.28),
+      inset -4px -5px 12px rgba(0, 0, 0, 0.48);
     filter: brightness(1);
+  }
+}
+
+@keyframes wolf-eye-ignite {
+  0% {
+    opacity: 0;
+    filter: brightness(0.8);
+  }
+  18% {
+    opacity: 1;
+    filter: brightness(1.45);
+  }
+  55% {
+    opacity: 0.88;
+    filter: brightness(1.15);
+  }
+  100% {
+    opacity: 0;
+    filter: brightness(0.95);
   }
 }
 
@@ -360,37 +473,81 @@
   animation: wolf-seal-flash 720ms ease-out;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .wolf-cover__seal.is-hint:not(:disabled) {
-    animation: none;
-    outline: 3px solid #f2ede4;
-    outline-offset: 4px;
+@media (orientation: portrait) {
+  .wolf-cover__stage {
+    top: max(42px, 8vh);
+    width: min(118vw, 650px);
   }
 
-  .wolf-rules-sheet.is-open .wolf-rules-panel {
-    transition: none;
+  .wolf-cover__chrome {
+    width: 100%;
+    gap: 10px;
+    padding-inline: 18px;
+  }
+
+  .wolf-cover__title {
+    width: min(94vw, 430px);
+    font-size: clamp(24px, 7.4vw, 32px);
+    letter-spacing: 0.04em;
+    text-indent: 0.04em;
+  }
+
+  .wolf-cover__line {
+    font-size: clamp(22px, 6.8vw, 30px);
+  }
+
+  .wolf-cover__only {
+    font-size: 12px;
   }
 }
 
-@media (max-height: 520px) {
-  .wolf-cover__seal {
-    width: 58px;
-    height: 58px;
-  }
-
-  .wolf-cover__mark {
-    width: 40px;
-    height: 40px;
+@media (max-height: 720px) {
+  .wolf-cover__stage {
+    top: 20px;
+    width: min(50vw, 620px);
   }
 
   .wolf-cover__chrome {
     gap: 8px;
   }
+
+  .wolf-cover__title {
+    font-size: clamp(34px, 5vw, 58px);
+  }
+
+  .wolf-cover__line {
+    font-size: clamp(23px, 3.2vw, 38px);
+  }
+
+  .wolf-cover__seal {
+    width: 72px;
+    height: 72px;
+  }
+}
+
+@media (max-width: 760px) {
+  .wolf-cover__stage {
+    width: min(112vw, 620px);
+  }
+
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .wolf-cover__frame,
-  .wolf-cover__front {
+  .wolf-cover__bg-video {
+    display: none;
+  }
+
+  .wolf-cover__canvas,
+  .wolf-cover__eye-glow,
+  .wolf-cover__front,
+  .wolf-cover__seal,
+  .wolf-rules-sheet.is-open .wolf-rules-panel {
     transition: none;
+  }
+
+  .wolf-cover__seal.is-hint:not(:disabled) {
+    animation: none;
+    outline: 3px solid #f2ede4;
+    outline-offset: 4px;
   }
 }

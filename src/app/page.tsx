@@ -1616,6 +1616,7 @@ export default function Home() {
 </AnimatePresence>
 
       {/* 笔记本悬浮按钮 - 参考 style-unification-preview.html */}
+      {showTable && (
       <button
         onClick={() => {
           setIsNotebookOpen((v) => !v);
@@ -1627,6 +1628,7 @@ export default function Home() {
       >
         {isNotebookOpen ? <X size={24} /> : <NotePencil size={24} />}
       </button>
+      )}
 
       <AnimatePresence>
         {isNotebookOpen && (

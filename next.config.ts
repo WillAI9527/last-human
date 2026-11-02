@@ -6,6 +6,7 @@ import type { NextConfig } from "next";
 const pkg = require("./package.json") as { version?: string };
 
 const nextConfig: NextConfig = {
+  devIndicators: false,
   // Note: Removed 'output: "standalone"' - not needed for Vercel deployment
   // standalone mode is for Docker/self-hosted environments and makes deploy much larger
   reactCompiler: true,

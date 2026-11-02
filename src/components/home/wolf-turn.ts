@@ -1,45 +1,50 @@
 /**
- * Calibrated screen angles for the 3×3 head sprite.
- * 0° is right, 90° is down. These are measured from the contact sheet, not evenly spaced.
+ * Calibrated screen angles for the head sprite.
+ * 0° is right, 90° is down. Frame 0 is the neutral front portrait.
  */
-export const WOLF_TURN_ANGLE_KEYS = [
-  { deg: -90, frame: 1 },
-  { deg: -51, frame: 2 },
-  { deg: 3, frame: 3 },
-  { deg: 30, frame: 4 },
-  { deg: 90, frame: 5 },
-  { deg: 150, frame: 6 },
-  { deg: 177, frame: 7 },
-  { deg: -141, frame: 8 },
-] as const;
+export const WOLF_TURN_ANGLE_KEYS = Array.from({ length: 128 }, (_, index) => ({
+  deg: index <= 96 ? -90 + index * 2.8125 : -450 + index * 2.8125,
+  frame: index + 1,
+}));
 
 /** Inside this fraction of the short viewport side, a turned head returns to front. */
-export const WOLF_TURN_DEAD = 0.10;
+export const WOLF_TURN_DEAD = 0.025;
 
 /** A front head stays front until the pointer reaches this fraction of the short side. */
-export const WOLF_TURN_DEAD_LEAVE = 0.12;
+export const WOLF_TURN_DEAD_LEAVE = 0.035;
 
 /** Degrees past the midpoint between adjacent keys before the head leaves the current key. */
-export const HYSTERESIS_DEG = 10;
+export const HYSTERESIS_DEG = 0.5;
 
 /** After the last touch ends, the head returns to front. */
 export const IDLE_RETURN_MS = 1500;
 
-/** A frame stays up at least this long; a newer target replaces any queued one. */
-export const MIN_DWELL_MS = 120;
+/** A frame stays up briefly enough to feel continuous while still avoiding shimmer. */
+export const MIN_DWELL_MS = 32;
 
 /** Per-sample lerp for gyroscope samples before they enter the same picker. */
 export const GYRO_SMOOTH = 0.2;
 
-export const WOLF_TURN_FRAME_COUNT = 9;
+/** Portrait heads need extra horizontal intent so ear corners are reachable. */
+export const GAZE_X_WEIGHT = 1.42;
 
-/** Nose sits at 50% / 53% of the stage. */
-export const WOLF_TURN_NOSE = { x: 0.5, y: 0.53 } as const;
+export const WOLF_TURN_FRAME_COUNT = 129;
+
+export const WOLF_TURN_RING_FRAME_COUNT = WOLF_TURN_FRAME_COUNT - 1;
+
+export const WOLF_TURN_SPRITE_COLS = 10;
+
+export const WOLF_TURN_SPRITE_ROWS = 13;
+
+/** Nose sits at about the visual center of the keyed wolf portrait. */
+export const WOLF_TURN_NOSE = { x: 0.5, y: 0.43 } as const;
 
 const ORDERED_ANGLE_KEYS = [...WOLF_TURN_ANGLE_KEYS].sort((a, b) => a.deg - b.deg);
 
 export function wolfSpritePosition(index: number) {
-  return `${(index % 3) * 50}% ${Math.floor(index / 3) * 50}%`;
+  const x = WOLF_TURN_SPRITE_COLS <= 1 ? 0 : (index % WOLF_TURN_SPRITE_COLS) / (WOLF_TURN_SPRITE_COLS - 1) * 100;
+  const y = WOLF_TURN_SPRITE_ROWS <= 1 ? 0 : Math.floor(index / WOLF_TURN_SPRITE_COLS) / (WOLF_TURN_SPRITE_ROWS - 1) * 100;
+  return `${x}% ${y}%`;
 }
 
 /** Shortest signed arc from `fromDeg` to `toDeg`, in (-180, 180]. */
@@ -60,6 +65,50 @@ function nearestFrame(angle: number) {
   return best;
 }
 
+function frameFloatForAngle(angle: number) {
+  return 1 + ((angle + 90 + 360) % 360) / (360 / WOLF_TURN_RING_FRAME_COUNT);
+}
+
+function gazeAngle(dx: number, dy: number) {
+  return Math.atan2(dy, dx * GAZE_X_WEIGHT) * 180 / Math.PI;
+}
+
+export function pickWolfFrameFloat(
+  px: number,
+  py: number,
+  noseX: number,
+  noseY: number,
+  viewportWidth: number,
+  viewportHeight: number,
+) {
+  const dx = px - noseX;
+  const dy = py - noseY;
+  const shortSide = Math.min(viewportWidth, viewportHeight);
+  if (Math.hypot(dx, dy) < shortSide * WOLF_TURN_DEAD) return 0;
+  return frameFloatForAngle(gazeAngle(dx, dy));
+}
+
+export function wolfFrameBlend(frameFloat: number) {
+  if (frameFloat <= 0) return { a: 0, b: 0, bOpacity: 0 };
+  const ringValue = ((frameFloat - 1) % WOLF_TURN_RING_FRAME_COUNT + WOLF_TURN_RING_FRAME_COUNT) % WOLF_TURN_RING_FRAME_COUNT;
+  const lower = Math.floor(ringValue);
+  const bOpacity = ringValue - lower;
+  return {
+    a: lower + 1,
+    b: (lower + 1) % WOLF_TURN_RING_FRAME_COUNT + 1,
+    bOpacity,
+  };
+}
+
+export function easeWolfFrameFloat(current: number, target: number, factor = 0.26) {
+  if (target <= 0 || current <= 0) return current + (target - current) * factor;
+  const ring = WOLF_TURN_RING_FRAME_COUNT;
+  const from = current - 1;
+  const to = target - 1;
+  const delta = ((to - from + ring * 1.5) % ring) - ring / 2;
+  return 1 + ((from + delta * factor) % ring + ring) % ring;
+}
+
 export function pickWolfFrame(
   px: number,
   py: number,
@@ -72,7 +121,7 @@ export function pickWolfFrame(
   const dy = py - noseY;
   const shortSide = Math.min(viewportWidth, viewportHeight);
   if (Math.hypot(dx, dy) < shortSide * WOLF_TURN_DEAD) return 0;
-  const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+  const angle = gazeAngle(dx, dy);
   return nearestFrame(angle);
 }
 
@@ -94,12 +143,12 @@ export function pickWolfFrameHysteresis(input: {
 
   if (input.currentFrame === 0) {
     if (radius < leaveFront) return 0;
-    return nearestFrame(Math.atan2(dy, dx) * 180 / Math.PI);
+    return nearestFrame(gazeAngle(dx, dy));
   }
 
   if (radius < enterFront) return 0;
 
-  const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+  const angle = gazeAngle(dx, dy);
   const nearest = nearestFrame(angle);
   if (nearest === input.currentFrame) return input.currentFrame;
 
@@ -131,6 +180,18 @@ export function stepWolfDwell(state: WolfDwellState, target: number, now: number
     return { shown: target, shownAt: now, pending: null };
   }
   return { shown: state.shown, shownAt: state.shownAt, pending: target };
+}
+
+export function nextWolfFrameToward(current: number, target: number) {
+  if (current === target) return current;
+  if (current === 0 || target === 0) return target;
+  const ring = WOLF_TURN_FRAME_COUNT - 1;
+  const from = current - 1;
+  const to = target - 1;
+  const clockwise = (to - from + ring) % ring;
+  const counter = (from - to + ring) % ring;
+  if (clockwise <= counter) return (from + 1) % ring + 1;
+  return (from - 1 + ring) % ring + 1;
 }
 
 export function smoothPointer(

@@ -2,24 +2,25 @@
 
 import { useCallback, useEffect, useRef } from "react";
 import { useTranslations } from "next-intl";
-import { SixSeatMark } from "@/components/home/SixSeatMark";
+import { LocaleSwitcher } from "@/components/game/LocaleSwitcher";
 import { keyboardInset } from "@/components/home/oath-card";
 import {
   IDLE_RETURN_MS,
-  MIN_DWELL_MS,
-  WOLF_TURN_FRAME_COUNT,
   WOLF_TURN_NOSE,
-  pickWolfFrameHysteresis,
+  WOLF_TURN_SPRITE_COLS,
+  WOLF_TURN_SPRITE_ROWS,
+  easeWolfFrameFloat,
+  pickWolfFrameFloat,
   smoothPointer,
-  stepWolfDwell,
-  wolfSpritePosition,
+  wolfFrameBlend,
 } from "@/components/home/wolf-turn";
 import type { PublicQuota } from "@/lib/demo-game-client";
 import "./wolf-cover.css";
 
 const FRONT_SRC = "/cover/frame_front.webp";
 const SPRITE_SRC = "/cover/sprite.webp";
-const FRAME_INDEXES = Array.from({ length: WOLF_TURN_FRAME_COUNT }, (_, index) => index);
+const BACKGROUND_SRC = "/cover/background.png";
+const BACKGROUND_VIDEO_SRC = "/cover/background-loop.mp4";
 
 type DeviceOrientationEventConstructor = typeof DeviceOrientationEvent & {
   requestPermission?: () => Promise<"granted" | "denied" | "default">;
@@ -32,10 +33,11 @@ function clamp(value: number, min: number, max: number) {
 function useWolfTurn(stageRef: React.RefObject<HTMLDivElement | null>) {
   const pausedRef = useRef(false);
   const reducedRef = useRef(false);
-  const requestFrameRef = useRef<(frame: number) => void>(() => {});
+  const requestFrameRef = useRef<(frame: number, force?: boolean) => void>(() => {});
   const lookAtRef = useRef<(px: number, py: number) => void>(() => {});
   const lastPointRef = useRef<{ x: number; y: number } | null>(null);
   const gyroPointRef = useRef<{ x: number; y: number } | null>(null);
+  const sealGazeTimerRef = useRef<number | null>(null);
   const orientationCleanupRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
@@ -43,45 +45,80 @@ function useWolfTurn(stageRef: React.RefObject<HTMLDivElement | null>) {
     if (!stage) return;
     const media = window.matchMedia("(prefers-reduced-motion: reduce)");
     let disposed = false;
-    let current = 0;
-    let shownAt = performance.now() - MIN_DWELL_MS;
-    let pending: number | null = null;
-    let painted = false;
+    let currentFrameFloat = 0;
+    let targetFrameFloat = 0;
     let spriteReady = false;
-    let dwellTimer = 0;
+    let spriteImage: HTMLImageElement | null = null;
+    let animationFrame = 0;
     let idleTimer = 0;
+    let stageWidth = 0;
+    let stageHeight = 0;
     let wasHidden = document.visibilityState === "hidden";
     reducedRef.current = media.matches;
+    const canvas = stage.querySelector<HTMLCanvasElement>("[data-wolf-canvas]");
+    const ctx = canvas?.getContext("2d", { alpha: true });
 
     const nosePoint = () => {
       const rect = stage.getBoundingClientRect();
       return [rect.left + rect.width * WOLF_TURN_NOSE.x, rect.top + rect.height * WOLF_TURN_NOSE.y] as const;
     };
 
-    const paint = (frame: number) => {
-      const layers = stage.querySelectorAll<HTMLElement>("[data-wolf-frame]");
-      layers.forEach((layer, index) => {
-        layer.style.opacity = index === frame ? "1" : "0";
-      });
-      current = frame;
-      painted = true;
-      stage.dataset.frame = String(frame);
+    const syncCanvasSize = () => {
+      if (!canvas || !ctx) return false;
+      const rect = stage.getBoundingClientRect();
+      stageWidth = rect.width;
+      stageHeight = rect.height;
+      const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+      const width = Math.max(1, Math.round(rect.width * dpr));
+      const height = Math.max(1, Math.round(rect.height * dpr));
+      if (canvas.width !== width || canvas.height !== height) {
+        canvas.width = width;
+        canvas.height = height;
+      }
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
+      return true;
     };
 
-    const clearDwell = () => {
-      window.clearTimeout(dwellTimer);
-      dwellTimer = 0;
+    const drawFrame = (index: number, opacity: number) => {
+      if (!ctx || !canvas || !spriteImage || opacity <= 0) return;
+      const cellWidth = spriteImage.naturalWidth / WOLF_TURN_SPRITE_COLS;
+      const cellHeight = spriteImage.naturalHeight / WOLF_TURN_SPRITE_ROWS;
+      const sx = (index % WOLF_TURN_SPRITE_COLS) * cellWidth;
+      const sy = Math.floor(index / WOLF_TURN_SPRITE_COLS) * cellHeight;
+      ctx.globalAlpha = opacity;
+      ctx.drawImage(spriteImage, sx, sy, cellWidth, cellHeight, 0, 0, stageWidth, stageHeight);
+      ctx.globalAlpha = 1;
     };
 
-    const armDwell = () => {
-      clearDwell();
-      if (pending == null) return;
-      const delay = Math.max(0, shownAt + MIN_DWELL_MS - performance.now());
-      dwellTimer = window.setTimeout(() => {
-        dwellTimer = 0;
-        if (pending == null) return;
-        requestFrame(pending);
-      }, delay);
+    const paint = (frameFloat: number) => {
+      if (!ctx || !canvas || !spriteImage || !syncCanvasSize()) return;
+      const blend = wolfFrameBlend(frameFloat);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      if (blend.a === blend.b) {
+        drawFrame(blend.a, 1);
+      } else {
+        drawFrame(blend.a, 1 - blend.bOpacity);
+        drawFrame(blend.b, blend.bOpacity);
+      }
+      currentFrameFloat = frameFloat;
+      stage.dataset.frame = frameFloat.toFixed(2);
+    };
+
+    const stopAnimation = () => {
+      window.cancelAnimationFrame(animationFrame);
+      animationFrame = 0;
+    };
+
+    const animate = () => {
+      animationFrame = 0;
+      if (disposed || reducedRef.current || !spriteReady) return;
+      const next = easeWolfFrameFloat(currentFrameFloat, targetFrameFloat);
+      paint(Math.abs(next - targetFrameFloat) < 0.015 ? targetFrameFloat : next);
+      if (Math.abs(currentFrameFloat - targetFrameFloat) >= 0.015) {
+        animationFrame = window.requestAnimationFrame(animate);
+      }
     };
 
     const requestFrame = (frame: number, force = false) => {
@@ -90,22 +127,15 @@ function useWolfTurn(stageRef: React.RefObject<HTMLDivElement | null>) {
         stage.dataset.frame = "0";
         return;
       }
+      targetFrameFloat = frame;
       if (force) {
-        clearDwell();
-        pending = null;
         paint(frame);
-        shownAt = performance.now();
+        stopAnimation();
         return;
       }
-      const now = performance.now();
-      const next = stepWolfDwell({ shown: current, shownAt, pending }, frame, now);
-      const changed = next.shown !== current || !painted;
-      pending = next.pending;
-      shownAt = next.shownAt;
-      if (changed) paint(next.shown);
-      armDwell();
+      if (!animationFrame) animationFrame = window.requestAnimationFrame(animate);
     };
-    requestFrameRef.current = (frame) => requestFrame(frame);
+    requestFrameRef.current = (frame, force = false) => requestFrame(frame, force);
 
     const lookAt = (px: number, py: number) => {
       if (reducedRef.current) return;
@@ -114,15 +144,7 @@ function useWolfTurn(stageRef: React.RefObject<HTMLDivElement | null>) {
       lastPointRef.current = { x: px, y: py };
       if (pausedRef.current) return;
       const [noseX, noseY] = nosePoint();
-      const frame = pickWolfFrameHysteresis({
-        px,
-        py,
-        noseX,
-        noseY,
-        viewportWidth: window.innerWidth,
-        viewportHeight: window.innerHeight,
-        currentFrame: current,
-      });
+      const frame = pickWolfFrameFloat(px, py, noseX, noseY, window.innerWidth, window.innerHeight);
       requestFrame(frame);
     };
     lookAtRef.current = lookAt;
@@ -187,15 +209,7 @@ function useWolfTurn(stageRef: React.RefObject<HTMLDivElement | null>) {
       const py = (y + 1) / 2 * window.innerHeight;
       lastPointRef.current = { x: px, y: py };
       const [noseX, noseY] = nosePoint();
-      const frame = pickWolfFrameHysteresis({
-        px,
-        py,
-        noseX,
-        noseY,
-        viewportWidth: window.innerWidth,
-        viewportHeight: window.innerHeight,
-        currentFrame: 0,
-      });
+      const frame = pickWolfFrameFloat(px, py, noseX, noseY, window.innerWidth, window.innerHeight);
       requestFrame(frame, true);
       return true;
     };
@@ -203,17 +217,11 @@ function useWolfTurn(stageRef: React.RefObject<HTMLDivElement | null>) {
     let cancelSpriteIdle = () => {};
     let revealTimer = 0;
     const revealSprite = () => {
-      if (disposed || !spriteReady) return;
-      const layers = stage.querySelectorAll<HTMLElement>("[data-wolf-frame]");
-      layers.forEach((layer, index) => {
-        layer.style.backgroundImage = `url("${SPRITE_SRC}")`;
-        layer.style.backgroundPosition = wolfSpritePosition(index);
-      });
-      current = 0;
-      shownAt = performance.now() - MIN_DWELL_MS;
-      pending = null;
-      painted = false;
-      clearDwell();
+      if (disposed || !spriteReady || !spriteImage) return;
+      currentFrameFloat = 0;
+      targetFrameFloat = 0;
+      stopAnimation();
+      paint(0);
       if (!applyDebugLook()) {
         const last = lastPointRef.current;
         if (last && !pausedRef.current) lookAt(last.x, last.y);
@@ -227,8 +235,10 @@ function useWolfTurn(stageRef: React.RefObject<HTMLDivElement | null>) {
     const bootSprite = () => {
       if (disposed || reducedRef.current || spriteReady) return;
       const image = new Image();
+      image.decoding = "async";
       image.onload = () => {
         if (disposed || reducedRef.current) return;
+        spriteImage = image;
         spriteReady = true;
         revealSprite();
       };
@@ -266,10 +276,10 @@ function useWolfTurn(stageRef: React.RefObject<HTMLDivElement | null>) {
     const onReduce = () => {
       reducedRef.current = media.matches;
       if (!media.matches) return;
-      clearDwell();
+      stopAnimation();
       window.clearTimeout(idleTimer);
       idleTimer = 0;
-      pending = null;
+      targetFrameFloat = 0;
       if (spriteReady) paint(0);
       else stage.dataset.frame = "0";
       stage.dataset.sprite = "static";
@@ -279,11 +289,15 @@ function useWolfTurn(stageRef: React.RefObject<HTMLDivElement | null>) {
     return () => {
       disposed = true;
       cancelSpriteIdle();
-      clearDwell();
+      stopAnimation();
       window.clearTimeout(idleTimer);
       window.clearTimeout(revealTimer);
       requestFrameRef.current = () => {};
       lookAtRef.current = () => {};
+      if (sealGazeTimerRef.current !== null) {
+        window.clearTimeout(sealGazeTimerRef.current);
+        sealGazeTimerRef.current = null;
+      }
       media.removeEventListener("change", onReduce);
       window.removeEventListener("pointermove", onPointerMove);
       window.removeEventListener("touchstart", onTouchStart);
@@ -294,6 +308,7 @@ function useWolfTurn(stageRef: React.RefObject<HTMLDivElement | null>) {
       document.removeEventListener("visibilitychange", onVisibility);
       orientationCleanupRef.current?.();
       orientationCleanupRef.current = null;
+      if (ctx && canvas) ctx.clearRect(0, 0, canvas.width, canvas.height);
     };
   }, [stageRef]);
 
@@ -350,7 +365,31 @@ function useWolfTurn(stageRef: React.RefObject<HTMLDivElement | null>) {
     }
   }, [stageRef]);
 
-  return { enableOrientation, setGazePaused };
+  const triggerSealGaze = useCallback(() => {
+    const stage = stageRef.current;
+    if (!stage) return;
+    if (sealGazeTimerRef.current !== null) {
+      window.clearTimeout(sealGazeTimerRef.current);
+      sealGazeTimerRef.current = null;
+    }
+    pausedRef.current = true;
+    stage.dataset.gazePaused = "1";
+    // Align the glow only after painting the calibrated neutral sprite frame.
+    requestFrameRef.current(0, true);
+    delete stage.dataset.ritual;
+    void stage.offsetWidth;
+    stage.dataset.ritual = "seal";
+    sealGazeTimerRef.current = window.setTimeout(() => {
+      sealGazeTimerRef.current = null;
+      const currentStage = stageRef.current;
+      if (!currentStage) return;
+      delete currentStage.dataset.ritual;
+      pausedRef.current = false;
+      currentStage.dataset.gazePaused = "0";
+    }, 1200);
+  }, [stageRef]);
+
+  return { enableOrientation, setGazePaused, triggerSealGaze };
 }
 
 function CloseIcon() {
@@ -368,16 +407,9 @@ function CloseIcon() {
 }
 
 export function WolfCover({
-  name,
-  onNameChange,
-  quota,
-  sealDisabled,
-  sealHint,
   sealRef,
   rulesOpen,
-  onNameEnter,
   onSeal,
-  onOpenRules,
   onCloseRules,
 }: {
   name: string;
@@ -395,9 +427,13 @@ export function WolfCover({
   const t = useTranslations();
   const stageRef = useRef<HTMLDivElement>(null);
   const chromeRef = useRef<HTMLDivElement>(null);
-  const { enableOrientation, setGazePaused } = useWolfTurn(stageRef);
-  const quotaSpent = quota !== null && !quota.unlimited && quota.remaining <= 0;
-  const showQuota = quota !== null && !quota.unlimited;
+  const bgVideoRef = useRef<HTMLVideoElement>(null);
+  const startTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { enableOrientation, setGazePaused, triggerSealGaze } = useWolfTurn(stageRef);
+
+  useEffect(() => () => {
+    if (startTimerRef.current !== null) clearTimeout(startTimerRef.current);
+  }, []);
 
   useEffect(() => {
     const chrome = chromeRef.current;
@@ -432,87 +468,91 @@ export function WolfCover({
     return () => window.removeEventListener("keydown", onKey);
   }, [onCloseRules, rulesOpen]);
 
+  useEffect(() => {
+    const video = bgVideoRef.current;
+    if (!video) return;
+    video.volume = 0.28;
+    video.muted = true;
+    void video.play().catch(() => {
+      // Autoplay can be blocked; the first user gesture below retries playback.
+    });
+
+    const unlockAudio = () => {
+      video.muted = false;
+      video.volume = 0.28;
+      void video.play().catch(() => {
+        video.muted = true;
+      });
+      window.removeEventListener("pointerdown", unlockAudio);
+      window.removeEventListener("keydown", unlockAudio);
+      window.removeEventListener("touchstart", unlockAudio);
+    };
+
+    window.addEventListener("pointerdown", unlockAudio, { once: true });
+    window.addEventListener("keydown", unlockAudio, { once: true });
+    window.addEventListener("touchstart", unlockAudio, { once: true });
+    return () => {
+      window.removeEventListener("pointerdown", unlockAudio);
+      window.removeEventListener("keydown", unlockAudio);
+      window.removeEventListener("touchstart", unlockAudio);
+    };
+  }, []);
+
   const handleSeal = () => {
-    if (sealDisabled) return;
+    triggerSealGaze();
     enableOrientation();
-    onSeal();
+    if (startTimerRef.current !== null) clearTimeout(startTimerRef.current);
+    startTimerRef.current = setTimeout(() => {
+      startTimerRef.current = null;
+      onSeal();
+    }, 1200);
   };
 
   return (
     <section className="wolf-cover" aria-label="LAST HUMAN">
+      <div className="wolf-cover__language"><LocaleSwitcher /></div>
       <link rel="preload" as="image" href={FRONT_SRC} type="image/webp" fetchPriority="high" />
-      <div className="wolf-cover__bg" />
-      <div className="wolf-cover__moon" aria-hidden="true" />
+      <link rel="preload" as="image" href={SPRITE_SRC} type="image/webp" />
+      <link rel="preload" as="image" href={BACKGROUND_SRC} fetchPriority="high" />
+      <div className="wolf-cover__bg" aria-hidden="true">
+        <video
+          ref={bgVideoRef}
+          className="wolf-cover__bg-video"
+          poster={BACKGROUND_SRC}
+          autoPlay
+          muted
+          loop
+          playsInline
+          preload="auto"
+        >
+          <source src={BACKGROUND_VIDEO_SRC} type="video/mp4" />
+        </video>
+      </div>
+      <div className="wolf-cover__mist" aria-hidden="true" />
       <div className="wolf-cover__stage" ref={stageRef} data-wolf-art="" data-sprite="front" data-frame="0">
         <img
           className="wolf-cover__front"
           src={FRONT_SRC}
           alt={t("welcome.cover.imageAlt")}
-          width={640}
-          height={360}
+          width={900}
+          height={760}
           draggable={false}
           fetchPriority="high"
           decoding="async"
         />
-        {FRAME_INDEXES.map((index) => (
-          <div key={index} className="wolf-cover__frame" data-wolf-frame={index} />
-        ))}
+        <canvas className="wolf-cover__canvas" data-wolf-canvas="" aria-hidden="true" />
+        <div className="wolf-cover__eye-glow" aria-hidden="true" />
       </div>
       <div className="wolf-cover__fog" />
       <div className="wolf-cover__chrome" ref={chromeRef} data-wolf-chrome="">
-        <h1 className="wolf-cover__title">
-          LAST HUMAN
-          <span className="wolf-cover__line">{t("welcome.cover.line")}</span>
-          <span className="wolf-cover__only">{t("welcome.subtitle")}</span>
-        </h1>
-        <input
-          className="wolf-cover__sign"
-          value={name}
-          placeholder={t("welcome.signature.placeholder")}
-          aria-label={t("welcome.signature.label")}
-          autoComplete="off"
-          enterKeyHint="done"
-          onChange={(event) => onNameChange(event.target.value)}
-          onFocus={(event) => {
-            setGazePaused(true);
-            event.currentTarget.scrollIntoView({ block: "center", inline: "nearest" });
-          }}
-          onBlur={() => {
-            setGazePaused(false);
-          }}
-          onKeyDown={(event) => {
-            if (event.key !== "Enter" || event.nativeEvent.isComposing) return;
-            event.preventDefault();
-            onNameEnter();
-          }}
-        />
-        {showQuota && (
-          <p className="wolf-cover__quota">
-            {quotaSpent
-              ? t.rich("welcome.quotaSpent", {
-                  limit: quota.limit,
-                  b: (chunks) => <strong>{chunks}</strong>,
-                })
-              : t.rich("welcome.quotaRemaining", {
-                  count: quota.remaining,
-                  b: (chunks) => <strong>{chunks}</strong>,
-                })}
-          </p>
-        )}
         <button
           ref={sealRef}
           type="button"
-          className={`wolf-cover__seal${sealDisabled ? " is-muted" : ""}${sealHint ? " is-hint" : ""}`}
-          disabled={sealDisabled}
-          aria-disabled={sealDisabled}
-          aria-label={t("welcome.cover.sealLabel")}
+          className="wolf-cover__seal"
+          aria-label="Start"
           onClick={handleSeal}
         >
-          <SixSeatMark muted={sealDisabled} />
-        </button>
-        <div className="wolf-cover__seal-label">{t("welcome.cover.sealLabel")}</div>
-        <button type="button" className="wolf-cover__how" onClick={onOpenRules}>
-          {t("welcome.howToPlay.link")}
+          <img className="wolf-cover__seal-image" src="/cover/start-button.png" alt="" draggable={false} />
         </button>
       </div>
 

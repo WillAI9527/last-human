@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { PawPrint, Sparkle, Wrench, GearSix, UserCircle, GithubLogo, EnvelopeSimple, Handshake, DotsThreeOutlineVertical, Users, UsersFour } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
@@ -310,25 +311,11 @@ export function WelcomeScreen({
   const [isTransitioning, setIsTransitioning] = useState(false);
   const sealButtonRef = useRef<HTMLButtonElement | null>(null);
   const isStartingRef = useRef(false);
+  const router = useRouter();
+  const werewolfLaunchRef = useRef(false);
+  const startWerewolfRef = useRef<() => Promise<void>>(async () => {});
   const [isAuthOpen, setIsAuthOpen] = useState(false);
 
-  useEffect(() => {
-    let cancelled = false;
-    fetch("/api/check-config")
-      .then((response) => response.json())
-      .then((payload: { zenmuxConfigured?: boolean; message?: string | null }) => {
-        if (cancelled) return;
-        if (!payload.zenmuxConfigured) {
-          toast.error(payload.message || "服务器未配置，暂时无法开局。");
-        }
-      })
-      .catch(() => {
-        if (!cancelled) toast.error("服务器未配置，暂时无法开局。");
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
   const [isShareOpen, setIsShareOpen] = useState(false);
   const [isAccountOpen, setIsAccountOpen] = useState(false);
   const [isUserProfileOpen, setIsUserProfileOpen] = useState(false);
@@ -580,16 +567,6 @@ export function WelcomeScreen({
   useEffect(() => {
     setFixedRoles(buildDefaultRoles(playerCount));
   }, [playerCount]);
-
-  useEffect(() => {
-    let cancelled = false;
-    void fetchPublicQuota().then((quota) => {
-      if (!cancelled) setDailyQuota(quota);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   const roleConfigValid = useMemo(() => {
     if (fixedRoles.length !== playerCount) return false;
@@ -847,7 +824,7 @@ export function WelcomeScreen({
     }
   };
 
-  const handleConfirm = async () => {
+  const startWerewolfGame = async () => {
     if (sealDisabled) {
       return;
     }
@@ -892,6 +869,20 @@ export function WelcomeScreen({
 
     await startGameWithCreditGuard(PUBLIC_DEMO || demoModeActive);
   };
+
+  startWerewolfRef.current = startWerewolfGame;
+
+  const handleConfirm = () => {
+    if (sealDisabled || isStartingRef.current) return;
+    router.push(locale === "zh" ? "/zh/hall" : "/hall");
+  };
+
+  const werewolfModeRef = useRef(false);
+  useEffect(() => {
+    if (!mounted) return;
+    const url = new URL(window.location.href);
+    werewolfModeRef.current = url.searchParams.get("start") === "werewolf";
+  }, [mounted]);
 
   const handleOpenPayAsYouGo = () => {
     setUserProfileDefaultTab("payAsYouGo");
@@ -951,7 +942,13 @@ export function WelcomeScreen({
           sealRef={sealButtonRef}
           rulesOpen={rulesOpen}
           onNameEnter={pulseSeal}
-          onSeal={() => { void handleConfirm(); }}
+          onSeal={() => {
+            if (werewolfModeRef.current) {
+              void startWerewolfRef.current();
+              return;
+            }
+            router.push(locale === "zh" ? "/zh/hall" : "/hall");
+          }}
           onOpenRules={() => setRulesOpen(true)}
           onCloseRules={() => setRulesOpen(false)}
         />
@@ -1431,13 +1428,6 @@ export function WelcomeScreen({
 
       {showDevTools && (
         <>
-          <DevModeButton
-            onClick={() => {
-              setIsDevModeEnabled(true);
-              setIsDevConsoleOpen(true);
-            }}
-          />
-
           <AnimatePresence>
             {isDevConsoleOpen && (
               <motion.div
