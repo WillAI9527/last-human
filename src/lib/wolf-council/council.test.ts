@@ -62,10 +62,20 @@ test("investment and legal replies carry a reference disclaimer, and Claude show
     assert.equal(consult.disclaimer, boardReference(invest, locale));
     const study = replyNotices(WOLVES.study, legal, locale);
     assert.equal(study.disclaimer, boardReference(legal, locale));
-    const claude = replyNotices(WOLVES.health, invest, locale);
+    const calm = replyNotices(WOLVES.health, invest, locale, locale === "zh" ? "怎么开始存钱" : "How do I start saving");
+    assert.equal(calm.crisis, "");
+    const claude = replyNotices(WOLVES.health, invest, locale, locale === "zh" ? "我不想活了" : "I want to die");
     assert.match(claude.crisis, /1767/);
     assert.match(claude.crisis, /995/);
     assert.match(claude.crisis, /SOS/);
+    const social = BOARDS.find((board) => board.id === "social");
+    assert.ok(social);
+    const socialInvest = replyNotices(WOLVES.invest, social, locale, locale === "zh" ? "怎么涨粉" : "How do I grow an account");
+    assert.equal(socialInvest.disclaimer, "");
+    assert.equal(socialInvest.crisis, "");
+    const socialHealth = replyNotices(WOLVES.health, social, locale, locale === "zh" ? "怎么涨粉" : "How do I grow an account");
+    assert.equal(socialHealth.disclaimer, "");
+    assert.equal(socialHealth.crisis, "");
   }
   assert.match(WOLVES.invest.disclaimer.zh, /投资/);
   assert.match(WOLVES.law.disclaimer.en, /legal/i);
@@ -108,6 +118,7 @@ test("Chinese screens stay Chinese and English screens stay English", () => {
 
 test("the council screen calls the review route and keeps model-name labels", () => {
   const source = readFileSync("src/components/wolf-council/CouncilRoom.tsx", "utf8");
+  assert.match(source, /boardId: board\.id/);
   assert.match(source, /\/api\/council-turn/);
   assert.doesNotMatch(source, /\/api\/chat|ZENMUX|API_KEY/);
   assert.match(source, /demoFail/);

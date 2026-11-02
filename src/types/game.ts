@@ -304,7 +304,7 @@ export const MODEL_IDS = {
     geminiFlashLite: "google/gemini-3.5-flash-lite",
     geminiFlashPreview: "google/gemini-3-flash-preview",
     deepseek: "deepseek/deepseek-v3.2",
-    gpt52Chat: "openai/gpt-5.2-chat",
+    gpt52Chat: "openai/gpt-5.2",
     claudeHaiku45: "anthropic/claude-haiku-4.5",
     claudeSonnet45: "anthropic/claude-sonnet-4.5",
     claudeOpus45: "anthropic/claude-opus-4.5",

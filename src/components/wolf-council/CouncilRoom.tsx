@@ -173,6 +173,7 @@ export function CouncilRoom({ boardId }: { boardId: string }) {
             previousWolfAnswer: previous,
             mode: "debate",
             locale,
+            boardId: board.id,
             demo: board.id === "social" && demoFail ? "fail" : undefined,
           }),
           signal: controller.signal,
@@ -189,7 +190,7 @@ export function CouncilRoom({ boardId }: { boardId: string }) {
       }
       if (!alive.current) return;
       if (!spoken || !review) {
-        const fallback = clientSample(wolves[seat].id, locale, board.id === "social" && demoFail);
+        const fallback = clientSample(wolves[seat].id, locale, board.id === "social" && demoFail, board.id);
         spoken = fallback.final;
         review = fallback.review;
       }
@@ -354,7 +355,7 @@ export function CouncilRoom({ boardId }: { boardId: string }) {
       {phase === "setup" ? null : (
       <div className="wh-chat" ref={chatRef} role="log" aria-live="polite">
         {log.map((entry, index) => (
-          <Message key={index} entry={entry} wolves={wolves} board={board} copy={copy} locale={locale} />
+          <Message key={index} entry={entry} wolves={wolves} board={board} copy={copy} locale={locale} question={question} />
         ))}
       </div>
       )}
@@ -530,12 +531,14 @@ function Message({
   board,
   copy,
   locale,
+  question,
 }: {
   entry: LogEntry;
   wolves: Wolf[];
   board: Board;
   copy: HallCopy;
   locale: "zh" | "en";
+  question: string;
 }) {
   if (entry.type === "sys") {
     const template = copy[entry.key];
@@ -546,7 +549,7 @@ function Message({
   }
   const wolf = wolves[entry.seat];
   const previous = entry.prev >= 0 ? wolves[entry.prev]?.modelLabel ?? null : null;
-  const notices = replyNotices(wolf, board, locale);
+  const notices = replyNotices(wolf, board, locale, question);
   return (
     <div className="wh-msg">
       <img src={wolf.avatar} alt="" width={40} height={48} style={{ width: 40, height: 48, objectFit: "cover", borderRadius: 20 }} />

@@ -6,7 +6,7 @@ if (!process.env.WOLVES_PATH) {
   process.env.WOLVES_PATH = path.join(__dirname, 'wolves.json');
 }
 
-const { councilTurn, codeChecks, getWolf, loadWolves } = require('./review.js');
+const { councilTurn, codeChecks, getWolf, loadWolves, boardDisclaimer } = require('./review.js');
 
 const CHECK_NAMES = {
   zh: {
@@ -72,9 +72,9 @@ function pageQuestion(question, locale) {
   return `请只用中文回答。\n\n${text}`;
 }
 
-function sampleBody(locale, wolf) {
+function sampleBody(locale, boardId) {
   const pack = lines[locale];
-  const disc = locale === 'en' ? (wolf.disclaimerEn || '') : (wolf.disclaimer || '');
+  const disc = boardDisclaimer(boardId, locale);
   const vote = disc ? `${pack.line3}${locale === 'en' ? ` (${disc})` : `（${disc}）`}` : pack.line3;
   return [pack.line1, pack.line2, vote].join('\n');
 }
@@ -85,16 +85,16 @@ function fixedCount(originalChecks, finalChecks) {
   return failed.filter((id) => passed.has(id)).length;
 }
 
-function sampleTurn({ wolfId, question, locale, demo }) {
+function sampleTurn({ wolfId, question, locale, demo, boardId }) {
   loadWolves();
   const loc = localeOf(locale);
   const wolf = getWolf(wolfId);
   const asked = pageQuestion(question || (loc === 'en' ? 'What should I do next?' : '下一步该怎么做？'), loc);
-  const final = sampleBody(loc, wolf);
+  const final = sampleBody(loc, boardId);
   const isDemo = demo === 'fail' || demo === true;
   const original = isDemo ? lines[loc].bad : final;
-  const originalChecks = codeChecks({ wolf, question: asked, answer: original, mode: 'debate' });
-  const finalChecks = codeChecks({ wolf, question: asked, answer: final, mode: 'debate' });
+  const originalChecks = codeChecks({ wolf, question: asked, answer: original, mode: 'debate', boardId });
+  const finalChecks = codeChecks({ wolf, question: asked, answer: final, mode: 'debate', boardId });
   const originalPassed = originalChecks.every((check) => check.pass);
   const passed = finalChecks.every((check) => check.pass);
   return {
@@ -147,7 +147,7 @@ async function runTurn(input) {
   const loc = localeOf(input.locale);
   const demo = input.demo === 'fail' || input.demo === true ? 'fail' : undefined;
   const key = (process.env.ZENMUX_API_KEY || '').trim();
-  if (!key) return sampleTurn({ ...input, locale: loc, demo });
+  if (!key)     return sampleTurn({ ...input, locale: loc, demo, boardId: input.boardId });
   try {
     const out = await councilTurn({
       wolfId: input.wolfId,
@@ -156,10 +156,12 @@ async function runTurn(input) {
       mode: input.mode === 'single' ? 'single' : 'debate',
       demo,
       history: input.history,
+      locale: loc,
+      boardId: input.boardId,
     });
     return decorate(out, loc);
   } catch {
-    return sampleTurn({ ...input, locale: loc, demo });
+    return sampleTurn({ ...input, locale: loc, demo, boardId: input.boardId });
   }
 }
 

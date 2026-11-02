@@ -1,13 +1,14 @@
-import { createRequire } from "node:module";
 import path from "node:path";
+import turn from "@/lib/wolf-council/review/turn.js";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
-const require = createRequire(import.meta.url);
-process.env.WOLVES_PATH ||= path.join(process.cwd(), "src/lib/wolf-council/review/wolves.json");
-const { runTurn } = require(path.join(process.cwd(), "src/lib/wolf-council/review/turn.js"));
+process.env.WOLVES_PATH = path.join(process.cwd(), "src/lib/wolf-council/review/wolves.json");
+const { runTurn } = turn;
+
+const BOARDS = new Set(["invest", "business", "legal", "learning", "social", "werewolf"]);
 
 export async function POST(request) {
   let body;
@@ -18,6 +19,7 @@ export async function POST(request) {
   }
   const question = typeof body?.question === "string" ? body.question.trim() : "";
   const wolfId = typeof body?.wolfId === "string" ? body.wolfId.trim() : "";
+  const boardId = typeof body?.boardId === "string" && BOARDS.has(body.boardId) ? body.boardId : "";
   if (!question || question.length > 4000 || !wolfId) {
     return Response.json({ error: "bad_request" }, { status: 400 });
   }
@@ -31,6 +33,7 @@ export async function POST(request) {
       mode: body.mode === "single" ? "single" : "debate",
       demo: demo ? "fail" : undefined,
       locale: body.locale === "en" ? "en" : "zh",
+      boardId,
       history: body.history,
     });
     return Response.json(result);

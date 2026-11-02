@@ -88,6 +88,48 @@ function discOf(wolf, language) {
   const raw = language === 'en' && wolf.disclaimerEn ? wolf.disclaimerEn : (wolf.disclaimer || '');
   return raw.replace(/[。.]$/, '');
 }
+function boardDisclaimer(boardId, language) {
+  if (boardId === 'invest') {
+    return language === 'en' ? 'For reference only. Not investment advice.' : '仅供参考，不构成投资建议';
+  }
+  if (boardId === 'legal') {
+    return language === 'en' ? 'For reference only. Not legal advice.' : '仅供参考，不构成法律意见';
+  }
+  return '';
+}
+function latinWords(text) { return /[A-Za-z]{3,}/.test(text || ''); }
+function zhField(primary, fallback) {
+  if (primary && !latinWords(primary)) return primary;
+  if (fallback && !latinWords(fallback)) return fallback;
+  return '';
+}
+function systemFor(wolf, locale, boardId) {
+  const language = locale === 'en' ? 'en' : 'zh';
+  const disc = boardDisclaimer(boardId, language);
+  if (language === 'zh') {
+    const catchphrase = zhField(wolf.catchphraseZh, wolf.catchphrase) || '先把事实摆齐。';
+    const tagline = zhField(wolf.taglineZh, wolf.tagline);
+    const style = zhField(wolf.decisionStyleZh, wolf.decisionStyle);
+    const personality = Array.isArray(wolf.personality)
+      ? wolf.personality.filter((item) => item && !latinWords(item)).join('，')
+      : '';
+    return [
+      `你是${wolf.name}。`,
+      tagline,
+      personality ? `性格：${personality}。` : '',
+      style ? `决策方式：${style}` : '',
+      `口头禅：「${catchphrase}」，最多用一次。`,
+      '这是群聊。只写三行，总共不超过一百二十个字。第一行回应上一席或话题，第二行说你的观点，第三行以「投票：」开头，只能是支持、反对或有条件支持，再加一句理由。',
+      disc ? `第三行末尾附上（${disc}）。除此之外不要再写免责声明。` : '不要写投资建议、法律意见或医疗建议的免责声明。',
+      '只有用户问题里出现危机信号时，才写出求助热线。',
+      '只用简体中文，不要写英文句子。',
+    ].filter(Boolean).join('\n');
+  }
+  const extra = disc
+    ? `\n\nThis board requires this exact disclaimer at the end of the vote line: (${disc}). Do not add any other disclaimer.`
+    : '\n\nThis board forbids investment, legal, and medical disclaimers. Mention a hotline only when the user describes a crisis. Reply in English only.';
+  return `${wolf.systemPrompt || ''}${extra}`;
+}
 function say(language, zh, en) { return language === 'en' ? en : zh; }
 function stripDisclaimer(text, disc) {
   if (!disc) return text;
@@ -102,10 +144,11 @@ function countChars(text, disc, language = 'zh') {
 }
 function isCrisis(q) { return CRISIS_RE.test(q || ''); }
 
-function codeChecks({ wolf, question, answer, mode, history }) {
+function codeChecks({ wolf, question, answer, mode, history, boardId }) {
   const checks = [];
   const ql0 = lang(question);
-  const disc = discOf(wolf, ql0);
+  const boardDisc = boardDisclaimer(boardId, ql0).replace(/[。.]$/, '');
+  const disc = boardId ? boardDisc : discOf(wolf, ql0);
   const debate = mode === 'debate';
   const n = countChars(answer, disc, ql0);
   checks.push(debate
@@ -124,7 +167,8 @@ function codeChecks({ wolf, question, answer, mode, history }) {
       : (pass ? say(ql0, '投票和理由都在', 'The vote and a reason are both present') : say(ql0, '有投票但缺少一句理由', 'The vote is missing a one-line reason'));
     checks.push({ id: 'vote', name: say(ql0, '结尾投票和理由', 'Closing vote and reason'), pass, reason, by: 'code' });
   } else checks.push({ id: 'vote', name: say(ql0, '结尾投票和理由', 'Closing vote and reason'), pass: true, skipped: true, reason: say(ql0, '单聊不需要投票', 'A single chat does not need a vote'), by: 'code' });
-  if (['invest', 'law', 'health'].includes(wolf.id) && disc) {
+  const needsDisc = boardId ? Boolean(boardDisc) : (['invest', 'law', 'health'].includes(wolf.id) && Boolean(disc));
+  if (needsDisc && disc) {
     const pass = answer.includes(disc);
     checks.push({ id: 'disclaimer', name: say(ql0, '免责声明', 'Disclaimer'), pass, reason: pass ? say(ql0, '已包含免责声明', 'The disclaimer is present') : say(ql0, '缺少免责声明', 'The disclaimer is missing'), by: 'code' });
   } else checks.push({ id: 'disclaimer', name: say(ql0, '免责声明', 'Disclaimer'), pass: true, skipped: true, reason: say(ql0, '这一席不需要免责声明', 'This seat needs no disclaimer'), by: 'code' });
@@ -179,11 +223,11 @@ async function aiChecks({ wolf, question, answer, previousWolfAnswer, mode, hist
 }
 
 const ORDER = ['length', 'responds', 'vote', 'disclaimer', 'crisis', 'fabrication', 'trained', 'identity', 'language'];
-async function review({ wolfId, question, answer, previousWolfAnswer, mode = 'debate', history }) {
+async function review({ wolfId, question, answer, previousWolfAnswer, mode = 'debate', history, boardId }) {
   const wolf = getWolf(wolfId);
   const t0 = Date.now();
   const [code, ai] = await Promise.all([
-    Promise.resolve(codeChecks({ wolf, question, answer, mode, history })),
+    Promise.resolve(codeChecks({ wolf, question, answer, mode, history, boardId })),
     aiChecks({ wolf, question, answer, previousWolfAnswer, mode, history }),
   ]);
   const checks = [...code, ...ai].sort((a, b) => ORDER.indexOf(a.id) - ORDER.indexOf(b.id));
@@ -191,59 +235,65 @@ async function review({ wolfId, question, answer, previousWolfAnswer, mode = 'de
 }
 
 // ---------- generation + fix ----------
-function turnPrompt(wolf, question, previousWolfAnswer, mode) {
+function turnPrompt(wolf, question, previousWolfAnswer, mode, boardId) {
   if (mode !== 'debate') return question;
   if (lang(question) === 'en') {
     const p = previousWolfAnswer && previousWolfAnswer.trim() ? `Previous wolf said:\n${previousWolfAnswer}` : '(You speak first.)';
-    const disc = discOf(wolf, 'en');
-    const tail = disc ? ` End the vote line with (${disc}).` : '';
+    const disc = boardDisclaimer(boardId, 'en');
+    const tail = disc ? ` End the vote line with (${disc}).` : ' Do not add an investment, legal, or medical disclaimer.';
     return `[Wolf Council round table] Topic: ${question}\n\n${p}\n\nNow it is your turn (${wolf.nameEn || wolf.name}). Follow the group-chat rules: at most 120 English words, respond to the previous wolf, last line is your Vote with a one-sentence reason. Reply in English only.${tail}`;
   }
   const prev = previousWolfAnswer && previousWolfAnswer.trim() ? `上一只狼的发言：\n${previousWolfAnswer}` : '（你是第一个发言的）';
-  return `【狼群圆桌群聊】话题：${question}\n\n${prev}\n\n现在轮到你（${wolf.name}）发言。遵守群聊规则：不超过120字，回应上一只狼的观点，最后一行投票并给一句理由。`;
+  const disc = boardDisclaimer(boardId, 'zh');
+  const tail = disc ? `第三行末尾附上（${disc}）。` : '不要附加投资、法律或医疗免责声明。';
+  return `【狼群圆桌群聊】话题：${question}\n\n${prev}\n\n现在轮到你（${wolf.name}）发言。遵守群聊规则：不超过120字，回应上一只狼的观点，最后一行投票并给一句理由。只用中文。${tail}`;
 }
-async function generate(wolf, question, previousWolfAnswer, mode, history) {
-  return chat(wolf.model, [{ role: 'system', content: wolf.systemPrompt }, ...normHistory(history), { role: 'user', content: turnPrompt(wolf, question, previousWolfAnswer, mode) }], { maxTokens: 1500 });
+async function generate(wolf, question, previousWolfAnswer, mode, history, ctx = {}) {
+  const locale = ctx.locale || (lang(question) === 'en' ? 'en' : 'zh');
+  return chat(wolf.model, [{ role: 'system', content: systemFor(wolf, locale, ctx.boardId) }, ...normHistory(history), { role: 'user', content: turnPrompt(wolf, question, previousWolfAnswer, mode, ctx.boardId) }], { maxTokens: 1500 });
 }
 // DEMO ONLY: deliberately sloppy draft so the catch-and-fix is visible on stage.
 async function generateSloppy(wolf, question, mode, history) {
   const sys = `DEMO FAIL MODE. You are a hype-y, over-confident chat buddy. Answer the user in their language in 5-7 casual run-on sentences, AT LEAST 160 Chinese characters (or 120 English words). Be enthusiastic, give a confident specific made-up number (e.g. an exact historical annual return percentage or a future price target) as if it were fact. Do NOT add any disclaimer, do NOT mention hotlines, do NOT add a vote line, ignore any length limit.`;
   return chat(wolf.model, [{ role: 'system', content: sys }, ...normHistory(history), { role: 'user', content: question }], { maxTokens: 800 });
 }
-async function fix(wolf, { question, answer, previousWolfAnswer, mode, failed, history }) {
-  const en = lang(question) === 'en';
-  const disc = discOf(wolf, en ? 'en' : 'zh');
+async function fix(wolf, { question, answer, previousWolfAnswer, mode, failed, history, locale, boardId }) {
+  const en = (locale || (lang(question) === 'en' ? 'en' : 'zh')) === 'en';
+  const disc = boardDisclaimer(boardId, en ? 'en' : 'zh').replace(/[。.]$/, '');
   const rules = [
     mode === 'debate' && `Total length ≤${en ? '120 English words' : '120 Chinese characters'} (disclaimer not counted). Use the exact 3-line group-chat format from your system prompt, one line each, separated by line breaks.`,
     mode === 'debate' && previousWolfAnswer && `Line 1 must name and respond to the previous wolf's point.`,
     mode === 'debate' && (en
       ? `The LAST line, on its own line, must be: Vote: <support/oppose/conditional support> — <one-sentence reason>${disc ? ` (${disc})` : ''}`
       : `The LAST line, on its own line, must be: 投票：<支持/反对/有条件支持> —— <one-sentence reason>${disc ? `（${disc}）` : ''}`),
-    disc && ['invest', 'law', 'health'].includes(wolf.id) && `Must contain the exact disclaimer text: ${disc}`,
+    disc && `Must contain the exact disclaimer text: ${disc}`,
+    !disc && 'Do not add an investment, legal, or medical disclaimer.',
     (isCrisis(question) || isCrisis(historyUserText(history))) && `Crisis signal detected: must tell them to call SOS 1767 (24h) or 995 for emergencies, and reach a trusted person now.`,
     `Do not state any specific number/price/percentage/return/date not given by the user; remove it or mark it 【待核实】.`,
     `Never say you were trained; no real-person names.`,
     `Reply in the user's language.`,
   ].filter(Boolean);
-  const user = `${turnPrompt(wolf, question, previousWolfAnswer, mode)}\n\n---\nYour previous draft was rejected by the reviewer wolf:\n"""${answer}"""\n\nViolations:\n${failed.map(c => `- [${c.name}] ${c.reason}`).join('\n')}\n\nRewrite the reply so it fixes ALL violations while keeping your persona. Hard rules:\n${rules.map(r => '- ' + r).join('\n')}\n\nOutput ONLY the rewritten reply, nothing else.`;
-  return chat(wolf.model, [{ role: 'system', content: wolf.systemPrompt }, ...normHistory(history), { role: 'user', content: user }], { maxTokens: 1500, temperature: 0.4 });
+  const user = `${turnPrompt(wolf, question, previousWolfAnswer, mode, boardId)}\n\n---\nYour previous draft was rejected by the reviewer wolf:\n"""${answer}"""\n\nViolations:\n${failed.map(c => `- [${c.name}] ${c.reason}`).join('\n')}\n\nRewrite the reply so it fixes ALL violations while keeping your persona. Hard rules:\n${rules.map(r => '- ' + r).join('\n')}\n\nOutput ONLY the rewritten reply, nothing else.`;
+  const language = en ? 'en' : 'zh';
+  return chat(wolf.model, [{ role: 'system', content: systemFor(wolf, language, boardId) }, ...normHistory(history), { role: 'user', content: user }], { maxTokens: 1500, temperature: 0.4 });
 }
 
-async function councilTurn({ wolfId, question, previousWolfAnswer, mode, demo, history }) {
+async function councilTurn({ wolfId, question, previousWolfAnswer, mode, demo, history, locale, boardId }) {
   history = normHistory(history);
   const wolf = getWolf(wolfId);
   mode = mode || 'debate';
+  const ctx = { locale: locale || (lang(question) === 'en' ? 'en' : 'zh'), boardId };
   const T = { start: Date.now() };
   const isDemo = demo === 'fail' || demo === true;
-  const original = isDemo ? await generateSloppy(wolf, question, mode, history) : await generate(wolf, question, previousWolfAnswer, mode, history);
+  const original = isDemo ? await generateSloppy(wolf, question, mode, history) : await generate(wolf, question, previousWolfAnswer, mode, history, ctx);
   T.generateMs = Date.now() - T.start;
-  let r = await review({ wolfId, question, answer: original, previousWolfAnswer, mode, history });
+  let r = await review({ wolfId, question, answer: original, previousWolfAnswer, mode, history, boardId });
   const steps = [{ attempt: 0, answer: original, checks: r.checks, passed: r.passed }];
   let cur = original, attempts = 0;
   while (!r.passed && attempts < MAX_RETRIES) {
     attempts++;
-    cur = await fix(wolf, { question, answer: cur, previousWolfAnswer, mode, history, failed: r.checks.filter(c => !c.pass) });
-    r = await review({ wolfId, question, answer: cur, previousWolfAnswer, mode, history });
+    cur = await fix(wolf, { question, answer: cur, previousWolfAnswer, mode, history, locale: ctx.locale, boardId, failed: r.checks.filter(c => !c.pass) });
+    r = await review({ wolfId, question, answer: cur, previousWolfAnswer, mode, history, boardId });
     steps.push({ attempt: attempts, answer: cur, checks: r.checks, passed: r.passed });
   }
   return {
@@ -265,7 +315,7 @@ async function reviewAndFix(args) {
   let cur = args.answer, r = out; const history = [];
   while (!r.passed && out.attempts < MAX_RETRIES) {
     out.attempts++;
-    cur = await fix(wolf, { question: args.question, answer: cur, previousWolfAnswer: args.previousWolfAnswer, history: args.history, mode, failed: r.checks.filter(c => !c.pass) });
+    cur = await fix(wolf, { question: args.question, answer: cur, previousWolfAnswer: args.previousWolfAnswer, history: args.history, mode, locale: args.locale, boardId: args.boardId, failed: r.checks.filter(c => !c.pass) });
     r = await review({ ...args, answer: cur, mode });
     history.push({ attempt: out.attempts, answer: cur, checks: r.checks, passed: r.passed });
   }
@@ -273,4 +323,4 @@ async function reviewAndFix(args) {
   return out;
 }
 
-module.exports = { normHistory, reviewAndFix, review, councilTurn, codeChecks, aiChecks, isCrisis, countChars, loadWolves, getWolf, chat };
+module.exports = { normHistory, reviewAndFix, review, councilTurn, codeChecks, aiChecks, isCrisis, countChars, loadWolves, getWolf, chat, systemFor, boardDisclaimer };

@@ -1,16 +1,14 @@
 import type { AppLocale } from "@/i18n/config";
 import lines from "./sample-lines.json";
 
-const DISCLAIMER: Record<AppLocale, Record<string, string>> = {
+const BOARD_DISCLAIMER: Record<AppLocale, Record<string, string>> = {
   zh: {
     invest: "仅供参考，不构成投资建议",
-    law: "仅供参考，不构成法律意见",
-    health: "仅供参考，不构成医疗或心理专业建议",
+    legal: "仅供参考，不构成法律意见",
   },
   en: {
     invest: "For reference only. Not investment advice.",
-    law: "For reference only. Not legal advice.",
-    health: "For reference only. Not medical or psychological advice.",
+    legal: "For reference only. Not legal advice.",
   },
 };
 
@@ -25,9 +23,9 @@ export type ClientReview = {
   checks: Array<{ id: string; name: string; pass: boolean; skipped?: boolean; reason: string }>;
 };
 
-export function clientSample(wolfId: string, locale: AppLocale, demo: boolean): { final: string; review: ClientReview } {
+export function clientSample(_wolfId: string, locale: AppLocale, demo: boolean, boardId = ""): { final: string; review: ClientReview } {
   const pack = lines[locale];
-  const disc = DISCLAIMER[locale][wolfId] || "";
+  const disc = BOARD_DISCLAIMER[locale][boardId] || "";
   const vote = disc ? `${pack.line3}${locale === "en" ? ` (${disc})` : `（${disc}）`}` : pack.line3;
   const final = [pack.line1, pack.line2, vote].join("\n");
   return {

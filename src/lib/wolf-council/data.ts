@@ -137,9 +137,20 @@ export function boardReference(board: Board, locale: AppLocale): string {
   return "";
 }
 
-export function replyNotices(wolf: Wolf, board: Board, locale: AppLocale): { disclaimer: string; crisis: string } {
+const CRISIS_RE = /自杀|轻生|自残|自伤|不想活|活不下去|想死|寻死|结束生命|结束这一切|结束自己|活着没(什么|啥)?意思|割腕|跳楼|suicid|kill myself|end my life|self[- ]?harm|want to die/i;
+
+export function isCrisisQuestion(question: string): boolean {
+  return CRISIS_RE.test(question || "");
+}
+
+export function replyNotices(
+  wolf: Wolf,
+  board: Board,
+  locale: AppLocale,
+  question = "",
+): { disclaimer: string; crisis: string } {
   return {
-    disclaimer: wolf.disclaimer[locale] || boardReference(board, locale),
-    crisis: wolf.crisis[locale],
+    disclaimer: boardReference(board, locale),
+    crisis: isCrisisQuestion(question) ? wolf.crisis[locale] : "",
   };
 }
